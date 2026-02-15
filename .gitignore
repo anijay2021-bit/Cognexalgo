@@ -1,0 +1,20 @@
+# Visual Studio / .NET Core
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build Results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# Packages
+/packages/
+/bin/
+/obj/
+.vs/
+.idea/
+.vscode/

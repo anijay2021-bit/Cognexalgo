@@ -1,0 +1,5 @@
+# Ignore actual credentials
+appsettings.json
+
+# Keep template
+!appsettings.template.json

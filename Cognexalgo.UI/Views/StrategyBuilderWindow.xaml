@@ -1,0 +1,764 @@
+<Window x:Class="Cognexalgo.UI.Views.StrategyBuilderWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="Strategy Builder" Height="800" Width="900" ResizeMode="CanResize"
+        Background="#F5F5F5"
+        WindowStartupLocation="CenterOwner">
+    
+    <Window.Resources>
+        <!-- Light Theme Overrides -->
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#007ACC"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#666666"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#E0E0E0"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#F5F5F5"/>
+
+        <!-- Text Styles -->
+        <Style TargetType="TextBlock" x:Key="HeaderTextStyle">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Gray" Opacity="0.2" BlurRadius="5" ShadowDepth="2"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TextBlock" x:Key="LabelTextStyle">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style TargetType="TextBlock" x:Key="SectionHeaderStyle">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+
+        <!-- Input Styles -->
+        <Style TargetType="TextBox" x:Key="DarkTextBoxStyle">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox" x:Key="DarkComboBoxStyle">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+        </Style>
+
+        <!-- Container Styles -->
+        <Style TargetType="Border" x:Key="CardBorderStyle">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" Opacity="0.05" BlurRadius="10" ShadowDepth="2"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Button Styles -->
+        <Style TargetType="Button" x:Key="PrimaryButtonStyle">
+            <Setter Property="Background" Value="#007ACC"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.9"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="Button" x:Key="SecondaryButtonStyle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCC"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EEE"/>
+                    <Setter Property="Foreground" Value="#333"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style TargetType="Button" x:Key="ActionPushButtonStyle" BasedOn="{StaticResource PrimaryButtonStyle}">
+             <Setter Property="FontSize" Value="12"/>
+             <Setter Property="Padding" Value="10,5"/>
+        </Style>
+
+        <!-- DataGrid Style -->
+        <Style TargetType="DataGrid" x:Key="DarkDataGridStyle">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#EEE"/>
+            <Setter Property="RowBackground" Value="#FFFFFF"/>
+            <Setter Property="AlternatingRowBackground" Value="#F9F9F9"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#EEE"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
+        
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F5F5F5"/>
+            <Setter Property="Foreground" Value="#555"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="#DDD"/>
+        </Style>
+        
+         <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Padding="{TemplateBinding Padding}" Background="Transparent">
+                             <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E6F7FF"/> <!-- Light Blue Selection -->
+                    <Setter Property="Foreground" Value="#000"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Text="CREATE NEW STRATEGY" Style="{StaticResource HeaderTextStyle}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+        <!-- Inputs -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="15" Margin="0,0,0,20">
+            <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                         <ColumnDefinition Width="2*"/>
+                         <ColumnDefinition Width="*"/>
+                         <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Margin="0,0,5,0">
+                         <TextBlock Text="Strategy Name" Style="{StaticResource LabelTextStyle}"/>
+                         <TextBox Text="{Binding StrategyName}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="5,0,5,0">
+                         <TextBlock Text="Strategy Type" Style="{StaticResource LabelTextStyle}"/>
+                         <ComboBox ItemsSource="{Binding StrategyTypes}" SelectedItem="{Binding SelectedStrategyType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="5,0,0,0">
+                         <TextBlock Text="Template" Style="{StaticResource LabelTextStyle}"/>
+                         <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+    
+                    <StackPanel Margin="0,0,5,0">
+                        <TextBlock Text="Symbol" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding Symbols}" SelectedItem="{Binding Symbol}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+    
+                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                        <TextBlock Text="Timeframe" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding Timeframes}" SelectedItem="{Binding Timeframe}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,15,0,0">
+                    <Grid.ColumnDefinitions>
+                         <ColumnDefinition Width="*"/>
+                         <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Margin="0,0,5,0">
+                         <TextBlock Text="Contract Expiry" Style="{StaticResource LabelTextStyle}"/>
+                         <ComboBox ItemsSource="{Binding ExpiryTypes}" SelectedItem="{Binding SelectedExpiryType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                         <TextBlock Text="Product Type" Style="{StaticResource LabelTextStyle}"/>
+                         <ComboBox ItemsSource="{Binding ProductTypes}" SelectedItem="{Binding SelectedProductType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Calendar Settings -->
+                <Grid Margin="0,15,0,0" Visibility="{Binding IsCalendarVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Configuration (Hybrid Straddle)" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,10"/>
+                    
+                    <Grid Grid.Row="1">
+                         <Grid.ColumnDefinitions>
+                             <ColumnDefinition Width="*"/>
+                             <ColumnDefinition Width="*"/>
+                             <ColumnDefinition Width="*"/>
+                         </Grid.ColumnDefinitions>
+                         <Grid.RowDefinitions>
+                             <RowDefinition Height="Auto"/>
+                             <RowDefinition Height="Auto"/>
+                             <RowDefinition Height="Auto"/>
+                         </Grid.RowDefinitions>
+
+                         <!-- Row 0 (New Fields) -->
+                         <StackPanel Margin="0,0,5,10">
+                             <TextBlock Text="Lot Size" Style="{StaticResource LabelTextStyle}"/>
+                             <TextBox Text="{Binding LotSize}" Style="{StaticResource DarkTextBoxStyle}"/>
+                         </StackPanel>
+
+                         <StackPanel Grid.Column="1" Margin="5,0,5,10">
+                             <TextBlock Text="Chart Type" Style="{StaticResource LabelTextStyle}"/>
+                             <ComboBox ItemsSource="{Binding ChartTypes}" SelectedItem="{Binding SelectedChartType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                         </StackPanel>
+                         
+                         <StackPanel Grid.Column="2" Margin="5,0,0,10">
+                             <TextBlock Text="Timeframe" Style="{StaticResource LabelTextStyle}"/>
+                             <!-- Reusing Timeframes collection for Candle Close Timeframe -->
+                             <ComboBox ItemsSource="{Binding Timeframes}" SelectedItem="{Binding Timeframe}" Style="{StaticResource DarkComboBoxStyle}"/>
+                         </StackPanel>
+
+                         <!-- Row 1 -->
+                         <StackPanel Grid.Row="1" Margin="0,0,5,10">
+                             <TextBlock Text="Start Day" Style="{StaticResource LabelTextStyle}"/>
+                             <ComboBox ItemsSource="{Binding DaysOfWeek}" SelectedItem="{Binding SelectedStartDay}" Style="{StaticResource DarkComboBoxStyle}"/>
+                         </StackPanel>
+                         
+                         <StackPanel Grid.Row="1" Grid.Column="1" Margin="5,0,5,10">
+                             <TextBlock Text="Start Time" Style="{StaticResource LabelTextStyle}"/>
+                             <TextBox Text="{Binding CalendarEntryTime}" Style="{StaticResource DarkTextBoxStyle}"/>
+                         </StackPanel>
+
+                         <StackPanel Grid.Row="1" Grid.Column="2" Margin="5,0,0,10">
+                             <TextBlock Text="Wkly Exit Time" Style="{StaticResource LabelTextStyle}"/>
+                             <TextBox Text="{Binding WeeklyExitTime}" Style="{StaticResource DarkTextBoxStyle}"/>
+                         </StackPanel>
+
+                         <!-- Row 2 -->
+                         <StackPanel Grid.Row="2" Margin="0,0,5,0">
+                             <TextBlock Text="Monthly Exit" Style="{StaticResource LabelTextStyle}"/>
+                             <TextBox Text="{Binding MonthlyExitTime}" Style="{StaticResource DarkTextBoxStyle}"/>
+                         </StackPanel>
+
+                         <StackPanel Grid.Row="2" Grid.Column="1" Margin="5,0,5,0">
+                             <TextBlock Text="Buy SL %" Style="{StaticResource LabelTextStyle}"/>
+                             <TextBox Text="{Binding BuyStopLossPercentage}" Style="{StaticResource DarkTextBoxStyle}"/>
+                         </StackPanel>
+                         
+                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="5,15,0,0" Orientation="Horizontal">
+                             <CheckBox IsChecked="{Binding UseCandleClose}" Content="Candle Close" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Scrollable Content Area -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <!-- Rules Section -->
+                <Grid Visibility="{Binding IsRuleBuilderVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,10">
+                        <Grid Margin="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Entry Conditions" Style="{StaticResource SectionHeaderStyle}"/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,5">
+                                 <TextBlock Text="Logic:" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,10,0"/>
+                                 <CheckBox IsChecked="{Binding IsMatchAllConditions}" Content="Match ALL Conditions (AND)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Rule Builder Inputs -->
+                            <Border Grid.Row="1" Background="#F9F9F9" BorderBrush="#EEE" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,10">
+                                <StackPanel>
+                                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <!-- LEFT -->
+                                        <ComboBox ItemsSource="{Binding IndicatorTypes}" 
+                                                  SelectedItem="{Binding SelectedIndicator}" Width="100" Margin="0,0,5,0" Style="{StaticResource DarkComboBoxStyle}"/>
+                                        <TextBox Text="{Binding LeftPeriod}" Width="40" Margin="0,0,5,0" Style="{StaticResource DarkTextBoxStyle}" ToolTip="Period"/>
+                                        
+                                        <!-- OP -->
+                                        <ComboBox ItemsSource="{Binding Comparators}" 
+                                                  SelectedItem="{Binding SelectedComparator}" Width="50" Margin="0,0,5,0" Style="{StaticResource DarkComboBoxStyle}"/>
+
+                                        <!-- SOURCE TYPE -->
+                                        <ComboBox ItemsSource="{Binding ValueSources}" 
+                                                  SelectedItem="{Binding SelectedSourceType}" Width="90" Margin="0,0,5,0" Style="{StaticResource DarkComboBoxStyle}"/>
+
+                                        <!-- RIGHT: STATIC -->
+                                        <TextBox Text="{Binding StaticValue}" Width="60">
+                                            <TextBox.Style>
+                                                <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBoxStyle}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedSourceType}" Value="StaticValue">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
+
+                                        <!-- RIGHT: INDICATOR -->
+                                        <StackPanel Orientation="Horizontal">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedSourceType}" Value="Indicator">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedSourceType}" Value="TrendFilter">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <ComboBox ItemsSource="{Binding IndicatorTypes}" 
+                                                      SelectedItem="{Binding SelectedRightIndicator}" Width="100" Margin="0,0,5,0" Style="{StaticResource DarkComboBoxStyle}"/>
+                                            <TextBox Text="{Binding RightPeriod}" Width="40" Style="{StaticResource DarkTextBoxStyle}" ToolTip="Period"/>
+                                        </StackPanel>
+                                    </WrapPanel>
+                                    
+                                    <WrapPanel Orientation="Horizontal">
+                                        <TextBlock Text="Then" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,5,0"/>
+                                        <ComboBox SelectedItem="{Binding Action}" Width="80" Margin="0,0,10,0" Style="{StaticResource DarkComboBoxStyle}">
+                                            <System:String xmlns:System="clr-namespace:System;assembly=mscorlib">BUY_CE</System:String>
+                                            <System:String xmlns:System="clr-namespace:System;assembly=mscorlib">BUY_PE</System:String>
+                                        </ComboBox>
+                                        <Button Content="ADD RULE" Command="{Binding AddEntryRuleCommand}" Style="{StaticResource ActionPushButtonStyle}" Width="80"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- List -->
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding EntryRules}" AutoGenerateColumns="False" 
+                                      CanUserAddRows="False"
+                                      Style="{StaticResource DarkDataGridStyle}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Logic" Binding="{Binding Description}" Width="*"/>
+                                    <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="80"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+        <!-- ========== HYBRID STRATEGY UI ========== -->
+        <Border Visibility="{Binding IsHybridVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/> <!-- NEW: Risk Management -->
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Strike Selection Mode Radio Buttons -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+                    <RadioButton Content="ATM Point" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ATMPoint}" 
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                    <RadioButton Content="ATM Percent" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ATMPercent}" 
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                    <RadioButton Content="Straddle Width" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=StraddleWidth}" 
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                    <RadioButton Content="Closest Premium (CP)" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ClosestPremium}" 
+                                 Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                </StackPanel>
+
+                <!-- Conditional Fields Based on Mode -->
+                <Grid Grid.Row="1" Margin="0,0,0,15">
+                    <!-- ATM Point Mode -->
+                    <StackPanel Visibility="{Binding IsATMPointMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="ATM Offset" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding ATMPointOptions}" SelectedItem="{Binding SelectedATMPoint}" 
+                                  Style="{StaticResource DarkComboBoxStyle}" Width="200" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <!-- ATM Percent Mode -->
+                    <StackPanel Visibility="{Binding IsATMPercentMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="ATM Percent Offset" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding ATMPercentOptions}" SelectedItem="{Binding SelectedATMPercent}" 
+                                  Style="{StaticResource DarkComboBoxStyle}" Width="200" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <!-- Straddle Width Mode -->
+                    <StackPanel Visibility="{Binding IsStraddleWidthMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="Straddle Multiplier" Style="{StaticResource LabelTextStyle}"/>
+                        <TextBox Text="{Binding StraddleMultiplier}" Style="{StaticResource DarkTextBoxStyle}" 
+                                 Width="200" HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <!-- Closest Premium Mode -->
+                    <Grid Visibility="{Binding IsClosestPremiumMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Operator" Style="{StaticResource LabelTextStyle}"/>
+                            <ComboBox ItemsSource="{Binding PremiumOperators}" SelectedItem="{Binding SelectedPremiumOperator}" 
+                                      Style="{StaticResource DarkComboBoxStyle}" Width="80"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock Text="Target Premium" Style="{StaticResource LabelTextStyle}"/>
+                            <TextBox Text="{Binding TargetPremiumValue}" Style="{StaticResource DarkTextBoxStyle}" Width="120"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
+                            <CheckBox Content="Wait for Match" IsChecked="{Binding WaitForMatch}" 
+                                      Foreground="{StaticResource TextBrush}" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- Common Fields -->
+                <Grid Grid.Row="2" Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Index" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding Indices}" SelectedItem="{Binding SelectedIndex}" 
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                        <TextBlock Text="Option Type" Style="{StaticResource LabelTextStyle}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Call" Command="{Binding SelectCallCommand}" 
+                                    Background="{Binding SelectedOptionType, Converter={StaticResource OptionTypeToColorConverter}, ConverterParameter=Call}"
+                                    Foreground="White" Padding="15,5" Margin="0,0,5,0"/>
+                            <Button Content="Put" Command="{Binding SelectPutCommand}"
+                                    Background="{Binding SelectedOptionType, Converter={StaticResource OptionTypeToColorConverter}, ConverterParameter=Put}"
+                                    Foreground="White" Padding="15,5"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="0,0,10,0">
+                        <TextBlock Text="Action" Style="{StaticResource LabelTextStyle}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Buy" Command="{Binding SelectBuyCommand}"
+                                    Background="{Binding SelectedAction, Converter={StaticResource ActionToColorConverter}, ConverterParameter=Buy}"
+                                    Foreground="White" Padding="15,5" Margin="0,0,5,0"/>
+                            <Button Content="Sell" Command="{Binding SelectSellCommand}"
+                                    Background="{Binding SelectedAction, Converter={StaticResource ActionToColorConverter}, ConverterParameter=Sell}"
+                                    Foreground="White" Padding="15,5"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Margin="0,0,10,0">
+                        <TextBlock Text="Total Lots" Style="{StaticResource LabelTextStyle}"/>
+                        <TextBox Text="{Binding TotalLots}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4" VerticalAlignment="Bottom">
+                        <Button Content="Add Position" Command="{Binding AddPositionCommand}" 
+                                Background="#00BCD4" Foreground="White" Padding="15,8" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Product Type and Expiry -->
+                <Grid Grid.Row="3" Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Product Type" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding ProductTypes}" SelectedItem="{Binding SelectedProductType}" 
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Expiry Type" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding ExpiryTypes}" SelectedItem="{Binding SelectedExpiryType}" 
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+
+                <!-- Positions List -->
+                <Border Grid.Row="5" BorderBrush="#EEE" BorderThickness="1" Background="#FAFAFA" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Positions" Foreground="{StaticResource PrimaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding HybridLegs}" AutoGenerateColumns="False" 
+                                  Background="#FFFFFF" Foreground="#333" BorderThickness="0" 
+                                  RowBackground="#FFFFFF" AlternatingRowBackground="#F9F9F9"
+                                  HeadersVisibility="Column" GridLinesVisibility="None" CanUserAddRows="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="120"/>
+                                <DataGridTextColumn Header="Strike" Binding="{Binding GetStrikeDisplay()}" Width="150"/>
+                                <DataGridTextColumn Header="Index" Binding="{Binding Index}" Width="100"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding OptionType}" Width="80"/>
+                                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="80"/>
+                                <DataGridTextColumn Header="Lots" Binding="{Binding TotalLots}" Width="60"/>
+                                <DataGridTextColumn Header="Product" Binding="{Binding ProductType}" Width="80"/>
+                                <DataGridTemplateColumn Header="Remove" Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="✕" Command="{Binding DataContext.RemovePositionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                    CommandParameter="{Binding}" Background="#D32F2F" Foreground="White" Padding="5,2"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+        <!-- ========== END HYBRID UI ========== -->
+
+        <!-- ========== RISK MANAGEMENT SECTION (All Strategies) ========== -->
+        <Border Style="{StaticResource CardBorderStyle}" Margin="0,20,0,0">
+            <StackPanel>
+                <TextBlock Text="Risk Management" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,15"/>
+
+                <!-- Target Settings -->
+                <TextBlock Text="Target / Take Profit" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Type" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <ComboBox ItemsSource="{Binding TargetTypes}" SelectedItem="{Binding SelectedTargetType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Value" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBox Text="{Binding TargetValue}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Stop Loss Settings -->
+                <TextBlock Text="Stop Loss" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Type" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <ComboBox ItemsSource="{Binding StopLossTypes}" SelectedItem="{Binding SelectedStopLossType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Value" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBox Text="{Binding StopLossValue}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ATR Settings -->
+                <TextBlock Text="ATR Settings" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Period" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBox Text="{Binding AtrPeriod}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Multiplier" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBox Text="{Binding AtrMultiplier}" Style="{StaticResource DarkTextBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Phase 1: Advanced Exit Features -->
+                <Border BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="0,15,0,0" Margin="0,10,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Advanced Exit Features" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,15"/>
+
+                        <!-- Trailing Stop Loss -->
+                        <CheckBox Content="Enable Trailing Stop Loss" IsChecked="{Binding EnableTrailingStop}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                        <Grid Margin="20,0,0,15" IsEnabled="{Binding EnableTrailingStop}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Trail Distance" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding TrailingStopDistance}" Style="{StaticResource DarkTextBoxStyle}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Use Percentage" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <CheckBox IsChecked="{Binding TrailingStopIsPercent}" Content="% (uncheck for points)" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Time-Based Exit -->
+                        <CheckBox Content="Enable Time-Based Exit" IsChecked="{Binding EnableTimeBasedExit}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                        <Grid Margin="20,0,0,15" IsEnabled="{Binding EnableTimeBasedExit}">
+                            <StackPanel>
+                                <TextBlock Text="Exit Time (HH:mm)" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding ExitTime}" Style="{StaticResource DarkTextBoxStyle}" Width="200" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Position will auto-exit at this time" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Breakeven Stop -->
+                        <CheckBox Content="Enable Breakeven Stop" IsChecked="{Binding EnableBreakevenStop}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                        <Grid Margin="20,0,0,15" IsEnabled="{Binding EnableBreakevenStop}">
+                            <StackPanel>
+                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding BreakevenTriggerPercent}" Style="{StaticResource DarkTextBoxStyle}" Width="200" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Stop loss will move to entry price when profit reaches this %" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Partial Exits -->
+                        <CheckBox Content="Enable Partial Exits" IsChecked="{Binding EnablePartialExits}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                        <StackPanel Margin="20,0,0,15" IsEnabled="{Binding EnablePartialExits}">
+                            <DataGrid ItemsSource="{Binding PartialExitLevels}" AutoGenerateColumns="False" CanUserAddRows="False" Style="{StaticResource DarkDataGridStyle}" Background="#2A2A2A" Foreground="White" BorderThickness="1" BorderBrush="#444">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Exit %" Binding="{Binding Percentage}" Width="*"/>
+                                    <DataGridTextColumn Header="Target %" Binding="{Binding TargetPercent}" Width="*"/>
+                                    <DataGridTemplateColumn Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="X" Command="{Binding DataContext.RemovePartialExitLevelCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButtonStyle}" Padding="5,2" Margin="2"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <Button Content="+ ADD EXIT LEVEL" Command="{Binding AddPartialExitLevelCommand}" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <!-- Profit Protection -->
+                        <CheckBox Content="Enable Profit Protection" IsChecked="{Binding EnableProfitProtection}" Margin="0,0,0,10" FontWeight="SemiBold"/>
+                        <Grid Margin="20,0,0,0" IsEnabled="{Binding EnableProfitProtection}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Protection %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding ProfitProtectionPercent}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="% of unrealized gain to lock" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding ProfitProtectionTrigger}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="Wait for this profit to activate" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+        <!-- ========== END RISK MANAGEMENT ========== -->
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="CANCEL" IsCancel="True" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0"/>
+            <Button Content="SAVE STRATEGY" Command="{Binding SaveStrategyCommand}" Style="{StaticResource PrimaryButtonStyle}" Width="150"/>
+        </StackPanel>
+    </Grid>
+</Window>

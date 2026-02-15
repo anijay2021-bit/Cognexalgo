@@ -1,0 +1,66 @@
+<Window x:Class="Cognexalgo.UI.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="Cognexalgo Login" Height="350" Width="400"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Background="#1E1E1E"
+        AllowsTransparency="True">
+
+    <Window.Resources>
+        <ResourceDictionary>
+             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/DarkTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border BorderBrush="#333" BorderThickness="1" CornerRadius="8">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <StackPanel HorizontalAlignment="Center" Margin="0,10,0,20">
+                <TextBlock Text="COGNEXALGO" FontSize="24" FontWeight="Bold" Foreground="#00C853" HorizontalAlignment="Center"/>
+                <TextBlock Text="ALGORITHMIC TRADING MACHINE" FontSize="10" Foreground="#888" HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Inputs -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                <TextBlock Text="LICENSE KEY" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}" 
+                         Style="{StaticResource DarkTextBoxStyle}" 
+                         Padding="10" FontSize="14"
+                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+                
+                <TextBlock Text="{Binding StatusMessage}" 
+                           Foreground="#FF5555" 
+                           FontSize="12" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,15,0,0"
+                           TextWrapping="Wrap"/>
+                
+                <ProgressBar IsIndeterminate="True" Height="2" Margin="0,10" 
+                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
+
+            <!-- Actions -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <Button Content="EXIT" Command="{Binding ExitCommand}" 
+                        Style="{StaticResource SecondaryButtonStyle}" Width="100" Margin="0,0,10,0"/>
+                <Button Content="LOGIN" Command="{Binding LoginCommand}" 
+                        Style="{StaticResource ActionPushButtonStyle}" Width="100"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
