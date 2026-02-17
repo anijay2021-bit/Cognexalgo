@@ -305,6 +305,45 @@ namespace Cognexalgo.Core.Services
                 return new System.Collections.Generic.Dictionary<string, double>();
             }
         }
+
+        /// <summary>
+        /// Fetches historical candle data
+        /// </summary>
+        public async Task<JArray> GetHistoricalDataAsync(string exchange, string symbolToken, string interval, DateTime fromDate, DateTime toDate)
+        {
+            try
+            {
+                var payload = new
+                {
+                    exchange = exchange,
+                    symboltoken = symbolToken,
+                    interval = interval,
+                    fromdate = fromDate.ToString("yyyy-MM-dd HH:mm"),
+                    todate = toDate.ToString("yyyy-MM-dd HH:mm")
+                };
+
+                var json = JsonConvert.SerializeObject(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _client.PostAsync("/rest/secure/angelbroking/historical/v1/getCandleData", content);
+                CheckAuth(response);
+                
+                var responseString = await response.Content.ReadAsStringAsync();
+                var data = JObject.Parse(responseString);
+
+                if (data["status"]?.Value<bool>() == true && data["data"] != null)
+                {
+                    return data["data"] as JArray;
+                }
+                
+                return new JArray();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetHistoricalData Error: {ex.Message}");
+                return new JArray();
+            }
+        }
     }
 
     #region LTP Response Models

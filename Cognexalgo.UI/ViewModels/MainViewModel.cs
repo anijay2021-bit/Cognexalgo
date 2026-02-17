@@ -42,6 +42,9 @@ namespace Cognexalgo.UI.ViewModels
 
         [ObservableProperty]
         private double _ltpSensex = 79500.25;
+        
+        [ObservableProperty]
+        private string _selectedOptionIndex = "NIFTY";
 
         [ObservableProperty]
         private double _totalMtm;
@@ -98,7 +101,6 @@ namespace Cognexalgo.UI.ViewModels
             
             // Subscribe to Engine Events
             _engine.Ticker.OnTickReceived += OnTick;
-            _engine.Ticker.OnTickReceived += OnTick;
             _engine.Ticker.OnStatusChanged += OnStatus;
             _engine.OnSignalReceived += OnSignal;
             
@@ -148,6 +150,7 @@ namespace Cognexalgo.UI.ViewModels
              {
                  _ = FetchPositions();
                  _ = FetchOrders();
+                 _ = FetchOptionChain(SelectedOptionIndex);
              }
         }
 
@@ -168,8 +171,6 @@ namespace Cognexalgo.UI.ViewModels
                 }
                 UpdateCounts();
             });
-
-            InitializeAutoStart();
         }
 
         private void UpdateCounts()
@@ -178,15 +179,7 @@ namespace Cognexalgo.UI.ViewModels
              ExitedStrategiesCount = Strategies.Count(s => !s.IsActive);
         }
 
-        private void InitializeAutoStart()
-        {
-            // Auto-start for debugging/user convenience
-            Task.Run(async () => 
-            {
-                await Task.Delay(2000); // Wait for UI to load
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () => await StartEngine());
-            });
-        }
+
 
         private void OnStatus(string status)
         {
@@ -195,31 +188,25 @@ namespace Cognexalgo.UI.ViewModels
 
         private void OnTick(TickerData data)
         {
-            if (data.Nifty != null) LtpNifty = data.Nifty.Ltp;
-            if (data.BankNifty != null) LtpBankNifty = data.BankNifty.Ltp;
-            if (data.FinNifty != null) LtpFinnifty = data.FinNifty.Ltp;
-            if (data.MidcpNifty != null) LtpMidcpNifty = data.MidcpNifty.Ltp;
-            if (data.Sensex != null) LtpSensex = data.Sensex.Ltp;
-
             // Update Strategy PNL & LTP (Simulated/Calculated)
             System.Windows.Application.Current.Dispatcher.Invoke(() => 
             {
+                if (data.Nifty != null) LtpNifty = data.Nifty.Ltp;
+                if (data.BankNifty != null) LtpBankNifty = data.BankNifty.Ltp;
+                if (data.FinNifty != null) LtpFinnifty = data.FinNifty.Ltp;
+                if (data.MidcpNifty != null) LtpMidcpNifty = data.MidcpNifty.Ltp;
+                if (data.Sensex != null) LtpSensex = data.Sensex.Ltp;
+
                 // Update Global PnL
                 TotalMtm = _engine.GetTotalPnL();
 
                 // Update Strategy LTPs from global ticker
-                // Note: In a real scenario, strategies might track individual strikes
-                // For now, we bind them to the underlying index LTP for display
                 foreach (var strategy in Strategies)
                 {
                     if (strategy.IsActive)
                     {
                         // TODO: Map strategy to specific underline (NIFTY/BANKNIFTY)
-                        // Currently defaulting to Nifty for visual feedback
                         strategy.Ltp = (decimal)LtpNifty; 
-                        
-                        // Sync individual strategy PnL if possible (requires mapping)
-                        // For now we rely on Global PnL
                     }
                 }
             });

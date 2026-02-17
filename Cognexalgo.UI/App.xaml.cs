@@ -47,11 +47,13 @@ namespace Cognexalgo.UI;
             loginWindow.Show();
         }
 
-        private void OnLoginSuccess()
+        private async void OnLoginSuccess()
         {
             try 
             {
                 var engine = new Cognexalgo.Core.TradingEngine();
+                await engine.InitializeDatabaseAsync(); // [NEW] Ensure DB tables are created
+                
                 engine.SetCloudService(_firebaseService); 
                 var mainViewModel = new ViewModels.MainViewModel(engine);
                 var mainWindow = new MainWindow { DataContext = mainViewModel };

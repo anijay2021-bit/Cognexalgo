@@ -11,7 +11,8 @@
         Width="{Binding WindowWidth, Mode=TwoWay}"
         Background="#F9FAFB" WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI"
-        Closing="Window_Closing">
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <Window.Resources>
         <conv:StatusBackgroundConverter x:Key="StatusBgConverter"/>
@@ -47,6 +48,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
 
     <Grid Background="{StaticResource BackgroundBrush}">
@@ -210,7 +212,10 @@
                         <!-- Toolbar -->
                         <Border Grid.Row="0" Background="{StaticResource CardBrush}" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Add Account" Style="{StaticResource ActionPushButtonStyle}" Margin="0,0,10,0"/>
+                                <Button Content="Add Account" 
+                                        Command="{Binding AccountManager.OpenAddAccountCommand}"
+                                        Visibility="{Binding AccountManager.IsAdminMode, Converter={StaticResource BoolToVis}}"
+                                        Style="{StaticResource ActionPushButtonStyle}" Margin="0,0,10,0"/>
                                 <Button Content="Refresh" Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,10,0"/>
                             </StackPanel>
                         </Border>
@@ -632,7 +637,7 @@
                         <!-- Filters -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
                             <TextBlock Text="Select Index:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0"/>
-                            <ComboBox Width="120" SelectedIndex="0" Style="{StaticResource DarkComboBoxStyle}" x:Name="IndexSelector">
+                            <ComboBox Width="120" Text="{Binding SelectedOptionIndex}" Style="{StaticResource DarkComboBoxStyle}">
                                 <ComboBoxItem Content="NIFTY"/>
                                 <ComboBoxItem Content="BANKNIFTY"/>
                                 <ComboBoxItem Content="FINNIFTY"/>
@@ -785,23 +790,46 @@
         </Grid>
 
         <!-- 5. Status Bar (Index Ticker) - Dark Footer -->
-        <Border Grid.Row="5" Background="{StaticResource BackgroundBrush}" Padding="10,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="NIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding LtpNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+        <Border Grid.Row="5" Background="{StaticResource BackgroundBrush}" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <!-- Connection Status (Left) -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Margin="0,0,8,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Running">
+                                        <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Connecting...">
+                                        <Setter Property="Fill" Value="{StaticResource WarningBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource TextMainBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
 
-                <TextBlock Text="BANKNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding LtpBankNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                <!-- Index Tickers (Center) -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="NIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
+                    <TextBlock Text="{Binding LtpNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
 
-                <TextBlock Text="FINNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                    <TextBlock Text="BANKNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
+                    <TextBlock Text="{Binding LtpBankNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
 
-                <TextBlock Text="MIDCPNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
-                
-                <TextBlock Text="SENSEX:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
-            </StackPanel>
+                    <TextBlock Text="FINNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
+                    <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+
+                    <TextBlock Text="MIDCPNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
+                    <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                    
+                    <TextBlock Text="SENSEX:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
+                    <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

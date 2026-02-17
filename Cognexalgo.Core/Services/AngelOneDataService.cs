@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Cognexalgo.Core.Models;
 using System.Diagnostics;
+using Skender.Stock.Indicators;
+using Newtonsoft.Json.Linq;
 
 namespace Cognexalgo.Core.Services
 {
@@ -13,6 +15,7 @@ namespace Cognexalgo.Core.Services
         private readonly TokenService _tokenService;
         private readonly FileLoggingService _logger;
         private readonly ApiRateLimiter _rateLimiter;
+        private readonly Dictionary<string, List<Skender.Stock.Indicators.Quote>> _indexHistory = new Dictionary<string, List<Skender.Stock.Indicators.Quote>>();
 
         public AngelOneDataService(
             SmartApiClient api, 
@@ -62,14 +65,28 @@ namespace Cognexalgo.Core.Services
                     symbolToken: token
                 );
 
-                if (ltpData?.Data?.Ltp == null)
+                double spotPrice = 0;
+
+                if (ltpData?.Data?.Ltp != null)
                 {
-                    throw new Exception($"Failed to fetch LTP for {index}. API returned null data.");
+                    spotPrice = ltpData.Data.Ltp;
+                }
+                else 
+                {
+                    // FALLBACK: Use Batch/Full Market Data call if LTP solo call fails
+                    var batchData = await _api.GetMarketDataBatchAsync("NSE", new List<string> { token });
+                    if (batchData != null && batchData.ContainsKey(token))
+                    {
+                        spotPrice = batchData[token];
+                        _logger?.Log("DataService", $"✓ [Fallback] Spot price for {index} fetched via Batch API: ₹{spotPrice:N2}");
+                    }
+                    else 
+                    {
+                        throw new Exception($"Failed to fetch LTP for {index} after fallback. API returned null/empty.");
+                    }
                 }
 
-                double spotPrice = ltpData.Data.Ltp;
                 _logger?.Log("DataService", $"Spot price for {index}: ₹{spotPrice:N2}");
-
                 return spotPrice;
             }
             catch (Exception ex)
@@ -77,6 +94,127 @@ namespace Cognexalgo.Core.Services
                 _logger?.Log("DataService", $"ERROR: Fetching spot price for {index}: {ex.Message}");
                 throw new Exception($"Failed to get spot price for {index}: {ex.Message}", ex);
             }
+        }
+
+        #endregion
+
+        #region Historical Data
+
+        public async Task PreFetchGlobalHistoryAsync()
+        {
+            _logger?.Log("DataService", "Pre-fetching global history for Indices...");
+            string[] indices = { "NIFTY", "BANKNIFTY", "FINNIFTY" };
+            
+            foreach (var index in indices)
+            {
+                try
+                {
+                    var history = await GetHistoryAsync(index, "ONE_MINUTE", 2);
+                    if (history != null && history.Any())
+                    {
+                        _indexHistory[index.ToUpper()] = history;
+                        _logger?.Log("DataService", $"✓ Global cache populated for {index}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Log("DataService", $"EROR: Pre-fetching {index} failed: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task<List<Skender.Stock.Indicators.Quote>> GetHistoryAsync(string index, string interval = "ONE_MINUTE", int days = 1)
+        {
+            try
+            {
+                index = index.ToUpper();
+
+                // Check Cache first if it's a standard index request
+                if (interval == "ONE_MINUTE" && days <= 2 && _indexHistory.ContainsKey(index))
+                {
+                    _logger?.Log("DataService", $"Using cached history for {index}");
+                    return _indexHistory[index].ToList(); // Return copy
+                }
+
+                // Map index to token
+                (string token, string symbol) = index.ToUpper() switch
+                {
+                    "NIFTY" => ("99926000", "Nifty 50"),
+                    "BANKNIFTY" => ("99926009", "Nifty Bank"),
+                    "FINNIFTY" => ("99926037", "Nifty Fin Service"),
+                    _ => throw new ArgumentException($"Unsupported index: {index}")
+                };
+
+                DateTime toDate = DateTime.Now;
+                DateTime fromDate = toDate.AddDays(-days);
+
+                _logger?.Log("DataService", $"Fetching History for {index} from {fromDate:yyyy-MM-dd} to {toDate:yyyy-MM-dd}");
+
+                // MOCK DATA CHECK
+                if (_api.JwtToken == null)
+                {
+                     return GenerateMockHistory(index, interval, days);
+                }
+
+                await _rateLimiter.WaitAsync();
+                var data = await _api.GetHistoricalDataAsync("NSE", token, interval, fromDate, toDate);
+
+                var quotes = new List<Skender.Stock.Indicators.Quote>();
+                if (data != null)
+                {
+                    foreach (var item in data)
+                    {
+                        var candle = item as JArray;
+                        if (candle != null && candle.Count >= 6)
+                        {
+                            quotes.Add(new Skender.Stock.Indicators.Quote
+                            {
+                                Date = DateTime.Parse(candle[0].ToString()),
+                                Open = candle[1].Value<decimal>(),
+                                High = candle[2].Value<decimal>(),
+                                Low = candle[3].Value<decimal>(),
+                                Close = candle[4].Value<decimal>(),
+                                Volume = candle[5].Value<decimal>()
+                            });
+                        }
+                    }
+                }
+
+                _logger?.Log("DataService", $"✓ History loaded: {quotes.Count} candles for {index}");
+                return quotes;
+            }
+            catch (Exception ex)
+            {
+                _logger?.Log("DataService", $"ERROR: Fetching history for {index}: {ex.Message}");
+                return new List<Skender.Stock.Indicators.Quote>();
+            }
+        }
+
+        private List<Skender.Stock.Indicators.Quote> GenerateMockHistory(string index, string interval, int days)
+        {
+            var list = new List<Skender.Stock.Indicators.Quote>();
+            double basePrice = GenerateMockSpotPrice(index);
+            DateTime start = DateTime.Now.AddDays(-days);
+            
+            var random = new Random();
+
+            for (int i = 0; i < 250; i++)
+            {
+                double change = basePrice * 0.001 * (random.NextDouble() * 2 - 1);
+                double close = basePrice + change;
+                
+                list.Add(new Skender.Stock.Indicators.Quote
+                {
+                    Date = start.AddMinutes(i),
+                    Open = (decimal)basePrice,
+                    High = (decimal)Math.Max(basePrice, close) + 2,
+                    Low = (decimal)Math.Min(basePrice, close) - 2,
+                    Close = (decimal)close,
+                    Volume = 1000
+                });
+                basePrice = close;
+            }
+            return list;
         }
 
         #endregion

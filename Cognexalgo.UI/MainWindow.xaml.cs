@@ -89,5 +89,27 @@ namespace Cognexalgo.UI
                 vm.SaveSettings();
             }
         }
+
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // SECRET SHORTCUT: Ctrl+Shift+A to toggle Admin Mode (Add Account button)
+            if (System.Windows.Input.Keyboard.Modifiers == (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift) &&
+                e.Key == System.Windows.Input.Key.A)
+            {
+                if (DataContext is ViewModels.MainViewModel vm && vm.AccountManager != null)
+                {
+                    vm.AccountManager.IsAdminMode = !vm.AccountManager.IsAdminMode;
+                    
+                    if (vm.AccountManager.IsAdminMode)
+                    {
+                        System.Windows.MessageBox.Show("Developer Mode: ON (Add Account enabled)", "Admin Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        System.Windows.MessageBox.Show("Developer Mode: OFF (Add Account hidden)", "Admin Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+            }
+        }
     }
 }

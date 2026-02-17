@@ -23,6 +23,8 @@
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource AccentColor}"/>
     <SolidColorBrush x:Key="TextDarkBrush" Color="{StaticResource TextMainColor}"/> 
     <SolidColorBrush x:Key="TextLightBrush" Color="{StaticResource TextMutedColor}"/>
     

@@ -17,6 +17,9 @@ namespace Cognexalgo.UI.ViewModels
         private readonly TradingEngine _engine;
         private readonly DispatcherTimer _updateTimer;
 
+        [ObservableProperty]
+        private bool _isAdminMode = false; // Hidden by default
+
         public ObservableCollection<AccountConfig> Accounts { get; } = new ObservableCollection<AccountConfig>();
 
         public AccountManagerViewModel(TradingEngine engine)
@@ -38,47 +41,20 @@ namespace Cognexalgo.UI.ViewModels
         {
             try
             {
-                // Ensure Table Exists (Quick Fix for dev env)
-                // In prod, use migrations. Here we just want to ensure it works.
-                // await _engine.DbContext.Database.EnsureCreatedAsync(); 
-                
-                // Fetch from DB
-                // Note: TradingEngine needs to expose DbContext or a Repository. 
-                // Creating a scope or using engine's context if available.
-                // For now assuming we can access it or creates a new one.
-                // Let's assume _engine has a public DbContext for simplicity in this task scope, 
-                // OR we create one. Best practice is Factory, but we'll use a local context for loading.
-                
-                // Mock Data for UI Dev if DB is empty
-                if (Accounts.Count == 0)
+                // Fetch from DB using EF Core Context from Engine
+                if (_engine.MetadataContext != null)
                 {
-                    Accounts.Add(new AccountConfig 
-                    { 
-                        ClientId = "A8821", 
-                        AccountName = "Alpha Fund", 
-                        Status = "Active",
-                        Description = "Main HFT Account",
-                        Broker = "Angel One",
-                        FundsUtilized = 250000,
-                        FundsAvailable = 1500000,
-                        Pnl = 5200.50m,
-                        MtmHigh = 8000,
-                        MtmLow = -2000
-                    });
-                     Accounts.Add(new AccountConfig 
-                    { 
-                        ClientId = "B9932", 
-                        AccountName = "Beta Strategy", 
-                        Status = "Stopped",
-                        Description = "Testing Algo",
-                        Broker = "Zerodha",
-                        FundsUtilized = 0,
-                        FundsAvailable = 500000,
-                        Pnl = 0m
+                    var dbAccounts = await _engine.MetadataContext.AccountConfigs.ToListAsync();
+                    
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        Accounts.Clear();
+                        foreach (var acc in dbAccounts)
+                        {
+                            Accounts.Add(acc);
+                        }
                     });
                 }
-                
-                // If we had a Repo, we'd use it. For now using Mock + ready for integration.
                 
                 _updateTimer.Start();
             }
@@ -86,6 +62,18 @@ namespace Cognexalgo.UI.ViewModels
             {
                 System.Windows.MessageBox.Show($"Error loading accounts: {ex.Message}");
             }
+        }
+
+        [RelayCommand]
+        public void OpenAddAccount()
+        {
+            var vm = new AddAccountViewModel(_engine, async () => await LoadAccountsAsync());
+            var win = new Views.AddAccountWindow(vm);
+            
+            vm.CloseAction = () => win.Close();
+            
+            win.Owner = System.Windows.Application.Current.MainWindow;
+            win.ShowDialog();
         }
 
         private void OnTimerTick(object sender, EventArgs e)

@@ -98,6 +98,95 @@ namespace Cognexalgo.Core
         {
              // Ensure database is created (Migration substitute for now)
              await MetadataContext.Database.EnsureCreatedAsync();
+
+             // [NEW] Migrate Strategies from SQLite to Postgres if Postgres is empty
+             try 
+             {
+                 var postgresCount = await MetadataContext.HybridStrategies.CountAsync();
+                 if (postgresCount == 0)
+                 {
+                     Logger.Log("Migration", "Postgres empty. Checking for local SQLite strategies...");
+                     using (var conn = _dbService.GetConnection())
+                     {
+                         await conn.OpenAsync();
+                         var cmd = conn.CreateCommand();
+                         cmd.CommandText = "SELECT Name, Symbol, StrategyType, Parameters, IsActive, ProductType FROM Strategies";
+                         using (var reader = await cmd.ExecuteReaderAsync())
+                         {
+                             while (await reader.ReadAsync())
+                             {
+                                 var name = reader.GetString(0);
+                                 var symbol = reader.GetString(1);
+                                 var type = reader.GetString(2);
+                                 var paramJson = reader.IsDBNull(3) ? "{}" : reader.GetString(3);
+                                 var isActive = reader.GetInt32(4) == 1;
+                                 var productType = reader.IsDBNull(5) ? "MIS" : reader.GetString(5);
+
+                                 Logger.Log("Migration", $"Migrating {name}...");
+
+                                 // Basic Migration Mapping
+                                 var config = new HybridStrategyConfig
+                                 {
+                                     Name = name,
+                                     StrategyType = type,
+                                     IsActive = isActive,
+                                     ProductType = productType,
+                                     Legs = new List<StrategyLeg> 
+                                     { 
+                                         new StrategyLeg { Index = symbol, Status = "PENDING" } 
+                                     }
+                                 };
+
+                                 await StrategyRepository.SaveHybridStrategyAsync(config, "Migration");
+                             }
+                         }
+                     }
+                     Logger.Log("Migration", "Successfully migrated local strategies to Cloud.");
+                 }
+
+                 // [NEW] Migrate Accounts from SQLite to Postgres
+                 var accountCount = await MetadataContext.AccountConfigs.CountAsync();
+                 if (accountCount == 0)
+                 {
+                     Logger.Log("Migration", "Postgres accounts empty. Checking SQLite...");
+                     using (var conn = _dbService.GetConnection())
+                     {
+                         await conn.OpenAsync();
+                         var cmd = conn.CreateCommand();
+                         cmd.CommandText = "SELECT BrokerName, ApiKey, ClientCode, TotpKey FROM Credentials";
+                         using (var reader = await cmd.ExecuteReaderAsync())
+                         {
+                             while (await reader.ReadAsync())
+                             {
+                                 var broker = reader.GetString(0);
+                                 var apiKey = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                                 var clientCode = reader.GetString(2);
+                                 var totp = reader.IsDBNull(3) ? "" : reader.GetString(3);
+
+                                 if (string.IsNullOrEmpty(clientCode)) continue;
+
+                                 var acc = new AccountConfig
+                                 {
+                                     ClientId = clientCode,
+                                     AccountName = $"{broker}_{clientCode}",
+                                     Broker = broker,
+                                     Status = "Offline",
+                                     IsEnabled = true,
+                                     // Description = $"Migrated from local"
+                                 };
+
+                                 MetadataContext.AccountConfigs.Add(acc);
+                             }
+                             await MetadataContext.SaveChangesAsync();
+                         }
+                     }
+                     Logger.Log("Migration", "Successfully migrated local accounts to Cloud.");
+                 }
+             }
+             catch (Exception ex)
+             {
+                 Logger.Log("Migration", $"Error during migration: {ex.Message}");
+             }
         }
 
         public void SetCloudService(IFirebaseService firebaseService)
@@ -245,6 +334,15 @@ namespace Cognexalgo.Core
                 // Initialize DataService with the API client and TokenService
                 DataService = new AngelOneDataService(Api, TokenService, Logger);
 
+                // [NEW] Global History Fetch for Indices
+                _ = Task.Run(async () => {
+                    try {
+                        await DataService.PreFetchGlobalHistoryAsync();
+                    } catch (Exception ex) {
+                        Logger?.Log("Engine", $"Global Pre-fetch Failed: {ex.Message}");
+                    }
+                });
+
                 return true;
             }
             catch (Exception ex)
@@ -254,7 +352,7 @@ namespace Cognexalgo.Core
             }
         }
 
-        public async void Start()
+        public async Task Start()
         {
             if (IsRunning) return;
             IsRunning = true;
@@ -274,6 +372,15 @@ namespace Cognexalgo.Core
                     if (config.StrategyType == "CUSTOM")
                     {
                         var strategy = new Cognexalgo.Core.Strategies.DynamicStrategy(this, config.Parameters);
+                        
+                        // [NEW] Fetch History for Technical Indicators (e.g. 200 EMA)
+                        if (DataService != null)
+                        {
+                            // Fetch 2 days of history to ensure 200 EMA has enough data
+                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 2);
+                            await strategy.InitializeAsync(history);
+                        }
+
                         strategy.IsActive = true;
                         strategy.OnSignalGenerated += (s) => OnSignalReceived?.Invoke(s);
                         _activeStrategies.Add(strategy);
@@ -317,23 +424,10 @@ namespace Cognexalgo.Core
                 {
                     try
                     {
-                        Logger.Log("Engine", "Tick Loop Iteration..."); 
-                        // 1. Fetch Real-Time Spot Prices (Parallel for speed)
-                        // Note: DataService handles rate limiting internally
-                        var tNifty = DataService.GetSpotPriceAsync("NIFTY");
-                        var tBankNifty = DataService.GetSpotPriceAsync("BANKNIFTY");
-                        var tFinNifty = DataService.GetSpotPriceAsync("FINNIFTY");
-                        
-                        // Wait for all (Sensex/Midcp might fail if not supported, so we handle gracefully)
-                        await Task.WhenAll(tNifty, tBankNifty, tFinNifty);
-
-                        lastNifty = tNifty.Result > 0 ? tNifty.Result : lastNifty;
-                        lastBankNifty = tBankNifty.Result > 0 ? tBankNifty.Result : lastBankNifty;
-                        lastFinNifty = tFinNifty.Result > 0 ? tFinNifty.Result : lastFinNifty;
-
-                        // Mock others if DataService doesn't support them yet or add them later
-                        // lastMidcpNifty = ...; 
-                        // lastSensex = ...;
+                        // 1. Fetch Real-Time Spot Prices
+                        try { lastNifty = await DataService.GetSpotPriceAsync("NIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"Nifty Fetch Failed: {ex.Message}"); }
+                        try { lastBankNifty = await DataService.GetSpotPriceAsync("BANKNIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"BankNifty Fetch Failed: {ex.Message}"); }
+                        try { lastFinNifty = await DataService.GetSpotPriceAsync("FINNIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"FinNifty Fetch Failed: {ex.Message}"); }
 
                         // 2. Create Ticker Data
                         var data = new TickerData 
@@ -341,15 +435,13 @@ namespace Cognexalgo.Core
                             Nifty = new InstrumentInfo { Ltp = lastNifty }, 
                             BankNifty = new InstrumentInfo { Ltp = lastBankNifty },
                             FinNifty = new InstrumentInfo { Ltp = lastFinNifty },
-                            // MidcpNifty = ...
-                            // Sensex = ...
                         };
 
                         // 3. Emit to UI
                         Ticker.EmitTick(data);
 
                         // [NEW] Check RMS Limits
-                        double currentMtm = GetTotalPnL(); // Implement this properly
+                        double currentMtm = GetTotalPnL(); 
                         if (currentMtm <= MaxLoss)
                         {
                             Logger.Log("RMS", $"[CRITICAL] Max Loss Reached ({currentMtm}). Triggering Global Square-Off.");
@@ -364,12 +456,12 @@ namespace Cognexalgo.Core
                         }
 
                         // 4. Update Strategies
-                        foreach (var strategy in _activeStrategies.ToList()) // ToList to avoid modification exceptions
+                        foreach (var strategy in _activeStrategies.ToList()) 
                         {
                             try 
                             {
                                 await strategy.OnTickAsync(data);
-                                strategy.RecalculatePnl(data); // [NEW] Update PnL
+                                strategy.RecalculatePnl(data); 
                             }
                             catch (Exception ex)
                             {
@@ -380,7 +472,6 @@ namespace Cognexalgo.Core
                     catch (Exception ex)
                     {
                          Logger.Log("Engine", $"Tick Loop Error: {ex.Message}");
-                         Console.WriteLine($"DEBUG: Tick Loop Error: {ex.Message}");
                     }
 
                     await Task.Delay(1000); // 1s Loop
