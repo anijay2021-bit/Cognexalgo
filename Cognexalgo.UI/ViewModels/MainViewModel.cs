@@ -90,6 +90,17 @@ namespace Cognexalgo.UI.ViewModels
 
         public AccountManagerViewModel AccountManager { get; } 
 
+        private BootstrapperService _bootstrapper; // [NEW]
+
+        [ObservableProperty]
+        private bool _isInitialized = false;
+
+        [ObservableProperty]
+        private double _loadingProgress = 0;
+
+        [ObservableProperty]
+        private string _loadingStatus = "Initializing...";
+
         public MainViewModel(TradingEngine engine)
         {
             // Initialize Engine
@@ -98,6 +109,15 @@ namespace Cognexalgo.UI.ViewModels
             
             // Initialize Sub-ViewModels
             AccountManager = new AccountManagerViewModel(_engine);
+            
+            // Initialize Bootstrapper
+            // Ideally injected, but for now instantiating with existing engine dependencies
+            // We need IConfiguration, let's assume Engine has it or we pass null/placeholder if not critical for now
+            // Or better, we can get it from App.Current if available as a static resource or similar. 
+            // The user prompt asked to write the service, integration implies usage.
+            // For this snippet, I will assume we can construct it or it should be passed in. 
+            // _bootstrapper = new BootstrapperService(_engine, _engine.DataService, _engine.Configuration); 
+            // We need to ensure Engine has these public or accessible. 
             
             // Subscribe to Engine Events
             _engine.Ticker.OnTickReceived += OnTick;
@@ -108,9 +128,6 @@ namespace Cognexalgo.UI.ViewModels
             _autoRefreshTimer = new System.Windows.Threading.DispatcherTimer();
             _autoRefreshTimer.Interval = TimeSpan.FromSeconds(3);
             _autoRefreshTimer.Tick += AutoRefreshTimer_Tick;
-
-            // Load Data
-            _ = LoadStrategies();
 
             // Subscribe to Engine Events
             if (_engine.Logger != null)
@@ -128,8 +145,54 @@ namespace Cognexalgo.UI.ViewModels
             MaxLoss = settings.MaxLoss;
             MaxProfit = settings.MaxProfit;
 
-            // Initialize Auto-Start for Debugging (Disabled for Production)
-            // InitializeAutoStart();
+            // Start Bootstrapper Sequence
+            _ = InitializeSystemAsync();
+        }
+
+        private async Task InitializeSystemAsync()
+        {
+            try 
+            {
+                IsInitialized = false;
+                Status = "Bootstrapping...";
+                LoadingProgress = 5;
+
+                // Instantiate Bootstrapper (Temporary logic until DI is fully refactored)
+                // Assuming Engine exposes Config and DataService is accessible
+                // We might need to ensure DataService is initialized or pass dependencies.
+                // For now, relying on Engine having what is needed.
+                var config = (Microsoft.Extensions.Configuration.IConfiguration)System.Windows.Application.Current.Resources["Configuration"];
+                _bootstrapper = new BootstrapperService(_engine, _engine.DataService, config); // Pass Config if available
+                
+                _bootstrapper.OnProgressChanged += (msg, percent) => 
+                {
+                    System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                    {
+                        LoadingStatus = msg;
+                        LoadingProgress = percent;
+                        Log($"[Bootstrapper] {msg}");
+                    });
+                };
+
+                await _bootstrapper.InitializeAsync();
+                
+                IsInitialized = true;
+                Status = "Ready";
+                LoadingStatus = "System Ready.";
+                
+                // Load UI Data after Bootstrap
+                await LoadStrategies();
+                await AccountManager.LoadAccountsAsync(); // Sequential load to avoid DbContext concurrency
+            }
+            catch (Exception ex)
+            {
+                Status = "Initialization Failed";
+                LoadingStatus = $"Error: {ex.Message}";
+                Log($"CRITICAL: Bootstrapper Failed - {ex.Message}", "ERROR");
+                MessageBox.Show($"System Initialization Failed:\n{ex.Message}\n\nApp will operate in restricted mode.", "Bootstrapper Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Allow usage but maybe warn? Or keep IsInitialized false to block Start Engine.
+                // IsInitialized = true; // Uncomment to allow bypass if desired
+            }
         }
 
         private void Logger_OnLog(string level, string component, string message)
@@ -156,21 +219,35 @@ namespace Cognexalgo.UI.ViewModels
 
         private async Task LoadStrategies()
         {
-            var strategies = await _engine.StrategyRepository.GetAllHybridStrategiesAsync(); // [Updated] Fetch Hybrid Strategies
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            try 
             {
-                Strategies.Clear();
-                foreach (var s in strategies) 
+                var strategies = await _engine.StrategyRepository.GetAllHybridStrategiesAsync(); 
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
-                    // Initialize Runtime Properties
-                    s.Status = s.IsActive ? "RUNNING" : "EXITED";
-                    s.EntryTime = s.Id == 0 ? DateTime.Now : s.Legs.FirstOrDefault()?.EntryTime ?? DateTime.Now; // Mock/Approx
-                    s.Pnl = 0; // Will be updated by OnTick
-                    
-                    Strategies.Add(s);
-                }
-                UpdateCounts();
-            });
+                    Strategies.Clear();
+                    foreach (var s in strategies) 
+                    {
+                        if (s == null) continue;
+                        
+                        // Initialize Runtime Properties
+                        s.Status = s.IsActive ? "RUNNING" : "EXITED";
+                        
+                        // [FIX] Null safe check for EntryTime
+                        s.EntryTime = (s.Legs != null && s.Legs.Any()) 
+                            ? (s.Legs.FirstOrDefault()?.EntryTime ?? DateTime.Now) 
+                            : DateTime.Now;
+                            
+                        s.Pnl = 0; 
+                        Strategies.Add(s);
+                    }
+                    UpdateCounts();
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"Error Loading Strategies: {ex.Message}", "ERROR");
+                Console.WriteLine($"[LoadStrategies] CRASH: {ex}");
+            }
         }
 
         private void UpdateCounts()
@@ -221,7 +298,7 @@ namespace Cognexalgo.UI.ViewModels
             });
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(IsInitialized))]
         public async Task StartEngine()
         {
             // LIVE & PAPER: REQUIRE LOGIN (For Real Data)

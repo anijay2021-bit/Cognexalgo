@@ -12,7 +12,7 @@ namespace Cognexalgo.Core.Services
     {
         public event Action OnSessionExpired;
 
-        private readonly HttpClient _client;
+        private HttpClient _client;
 
         private void CheckAuth(HttpResponseMessage response)
         {
@@ -34,14 +34,39 @@ namespace Cognexalgo.Core.Services
 
         public SmartApiClient(string apiKey)
         {
-            _apiKey = apiKey;
+            InitializeClient(apiKey);
+        }
+
+        public SmartApiClient()
+        {
             _client = new HttpClient { BaseAddress = new Uri(BASE_URL) };
             _client.DefaultRequestHeaders.Add("X-User-Type", "USER");
             _client.DefaultRequestHeaders.Add("X-SourceID", "WEB");
             _client.DefaultRequestHeaders.Add("X-ClientLocalIP", "127.0.0.1");
             _client.DefaultRequestHeaders.Add("X-ClientPublicIP", "127.0.0.1");
             _client.DefaultRequestHeaders.Add("X-MACAddress", "MAC_ADDRESS");
-            _client.DefaultRequestHeaders.Add("X-PrivateKey", apiKey); // Standard Header
+        }
+
+        public void SetApiKey(string apiKey)
+        {
+            _apiKey = apiKey;
+            if (_client.DefaultRequestHeaders.Contains("X-PrivateKey"))
+            {
+                _client.DefaultRequestHeaders.Remove("X-PrivateKey");
+            }
+            _client.DefaultRequestHeaders.Add("X-PrivateKey", apiKey);
+        }
+
+        private void InitializeClient(string apiKey)
+        {
+             _apiKey = apiKey;
+            _client = new HttpClient { BaseAddress = new Uri(BASE_URL) };
+            _client.DefaultRequestHeaders.Add("X-User-Type", "USER");
+            _client.DefaultRequestHeaders.Add("X-SourceID", "WEB");
+            _client.DefaultRequestHeaders.Add("X-ClientLocalIP", "127.0.0.1");
+            _client.DefaultRequestHeaders.Add("X-ClientPublicIP", "127.0.0.1");
+            _client.DefaultRequestHeaders.Add("X-MACAddress", "MAC_ADDRESS");
+            _client.DefaultRequestHeaders.Add("X-PrivateKey", apiKey); 
         }
 
         public async Task<bool> LoginAsync(string clientCode, string password, string totp)
@@ -208,6 +233,28 @@ namespace Cognexalgo.Core.Services
             {
                 System.Diagnostics.Debug.WriteLine($"GetOrderBook Error: {ex.Message}");
                 return new System.Collections.Generic.List<Order>();
+            }
+        }
+
+        public async Task<RMSLimit> GetRMSLimitAsync()
+        {
+            try
+            {
+                var response = await _client.GetAsync("/rest/secure/angelbroking/user/v1/getRMS");
+                CheckAuth(response);
+                var responseString = await response.Content.ReadAsStringAsync();
+                
+                var data = JObject.Parse(responseString);
+                if (data["status"]?.Value<bool>() == true && data["data"] != null)
+                {
+                    return data["data"].ToObject<RMSLimit>();
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetRMSLimit Error: {ex.Message}");
+                return null;
             }
         }
 

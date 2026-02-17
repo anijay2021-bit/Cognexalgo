@@ -13,7 +13,7 @@ namespace Cognexalgo.Core.Models
         public string ClientId { get; set; } // Key ID (e.g., A1234)
 
         [Column("account_name")]
-        public string AccountName { get; set; }
+        public string? AccountName { get; set; }
 
         [Column("broker")]
         public string Broker { get; set; } = "Angel One";
@@ -27,12 +27,12 @@ namespace Cognexalgo.Core.Models
         private string _status = "Active";
 
         [Column("description")]
-        public string Description
+        public string? Description
         {
             get => _description;
             set => SetProperty(ref _description, value);
         }
-        private string _description;
+        private string? _description;
 
         [Column("is_enabled")]
         public bool IsEnabled
@@ -43,10 +43,10 @@ namespace Cognexalgo.Core.Models
         private bool _isEnabled = true;
 
         [Column("api_key")]
-        public string ApiKey { get; set; }
+        public string? ApiKey { get; set; }
 
         [Column("totp_key")]
-        public string TotpKey { get; set; }
+        public string? TotpKey { get; set; }
 
         // --- Real-time / Runtime Properties (Not Persisted) ---
 

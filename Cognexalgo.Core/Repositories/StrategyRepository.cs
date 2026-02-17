@@ -20,12 +20,46 @@ namespace Cognexalgo.Core.Repositories
         }
 
         // Legacy Methods Implementation
-        public async Task<IEnumerable<StrategyConfig>> GetAllAsync() => new List<StrategyConfig>();
-        public async Task<IEnumerable<StrategyConfig>> GetAllActiveAsync() => new List<StrategyConfig>();
+        public async Task<IEnumerable<StrategyConfig>> GetAllAsync() 
+        {
+            var hybrid = await GetAllHybridStrategiesAsync();
+            return hybrid.Select(h => new StrategyConfig 
+            { 
+               Id = h.Id, 
+               Name = h.Name, 
+               IsActive = h.IsActive, 
+               StrategyType = h.StrategyType, 
+               Parameters = h.Parameters,
+               Symbol = h.Legs.FirstOrDefault()?.Index ?? "NIFTY"
+            });
+        }
+
+        public async Task<IEnumerable<StrategyConfig>> GetAllActiveAsync()
+        {
+            var active = await GetActiveHybridStrategiesAsync();
+            return active.Select(h => new StrategyConfig 
+            { 
+               Id = h.Id, 
+               Name = h.Name, 
+               IsActive = h.IsActive, 
+               StrategyType = h.StrategyType, 
+               Parameters = h.Parameters,
+               Symbol = h.Legs.FirstOrDefault()?.Index ?? "NIFTY"
+            });
+        }
+
         public async Task AddAsync(StrategyConfig strategy) { }
         public async Task UpdateAsync(StrategyConfig strategy) { }
         public async Task DeleteAsync(int id) { }
-        public async Task UpdateStatusAsync(int id, bool isActive) { }
+        public async Task UpdateStatusAsync(int id, bool isActive) 
+        {
+             var entity = await _context.HybridStrategies.FindAsync(id);
+             if (entity != null)
+             {
+                 entity.IsActive = isActive;
+                 await _context.SaveChangesAsync();
+             }
+        }
 
         // Hybrid Strategy Implementation
 

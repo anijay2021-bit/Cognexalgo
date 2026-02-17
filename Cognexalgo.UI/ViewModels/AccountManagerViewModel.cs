@@ -34,10 +34,10 @@ namespace Cognexalgo.UI.ViewModels
             _updateTimer.Tick += OnTimerTick;
 
             // Load Data
-            _ = LoadAccountsAsync();
+            // _ = LoadAccountsAsync(); // Removed to prevent concurrency with Bootstrapper
         }
 
-        private async Task LoadAccountsAsync()
+        public async Task LoadAccountsAsync()
         {
             try
             {

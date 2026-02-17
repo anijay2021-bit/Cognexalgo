@@ -1,6 +1,7 @@
 ﻿using System.Configuration;
 using System.Data;
 using System.Windows;
+using Microsoft.Extensions.Configuration;
 using Cognexalgo.Core.CloudServices;
 
 namespace Cognexalgo.UI;
@@ -15,6 +16,21 @@ namespace Cognexalgo.UI;
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // [NEW] Load Configuration
+            try 
+            {
+                var builder = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+
+                var config = builder.Build();
+                Resources.Add("Configuration", config);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading configuration: {ex.Message}", "Config Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
 
             ShutdownMode = ShutdownMode.OnExplicitShutdown; 
 

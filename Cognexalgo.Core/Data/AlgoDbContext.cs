@@ -12,6 +12,7 @@ namespace Cognexalgo.Core.Data
         public DbSet<HybridStrategyEntity> HybridStrategies { get; set; }
         public DbSet<StrategyExecutionLog> ExecutionLogs { get; set; }
         public DbSet<AccountConfig> AccountConfigs { get; set; }
+        public DbSet<ActivePosition> ActivePositions { get; set; }
         
         private readonly IConfiguration _configuration;
 

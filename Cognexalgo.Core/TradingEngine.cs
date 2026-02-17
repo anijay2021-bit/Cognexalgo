@@ -87,8 +87,9 @@ namespace Cognexalgo.Core
             Logger = new FileLoggingService();
             _totpService = new TotpService();
             
-            _clientId = Environment.MachineName;
-            Logger.Log("Engine", "Trading Engine Constructed.");
+            // [NEW] Initialize API and DataService (Key set later on Connect)
+            Api = new SmartApiClient(); 
+            DataService = new AngelOneDataService(Api, TokenService, Logger);
 
             _clientId = Environment.MachineName;
             Logger.Log("Engine", "Trading Engine Constructed.");
@@ -137,14 +138,31 @@ namespace Cognexalgo.Core
 
                  string createLogTable = @"
                     CREATE TABLE IF NOT EXISTS strategy_execution_logs (
-                        id SERIAL PRIMARY KEY,
-                        strategy_id INTEGER,
-                        log_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                        log_level TEXT,
-                        message TEXT,
-                        details TEXT
-                    );";
+                        Id SERIAL PRIMARY KEY,
+                        StrategyId INTEGER,
+                        Timestamp TIMESTAMP,
+                        Type TEXT,
+                        Message TEXT,
+                        Details TEXT
+                    );
+                ";
+                await MetadataContext.Database.ExecuteSqlRawAsync(createLogTable);
 
+                // [NEW] Active Positions Table for Bootstrapper Sync
+                string createPositionsTable = @"
+                    CREATE TABLE IF NOT EXISTS active_positions (
+                        symbol_token TEXT PRIMARY KEY,
+                        trading_symbol TEXT,
+                        quantity INTEGER,
+                        average_price NUMERIC,
+                        ltp NUMERIC,
+                        pnl NUMERIC,
+                        product_type TEXT,
+                        strategy_name TEXT,
+                        updated_at TIMESTAMP
+                    );
+                ";
+                await MetadataContext.Database.ExecuteSqlRawAsync(createPositionsTable);
                  await MetadataContext.Database.ExecuteSqlRawAsync(createAccountTable);
                  await MetadataContext.Database.ExecuteSqlRawAsync(createStrategyTable);
                  await MetadataContext.Database.ExecuteSqlRawAsync(createLogTable);
@@ -375,7 +393,7 @@ namespace Cognexalgo.Core
                 Logger?.Log("Engine", "Connecting to Angel One API...");
 
                 // Initialize API client
-                Api = new SmartApiClient(apiKey);
+                Api.SetApiKey(apiKey);  // Reuse existing instance
 
                 // Generate TOTP
                 string totp = _totpService.GenerateTotp(totpSecret);
@@ -397,8 +415,8 @@ namespace Cognexalgo.Core
                 await TokenService.LoadMasterAsync();
                 Logger?.Log("Engine", $"✓ Scrip Master loaded. Total symbols: {TokenService.GetSymbolCount()}");
 
-                // Initialize DataService with the API client and TokenService
-                DataService = new AngelOneDataService(Api, TokenService, Logger);
+                // DataService already initialized with Api reference, so no need to recreate
+                // DataService = new AngelOneDataService(Api, TokenService, Logger);
 
                 // [NEW] Global History Fetch for Indices
                 _ = Task.Run(async () => {
@@ -435,7 +453,7 @@ namespace Cognexalgo.Core
             {
                 try 
                 {
-                    if (config.StrategyType == "CUSTOM")
+                    if (config.StrategyType == "CUSTOM" || config.StrategyType == "DYNAMIC")
                     {
                         var strategy = new Cognexalgo.Core.Strategies.DynamicStrategy(this, config.Parameters);
                         

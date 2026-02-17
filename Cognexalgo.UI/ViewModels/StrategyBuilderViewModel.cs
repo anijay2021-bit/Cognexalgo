@@ -721,7 +721,7 @@ namespace Cognexalgo.UI.ViewModels
                 StrategyType = SelectedStrategyType switch {
                     "Calendar Straddle" => "CALENDAR",
                     "Hybrid" => "HYBRID",
-                    _ => "DYNAMIC"
+                    _ => "CUSTOM"
                 },
                 Legs = HybridLegs.ToList(),
                 Parameters = JsonConvert.SerializeObject(paramsDict), // Save JSON Parameters
