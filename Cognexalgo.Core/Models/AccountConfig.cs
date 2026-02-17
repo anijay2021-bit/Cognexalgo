@@ -19,96 +19,190 @@ namespace Cognexalgo.Core.Models
         public string Broker { get; set; } = "Angel One";
 
         [Column("status")]
-        [ObservableProperty]
-        private string _status = "Active"; // Persisted
+        public string Status
+        {
+            get => _status;
+            set => SetProperty(ref _status, value);
+        }
+        private string _status = "Active";
 
         [Column("description")]
-        [ObservableProperty]
+        public string Description
+        {
+            get => _description;
+            set => SetProperty(ref _description, value);
+        }
         private string _description;
 
         [Column("is_enabled")]
-        [ObservableProperty]
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set => SetProperty(ref _isEnabled, value);
+        }
         private bool _isEnabled = true;
+
+        [Column("api_key")]
+        public string ApiKey { get; set; }
+
+        [Column("totp_key")]
+        public string TotpKey { get; set; }
 
         // --- Real-time / Runtime Properties (Not Persisted) ---
 
         [NotMapped]
-        [ObservableProperty]
+        public bool IsFeedActive
+        {
+            get => _isFeedActive;
+            set => SetProperty(ref _isFeedActive, value);
+        }
         private bool _isFeedActive;
 
         [NotMapped]
-        [ObservableProperty]
-        private string _feedStatusColor = "#Gray";
+        public string FeedStatusColor
+        {
+            get => _feedStatusColor;
+            set => SetProperty(ref _feedStatusColor, value);
+        }
+        private string _feedStatusColor = "Gray";
 
         [NotMapped]
-        [ObservableProperty]
+        public decimal Pnl
+        {
+            get => _pnl;
+            set => SetProperty(ref _pnl, value);
+        }
         private decimal _pnl;
 
         [NotMapped]
-        [ObservableProperty]
+        public decimal MtmHigh
+        {
+            get => _mtmHigh;
+            set => SetProperty(ref _mtmHigh, value);
+        }
         private decimal _mtmHigh;
 
         [NotMapped]
-        [ObservableProperty]
+        public decimal MtmLow
+        {
+            get => _mtmLow;
+            set => SetProperty(ref _mtmLow, value);
+        }
         private decimal _mtmLow;
 
         [NotMapped]
-        [ObservableProperty]
+        public decimal Multiplier
+        {
+            get => _multiplier;
+            set => SetProperty(ref _multiplier, value);
+        }
         private decimal _multiplier = 1.0m;
 
         // Funds Group
         [NotMapped]
-        [ObservableProperty]
+        public decimal FundsUtilized
+        {
+            get => _fundsUtilized;
+            set => SetProperty(ref _fundsUtilized, value);
+        }
         private decimal _fundsUtilized;
 
         [NotMapped]
-        [ObservableProperty]
+        public decimal FundsAvailable
+        {
+            get => _fundsAvailable;
+            set => SetProperty(ref _fundsAvailable, value);
+        }
         private decimal _fundsAvailable;
 
         // Position Group
         [NotMapped]
-        [ObservableProperty]
+        public int PositionTotal
+        {
+            get => _positionTotal;
+            set => SetProperty(ref _positionTotal, value);
+        }
         private int _positionTotal;
         
         [NotMapped]
-        [ObservableProperty]
+        public int PositionOpen
+        {
+            get => _positionOpen;
+            set => SetProperty(ref _positionOpen, value);
+        }
         private int _positionOpen;
         
         [NotMapped]
-        [ObservableProperty]
+        public int PositionClosed
+        {
+            get => _positionClosed;
+            set => SetProperty(ref _positionClosed, value);
+        }
         private int _positionClosed;
 
         [NotMapped]
-        [ObservableProperty]
+        public DateTime PositionLastSync
+        {
+            get => _positionLastSync;
+            set => SetProperty(ref _positionLastSync, value);
+        }
         private DateTime _positionLastSync;
 
         // Orders Group
         [NotMapped]
-        [ObservableProperty]
+        public int OrderTotal
+        {
+            get => _orderTotal;
+            set => SetProperty(ref _orderTotal, value);
+        }
         private int _orderTotal;
 
         [NotMapped]
-        [ObservableProperty]
+        public int OrderOpen
+        {
+            get => _orderOpen;
+            set => SetProperty(ref _orderOpen, value);
+        }
         private int _orderOpen;
 
         [NotMapped]
-        [ObservableProperty]
+        public int OrderTrgPend
+        {
+            get => _orderTrgPend;
+            set => SetProperty(ref _orderTrgPend, value);
+        }
         private int _orderTrgPend;
 
         [NotMapped]
-        [ObservableProperty]
+        public int OrderCompl
+        {
+            get => _orderCompl;
+            set => SetProperty(ref _orderCompl, value);
+        }
         private int _orderCompl;
 
         [NotMapped]
-        [ObservableProperty]
+        public int OrderRej
+        {
+            get => _orderRej;
+            set => SetProperty(ref _orderRej, value);
+        }
         private int _orderRej;
 
         [NotMapped]
-        [ObservableProperty]
+        public int OrderCancel
+        {
+            get => _orderCancel;
+            set => SetProperty(ref _orderCancel, value);
+        }
         private int _orderCancel;
 
         [NotMapped]
-        [ObservableProperty]
+        public DateTime OrderLastSync
+        {
+            get => _orderLastSync;
+            set => SetProperty(ref _orderLastSync, value);
+        }
         private DateTime _orderLastSync;
     }
 }

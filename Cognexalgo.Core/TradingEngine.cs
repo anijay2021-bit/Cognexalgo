@@ -99,6 +99,70 @@ namespace Cognexalgo.Core
              // Ensure database is created (Migration substitute for now)
              await MetadataContext.Database.EnsureCreatedAsync();
 
+             // [NEW] Manual check for core tables as EnsureCreated fails if DB is partially populated
+             try 
+             {
+                 string createAccountTable = @"
+                    CREATE TABLE IF NOT EXISTS account_configs (
+                        id TEXT PRIMARY KEY,
+                        account_name TEXT,
+                        broker TEXT,
+                        description TEXT,
+                        status TEXT,
+                        is_enabled BOOLEAN DEFAULT TRUE,
+                        api_key TEXT,
+                        totp_key TEXT,
+                        pnl NUMERIC DEFAULT 0,
+                        funds_available NUMERIC DEFAULT 0,
+                        funds_utilized NUMERIC DEFAULT 0,
+                        mtm_high NUMERIC DEFAULT 0,
+                        mtm_low NUMERIC DEFAULT 0,
+                        is_feed_active BOOLEAN DEFAULT FALSE,
+                        feed_status_color TEXT DEFAULT '#95A5A6'
+                    );";
+                 
+                 string createStrategyTable = @"
+                    CREATE TABLE IF NOT EXISTS hybrid_strategies (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL UNIQUE,
+                        config_json TEXT NOT NULL,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        last_modified TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        created_by TEXT,
+                        last_modified_by TEXT,
+                        version INTEGER DEFAULT 1,
+                        product_type TEXT
+                    );";
+
+                 string createLogTable = @"
+                    CREATE TABLE IF NOT EXISTS strategy_execution_logs (
+                        id SERIAL PRIMARY KEY,
+                        strategy_id INTEGER,
+                        log_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        log_level TEXT,
+                        message TEXT,
+                        details TEXT
+                    );";
+
+                 await MetadataContext.Database.ExecuteSqlRawAsync(createAccountTable);
+                 await MetadataContext.Database.ExecuteSqlRawAsync(createStrategyTable);
+                 await MetadataContext.Database.ExecuteSqlRawAsync(createLogTable);
+
+                 // [NEW] Patch existing table if columns are missing (ALTER TABLE is idempotent with IF NOT EXISTS in PG 9.6+)
+                 string patchAccountTable = @"
+                    ALTER TABLE account_configs ADD COLUMN IF NOT EXISTS description TEXT;
+                    ALTER TABLE account_configs ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT TRUE;
+                    ALTER TABLE account_configs ADD COLUMN IF NOT EXISTS api_key TEXT;
+                    ALTER TABLE account_configs ADD COLUMN IF NOT EXISTS totp_key TEXT;
+                 ";
+                 await MetadataContext.Database.ExecuteSqlRawAsync(patchAccountTable);
+             }
+             catch (Exception ex)
+             {
+                 Logger.Log("DB", $"Table Creation Warning: {ex.Message}");
+             }
+
              // [NEW] Migrate Strategies from SQLite to Postgres if Postgres is empty
              try 
              {
@@ -172,6 +236,8 @@ namespace Cognexalgo.Core
                                      Broker = broker,
                                      Status = "Offline",
                                      IsEnabled = true,
+                                     ApiKey = apiKey,
+                                     TotpKey = totp
                                      // Description = $"Migrated from local"
                                  };
 

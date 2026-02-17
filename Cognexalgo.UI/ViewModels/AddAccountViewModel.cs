@@ -46,7 +46,9 @@ namespace Cognexalgo.UI.ViewModels
                     Broker = Broker,
                     Description = Description,
                     IsEnabled = true,
-                    Status = "Active"
+                    Status = "Active",
+                    ApiKey = ApiKey,
+                    TotpKey = TotpKey
                 };
 
                 // Add to DB
