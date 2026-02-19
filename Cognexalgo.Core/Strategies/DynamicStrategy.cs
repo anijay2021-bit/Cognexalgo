@@ -21,14 +21,38 @@ namespace Cognexalgo.Core.Strategies
         public DynamicStrategy(TradingEngine engine, string jsonConfig) 
             : base(engine, "Dynamic")
         {
-            _config = JsonConvert.DeserializeObject<DynamicStrategyConfig>(jsonConfig);
-            if (_config != null)
+            try 
             {
-                Name = _config.StrategyName;
+                // [FIX] Handle cases where the JSON might be double-stringified or malformed
+                _config = JsonConvert.DeserializeObject<DynamicStrategyConfig>(jsonConfig);
+                
+                if (_config != null)
+                {
+                    Name = _config.StrategyName ?? "Unnamed_Dynamic";
+                    engine.Logger?.Log("Strategy", $"Loaded Dynamic Strategy: {Name} for {_config.Symbol} with {_config.EntryRules.Count} Entry Rules");
+                    
+                    // [NEW] Resilient Rules Deserialization 
+                    HandleStringifiedRules();
+                    
+                    if (string.IsNullOrEmpty(_config.StrategyName))
+                    {
+                        // Try to infer name from metadata or description if available, or just append ID
+                        Name = $"Strategy_{_config.Symbol}_{DateTime.Now.Ticks}";
+                        engine.Logger?.Log("Strategy", $"[WARNING] StrategyName missing in config. Assigned: {Name}");
+                    }
+                }
+                else 
+                {
+                    engine.Logger?.Log("Strategy", "ERROR: Deserialized DynamicStrategyConfig is NULL");
+                }
+            }
+            catch (Exception ex)
+            {
+                engine.Logger?.Log("Strategy", $"CRITICAL: Failed to deserialize DynamicStrategyConfig: {ex.Message} | JSON: {jsonConfig}");
             }
             
             _evaluator = new RuleEvaluator();
-            _context = new EvaluationContext(new System.Collections.Generic.List<Skender.Stock.Indicators.Quote>());
+            _context = new EvaluationContext(new List<Skender.Stock.Indicators.Quote>());
 
             if (_config != null)
             {
@@ -41,6 +65,15 @@ namespace Cognexalgo.Core.Strategies
             }
             
             _context = new EvaluationContext(_history);
+        }
+
+        private void HandleStringifiedRules()
+        {
+            // The ResilientRuleListConverter handles the property-level deserialization 
+            // the constructor just ensure the Name is set and other basics.
+            // But if we ever need to manually fix them, we can do it here.
+            if (_config.EntryRules == null) _config.EntryRules = new List<Rule>();
+            if (_config.ExitRules == null) _config.ExitRules = new List<Rule>();
         }
 
         public async Task InitializeAsync(List<Skender.Stock.Indicators.Quote> history)
@@ -97,21 +130,34 @@ namespace Cognexalgo.Core.Strategies
             {
                 foreach (var rule in _config.EntryRules)
                 {
+                    // DEBUG: Log Indicator Values
+                    foreach(var cond in rule.Conditions)
+                    {
+                        double left = _context.GetIndicatorValue(cond.Indicator, cond.Period, 0);
+                        double prevLeft = _context.GetIndicatorValue(cond.Indicator, cond.Period, 1);
+                        double right = cond.SourceType == ValueSource.StaticValue ? cond.StaticValue : _context.GetIndicatorValue(cond.RightIndicator, cond.RightPeriod, 0);
+                        double prevRight = cond.SourceType == ValueSource.StaticValue ? cond.StaticValue : _context.GetIndicatorValue(cond.RightIndicator, cond.RightPeriod, 1);
+                        
+                        _engine.Logger?.Log("Strategy", $"[{Name}] Rule Check: {cond.Indicator}({cond.Period}) {cond.Operator} {cond.SourceType} | Current: {left:N2} vs {right:N2} | Prev: {prevLeft:N2} vs {prevRight:N2}");
+                    }
+
                     if (_evaluator.Evaluate(rule, _context))
                     {
-                        Console.WriteLine($"[Dynamic] {_config.StrategyName} Entry: {rule.Action} @ {candle.Close}");
+                        string actionMsg = $"[Dynamic] {Name} Entry Signal: {rule.Action} @ {candle.Close}";
+                        _engine.Logger?.Log("Strategy", actionMsg);
+                        Console.WriteLine(actionMsg);
                         
                         BroadcastSignal(new Signal 
                         {
                             Timestamp = DateTime.Now,
-                            StrategyName = _config.StrategyName,
+                            StrategyName = Name,
                             Symbol = _config.Symbol,
                             SignalType = rule.Action,
                             Price = (double)candle.Close,
                             Reason = rule.Action
                         });
 
-                        await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=_config.StrategyName }, _config.Symbol, rule.Action);
+                        await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
                         _riskManager.InitializeEntry((double)candle.Close, _context);
                         break;
                     }

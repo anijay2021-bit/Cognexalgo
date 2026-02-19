@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Globalization;
 
 namespace Cognexalgo.Core.Services
 {
@@ -13,6 +14,9 @@ namespace Cognexalgo.Core.Services
     {
         private ConcurrentDictionary<string, string> _symbolToToken = new ConcurrentDictionary<string, string>();
         private ConcurrentDictionary<string, int> _symbolToLotSize = new ConcurrentDictionary<string, int>();
+        // [NEW] Cache for distinct expiry dates per index
+        private ConcurrentDictionary<string, HashSet<DateTime>> _indexExpiries = new ConcurrentDictionary<string, HashSet<DateTime>>();
+        
         private const string SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json";
         private bool _hasLoggedSamples = false; // Track if we've logged sample symbols
 
@@ -73,8 +77,28 @@ namespace Cognexalgo.Core.Services
                         foreach (var item in list)
                         {
                             // Map "NIFTY26FEB24500CE" -> "12345"
-                            // Also Map "Nifty 50" -> "99926000" if needed
                             
+                            // [NEW] Capture Expiry for Index Options
+                            if (!string.IsNullOrEmpty(item.Expiry) && !string.IsNullOrEmpty(item.Symbol))
+                            {
+                                if (DateTime.TryParseExact(item.Expiry, "ddMMMyyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime expiryDate))
+                                {
+                                     string indexKey = null;
+                                     // Categorize by index based on Symbol prefix (Index Options only)
+                                     // Optimization: Check for OPTIDX or common index prefixes
+                                     if (item.Symbol.StartsWith("NIFTY") && !item.Symbol.StartsWith("NIFTYIT")) indexKey = "NIFTY";
+                                     else if (item.Symbol.StartsWith("BANKNIFTY")) indexKey = "BANKNIFTY";
+                                     else if (item.Symbol.StartsWith("FINNIFTY")) indexKey = "FINNIFTY";
+                                     
+                                     if (indexKey != null)
+                                     {
+                                         _indexExpiries.AddOrUpdate(indexKey, 
+                                             new HashSet<DateTime> { expiryDate }, 
+                                             (key, existingSet) => { existingSet.Add(expiryDate); return existingSet; });
+                                     }
+                                }
+                            }
+
                             // Key format: SYMBOL (e.g. NIFTY26FEB..., BANKNIFTY...)
                             if (!string.IsNullOrEmpty(item.Symbol) && !string.IsNullOrEmpty(item.Token))
                             {
@@ -431,12 +455,9 @@ namespace Cognexalgo.Core.Services
             }
             return (null, null);
         }
-    }
 
-    /// <summary>
-    /// Token instrument information for option chain building
-    /// </summary>
-    public class TokenInstrumentInfo
+
+        public class TokenInstrumentInfo
     {
         public string Symbol { get; set; }
         public string Token { get; set; }
@@ -444,6 +465,57 @@ namespace Cognexalgo.Core.Services
         public string OptionType { get; set; } // "CE" or "PE"
         public int LotSize { get; set; }
     }
+
+    /// <summary>
+    /// Get the next authoritative expiry date for an index based on Angel One Scrip Master data.
+    /// Eliminates manual day-of-week calculation errors.
+    /// </summary>
+    public DateTime GetNextExpiry(string index, string type = "Weekly")
+    {
+        if (_indexExpiries.TryGetValue(index, out var dates))
+        {
+                // Filter for future dates (Today or later)
+                var validDates = dates.Where(d => d.Date >= DateTime.Today.Date).OrderBy(d => d).ToList();
+                
+                if (!validDates.Any()) 
+                {
+                    Console.WriteLine($"[TokenService] WARNING: No future expiry dates found for {index} in Scrip Master!");
+                    return CalculateFallbackExpiry(index);
+                }
+                
+                if (type.Equals("Weekly", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Return the nearest expiry
+                    return validDates.First();
+                }
+                else // Monthly
+                {
+                    // Logic: Group by month/year and pick the last expiry of the nearest month group
+                    var nextMonthGroup = validDates.GroupBy(d => new { d.Year, d.Month }).First();
+                    return nextMonthGroup.Max();
+                }
+        }
+        
+        Console.WriteLine($"[TokenService] WARNING: Index {index} not found in Expiry Cache! Using Fallback.");
+        return CalculateFallbackExpiry(index);
+    }
+
+    private DateTime CalculateFallbackExpiry(string index)
+    {
+        DayOfWeek expiryDay = DayOfWeek.Thursday;
+        if (index.Contains("BANKNIFTY")) expiryDay = DayOfWeek.Wednesday;
+        if (index.Contains("FINNIFTY")) expiryDay = DayOfWeek.Tuesday;
+        
+        DateTime today = DateTime.Today;
+        int daysUntil = ((int)expiryDay - (int)today.DayOfWeek + 7) % 7;
+        
+        if (daysUntil == 0 && DateTime.Now.Hour >= 15 && DateTime.Now.Minute >= 30)
+            daysUntil = 7;
+            
+        return today.AddDays(daysUntil);
+    }
+    }
+
 
     public class ScripItem
     {

@@ -124,7 +124,8 @@ namespace Cognexalgo.Core.Services
                     if (optionChain.Any())
                     {
                         var spotPrice = await _dataService.GetSpotPriceAsync(index);
-                        var expiryDate = _dataService.GetExpiryDate(index, "Weekly");
+                        // [FIX] Use TokenService for authoritative expiry
+                        var expiryDate = _engine.TokenService.GetNextExpiry(index, "Weekly");
                         var daysToExpiry = (expiryDate - DateTime.Now).TotalDays;
 
                         // 2. Calculate Greeks for each Option

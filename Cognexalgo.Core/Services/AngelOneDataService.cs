@@ -40,7 +40,14 @@ namespace Cognexalgo.Core.Services
                 // MOCK DATA CHECK
                 if (_api.JwtToken == null)
                 {
+                     _logger?.Log("DataService", $"[MOCK] Fetching spot price for {index}");
                      return GenerateMockSpotPrice(index);
+                }
+
+                if (string.IsNullOrEmpty(index))
+                {
+                    _logger?.Log("DataService", "ERROR: GetSpotPriceAsync called with null or empty index name.");
+                    return 0;
                 }
 
                 // Map index name to hardcoded Angel One NSE Index Tokens
@@ -227,11 +234,13 @@ namespace Cognexalgo.Core.Services
             {
                 _logger?.Log("DataService", $"Building option chain for {index} {expiryType} expiry");
 
-                DateTime expiryDate = GetExpiryDate(index, expiryType);
+                // [UPDATED] Use authoritative expiry from TokenService (Scrip Master)
+                DateTime expiryDate = _tokenService.GetNextExpiry(index, expiryType);
+                
                 // CRITICAL: Scrip Master uses 2-digit year format (e.g., "13FEB26" not "13FEB2026")
                 string expiryStr = expiryDate.ToString("ddMMMyy").ToUpper(); 
                 
-                _logger?.Log("DataService", $"Calculated expiry date: {expiryDate:dd-MMM-yyyy}");
+                _logger?.Log("DataService", $"Authoritative Expiry Date: {expiryDate:dd-MMM-yyyy} ({expiryType})");
                 _logger?.Log("DataService", $"Expiry string format (2-digit year): {expiryStr}");
 
                 // Use index directly (NIFTY or BANKNIFTY) - NFO segment for derivatives
@@ -328,51 +337,7 @@ namespace Cognexalgo.Core.Services
 
         #endregion
 
-        #region Expiry Date Calculation
 
-        public DateTime GetExpiryDate(string index, string expiryType)
-        {
-            DateTime today = DateTime.Today;
-
-            if (expiryType.Equals("Weekly", StringComparison.OrdinalIgnoreCase))
-            {
-                // NIFTY weekly expiries are on TUESDAY (changed from Thursday in 2024)
-                int daysUntilTuesday = ((int)DayOfWeek.Tuesday - (int)today.DayOfWeek + 7) % 7;
-                
-                // If today is Tuesday and market has closed (3:30 PM), move to next Tuesday
-                if (daysUntilTuesday == 0 && DateTime.Now.Hour >= 15 && DateTime.Now.Minute >= 30)
-                {
-                    daysUntilTuesday = 7;
-                }
-                
-                DateTime expiryDate = today.AddDays(daysUntilTuesday);
-                _logger?.Log("DataService", $"Weekly expiry calculated: {expiryDate:dd-MMM-yyyy} (Tuesday)");
-                return expiryDate;
-            }
-            else 
-            {
-                // Monthly expiry: Last Tuesday of the month
-                DateTime lastDayOfMonth = new DateTime(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
-                DateTime lastTuesday = lastDayOfMonth;
-                while (lastTuesday.DayOfWeek != DayOfWeek.Tuesday) 
-                    lastTuesday = lastTuesday.AddDays(-1);
-
-                // If we've passed this month's expiry, calculate next month's
-                if (today > lastTuesday || (today == lastTuesday && DateTime.Now.Hour >= 15 && DateTime.Now.Minute >= 30))
-                {
-                    DateTime nextMonth = today.AddMonths(1);
-                    lastDayOfMonth = new DateTime(nextMonth.Year, nextMonth.Month, DateTime.DaysInMonth(nextMonth.Year, nextMonth.Month));
-                    lastTuesday = lastDayOfMonth;
-                    while (lastTuesday.DayOfWeek != DayOfWeek.Tuesday) 
-                        lastTuesday = lastTuesday.AddDays(-1);
-                }
-                
-                _logger?.Log("DataService", $"Monthly expiry calculated: {lastTuesday:dd-MMM-yyyy} (Last Tuesday)");
-                return lastTuesday;
-            }
-        }
-
-        #endregion
 
         #region Mock Data Generation
 
