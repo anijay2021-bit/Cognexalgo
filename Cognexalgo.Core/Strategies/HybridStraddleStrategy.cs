@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Rules;
+using Cognexalgo.Core.Services;
 
 namespace Cognexalgo.Core.Strategies
 {
@@ -14,9 +16,16 @@ namespace Cognexalgo.Core.Strategies
         
         private bool _isPositionOpen = false;
         private HybridStrategySettings _settings;
+        
+        private readonly RuleEvaluator _evaluator;
+        private EvaluationContext _context;
+        private CandleAggregator _aggregator;
+        private readonly List<Skender.Stock.Indicators.Quote> _history = new List<Skender.Stock.Indicators.Quote>();
 
         public HybridStraddleStrategy(TradingEngine engine) : base(engine, "Hybrid Straddle") 
         { 
+            _evaluator = new RuleEvaluator();
+            _context = new EvaluationContext(new List<Skender.Stock.Indicators.Quote>());
         }
 
         public void Initialize(string jsonParams)
@@ -37,12 +46,38 @@ namespace Cognexalgo.Core.Strategies
                         Legs = _settings.Legs;
                         foreach(var leg in Legs) leg.Status = "PENDING";
                     }
+
+                    if (_settings.EntryRules == null) _settings.EntryRules = new List<Rule>();
+                    
+                    int timeframe = ParseTimeframe(_settings.Timeframe);
+                    _aggregator = new CandleAggregator(timeframe);
                 }
             }
             catch (Exception ex) 
             { 
                 Console.WriteLine($"[Hybrid] Init Error: {ex.Message}");
             }
+        }
+        
+        public async Task InitializeAsync(List<Skender.Stock.Indicators.Quote> history)
+        {
+            if (history != null && history.Any())
+            {
+                _history.AddRange(history);
+                Console.WriteLine($"[Hybrid] {Name} initialized with {history.Count} historical candles.");
+            }
+            _context = new EvaluationContext(_history);
+            await Task.CompletedTask;
+        }
+
+        private int ParseTimeframe(string timeframe)
+        {
+            if (string.IsNullOrEmpty(timeframe)) return 1;
+            if (timeframe.Contains("5")) return 5;
+            if (timeframe.Contains("15")) return 15;
+            if (timeframe.Contains("30")) return 30;
+            if (timeframe.Contains("60")) return 60;
+            return 1; // Default 1 min
         }
 
         public List<StrategyLeg> Legs { get; set; } = new List<StrategyLeg>();
@@ -56,6 +91,11 @@ namespace Cognexalgo.Core.Strategies
             
             public int LotSize { get; set; } = 1;
             public string Symbol { get; set; } = "BANKNIFTY";
+
+            // --- Tick Level Rules ---
+            [Newtonsoft.Json.JsonConverter(typeof(ResilientRuleListConverter))]
+            public List<Rule> EntryRules { get; set; } = new List<Rule>();
+            public string Timeframe { get; set; } = "1min";
 
             // --- Dynamic Engine Settings (Hybrid v2.0) ---
             public StrikeSelectionType SelectionType { get; set; } = StrikeSelectionType.ATM;
@@ -77,28 +117,61 @@ namespace Cognexalgo.Core.Strategies
 
             var now = DateTime.Now.TimeOfDay;
             
-            // 1. Check Entry Time for PENDING legs
+            // 1. Update Aggregator for Indicator Evaluation
+            double underlyingLtp = (Symbol == "NIFTY") ? ticker.Nifty.Ltp : ticker.BankNifty.Ltp;
+            if (_aggregator != null && underlyingLtp > 0)
+            {
+                _aggregator.AddTick(DateTime.Now, (decimal)underlyingLtp);
+            }
+
+            // 2. Check Entry Time for PENDING legs
             if (now >= EntryTime && now < ExitTime)
             {
-                foreach (var leg in Legs.Where(l => l.Status == "PENDING"))
-                {
-                    // Calculate Strike based on Selection Mode
-                    if (leg.CalculatedStrike == 0)
-                    {
-                        leg.CalculatedStrike = await SelectStrike(leg, ticker);
-                    }
+                bool shouldEnter = false;
 
-                    // Execute Leg
-                    // Note: ExecuteLeg needs to support passing specific Strike if calculated
-                    // For now, let's assume ExecuteLeg handles the order placement
-                    string result = await _engine.ExecuteLeg(leg, new StrategyConfig { Id=0, Name="Hybrid" }); 
-                    
-                    if (result != "FAILED" && result != "SKIPPED" && result != "PENDING" && result != "ERROR")
+                // Check Dynamic Entry Rules
+                if (_settings.EntryRules != null && _settings.EntryRules.Any() && _aggregator?.CurrentCandle != null)
+                {
+                    var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
+                    liveHistory.Add(_aggregator.CurrentCandle);
+                    var liveContext = new EvaluationContext(liveHistory);
+
+                    foreach (var rule in _settings.EntryRules)
                     {
-                        leg.Status = "OPEN";
-                        leg.OrderId = result;
-                        leg.EntryTime = DateTime.Now;
-                        _isPositionOpen = true;
+                        if (_evaluator.Evaluate(rule, liveContext))
+                        {
+                            shouldEnter = true;
+                            Console.WriteLine($"[Hybrid] Entry Rule matched: {rule.Action}");
+                            break;
+                        }
+                    }
+                }
+                else if (_settings.EntryRules == null || !_settings.EntryRules.Any())
+                {
+                    // Legacy Time-based Entry
+                    shouldEnter = true;
+                }
+
+                if (shouldEnter)
+                {
+                    foreach (var leg in Legs.Where(l => l.Status == "PENDING"))
+                    {
+                        // Calculate Strike based on Selection Mode
+                        if (leg.CalculatedStrike == 0)
+                        {
+                            leg.CalculatedStrike = await SelectStrike(leg, ticker);
+                        }
+
+                        // Execute Leg
+                        string result = await _engine.ExecuteLeg(leg, new StrategyConfig { Id=0, Name="Hybrid" }); 
+                        
+                        if (result != "FAILED" && result != "SKIPPED" && result != "PENDING" && result != "ERROR")
+                        {
+                            leg.Status = "OPEN";
+                            leg.OrderId = result;
+                            leg.EntryTime = DateTime.Now;
+                            _isPositionOpen = true;
+                        }
                     }
                 }
             }

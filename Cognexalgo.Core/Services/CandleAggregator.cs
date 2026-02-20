@@ -9,6 +9,7 @@ namespace Cognexalgo.Core.Services
     {
         private readonly int _timeframeMinutes;
         private Quote _currentCandle;
+        public Quote CurrentCandle => _currentCandle;
 
         public event Action<Quote> OnCandleClosed;
 

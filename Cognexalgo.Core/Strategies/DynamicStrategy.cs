@@ -111,6 +111,47 @@ namespace Cognexalgo.Core.Strategies
             {
                 await _riskManager.CheckExits(ltp, _context);
             }
+            else
+            {
+                // 3. Evaluate Entries on EVERY TICK
+                // We construct a temporary context that includes the historically closed
+                // candles PLUS the currently forming candle from the aggregator.
+                if (_aggregator.CurrentCandle != null)
+                {
+                    var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
+                    liveHistory.Add(_aggregator.CurrentCandle);
+
+                    var liveContext = new EvaluationContext(liveHistory);
+                    await EvaluateEntryRulesAsync(liveContext, (double)_aggregator.CurrentCandle.Close);
+                }
+            }
+        }
+
+        private async Task EvaluateEntryRulesAsync(EvaluationContext context, double currentPrice)
+        {
+            foreach (var rule in _config.EntryRules)
+            {
+                if (_evaluator.Evaluate(rule, context))
+                {
+                    string actionMsg = $"[Dynamic] {Name} Live Entry Signal: {rule.Action} @ {currentPrice}";
+                    _engine.Logger?.Log("Strategy", actionMsg);
+                    Console.WriteLine(actionMsg);
+                    
+                    BroadcastSignal(new Signal 
+                    {
+                        Timestamp = DateTime.Now,
+                        StrategyName = Name,
+                        Symbol = _config.Symbol,
+                        SignalType = rule.Action,
+                        Price = currentPrice,
+                        Reason = rule.Action
+                    });
+
+                    await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
+                    _riskManager.InitializeEntry(currentPrice, context);
+                    break; // Only take one entry per tick
+                }
+            }
         }
 
         private async Task OnCandleClosedAsync(Skender.Stock.Indicators.Quote candle)
@@ -125,43 +166,14 @@ namespace Cognexalgo.Core.Strategies
 
             _engine.Logger?.Log("Strategy", $"[{Name}] Candle Closed: {candle.Date} | Close: {candle.Close}");
 
-            // 2. Evaluate Entry Rules ONLY ON CANDLE CLOSE
+            // 2. Evaluate Entry Rules on CANDLE CLOSE (Fallback/Standard)
+            // If the position wasn't already opened during the live ticks of this candle,
+            // check again on the confirmed close.
             if (!_riskManager.IsPositionOpen)
             {
-                foreach (var rule in _config.EntryRules)
-                {
-                    // DEBUG: Log Indicator Values
-                    foreach(var cond in rule.Conditions)
-                    {
-                        double left = _context.GetIndicatorValue(cond.Indicator, cond.Period, 0);
-                        double prevLeft = _context.GetIndicatorValue(cond.Indicator, cond.Period, 1);
-                        double right = cond.SourceType == ValueSource.StaticValue ? cond.StaticValue : _context.GetIndicatorValue(cond.RightIndicator, cond.RightPeriod, 0);
-                        double prevRight = cond.SourceType == ValueSource.StaticValue ? cond.StaticValue : _context.GetIndicatorValue(cond.RightIndicator, cond.RightPeriod, 1);
-                        
-                        _engine.Logger?.Log("Strategy", $"[{Name}] Rule Check: {cond.Indicator}({cond.Period}) {cond.Operator} {cond.SourceType} | Current: {left:N2} vs {right:N2} | Prev: {prevLeft:N2} vs {prevRight:N2}");
-                    }
-
-                    if (_evaluator.Evaluate(rule, _context))
-                    {
-                        string actionMsg = $"[Dynamic] {Name} Entry Signal: {rule.Action} @ {candle.Close}";
-                        _engine.Logger?.Log("Strategy", actionMsg);
-                        Console.WriteLine(actionMsg);
-                        
-                        BroadcastSignal(new Signal 
-                        {
-                            Timestamp = DateTime.Now,
-                            StrategyName = Name,
-                            Symbol = _config.Symbol,
-                            SignalType = rule.Action,
-                            Price = (double)candle.Close,
-                            Reason = rule.Action
-                        });
-
-                        await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
-                        _riskManager.InitializeEntry((double)candle.Close, _context);
-                        break;
-                    }
-                }
+                 // We can reuse the same tick evaluation logic with the standard context 
+                 // since _history now includes the recently closed candle.
+                 await EvaluateEntryRulesAsync(_context, (double)candle.Close);
             }
         }
         

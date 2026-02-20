@@ -473,6 +473,13 @@ namespace Cognexalgo.Core
                     {
                         var strategy = new Cognexalgo.Core.Strategies.HybridStraddleStrategy(this);
                         strategy.Initialize(config.Parameters);
+                        
+                        if (DataService != null)
+                        {
+                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 2);
+                            await strategy.InitializeAsync(history);
+                        }
+
                         strategy.IsActive = true;
                         strategy.OnSignalGenerated += (s) => OnSignalReceived?.Invoke(s);
                         _activeStrategies.Add(strategy);
