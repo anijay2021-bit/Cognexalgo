@@ -63,6 +63,9 @@
             <RowDefinition Height="Auto"/> <!-- 5. Status Bar -->
         </Grid.RowDefinitions>
 
+        <!-- BRAND BACKGROUND WATERMARK -->
+        <Image Source="Assets/brand_bg.jpg" Opacity="0.08" Stretch="Uniform" Grid.RowSpan="6" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        
         <!-- 0. Menu -->
         <Menu Grid.Row="0" Background="{StaticResource CardBrush}" Foreground="{StaticResource TextMainBrush}" Padding="5" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
             <MenuItem Header="File" Foreground="{StaticResource TextMainBrush}">

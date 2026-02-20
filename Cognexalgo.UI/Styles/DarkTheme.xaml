@@ -4,15 +4,15 @@
     <!-- MARKET MAKER LIGHT THEME -->
     
     <!-- Palette -->
-    <Color x:Key="BackgroundColor">#F3F4F6</Color> <!-- Gray-100 -->
-    <Color x:Key="CardColor">#FFFFFF</Color>       <!-- White -->
-    <Color x:Key="CardHoverColor">#F9FAFB</Color>  <!-- Gray-50 -->
+    <Color x:Key="BackgroundColor">#E6F3F4F6</Color> <!-- Gray-100 (90% Opacity) -->
+    <Color x:Key="CardColor">#CCFFFFFF</Color>       <!-- White (80% Opacity) -->
+    <Color x:Key="CardHoverColor">#D9F9FAFB</Color>  <!-- Gray-50 (85% Opacity) -->
     
     <Color x:Key="PrimaryColor">#10B981</Color>    <!-- Emerald Green -->
     <Color x:Key="DangerColor">#F87171</Color>     <!-- Muted Coral Red -->
     <Color x:Key="AccentColor">#F59E0B</Color>     <!-- Amber -->
     
-    <Color x:Key="BorderColor">#E2E8F0</Color>     <!-- Slate-200 (Softer Border) -->
+    <Color x:Key="BorderColor">#CAD1D9</Color>     <!-- Slate-300 (Slightly darker for transparency contrast) -->
     <Color x:Key="TextMainColor">#1E293B</Color>   <!-- Slate-800 -->
     <Color x:Key="TextMutedColor">#64748B</Color>  <!-- Slate-500 -->
     

@@ -21,6 +21,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Assets\brand_bg.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\splash_screen.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
