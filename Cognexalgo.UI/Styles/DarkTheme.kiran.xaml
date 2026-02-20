@@ -8,13 +8,13 @@
     <Color x:Key="CardColor">#FFFFFF</Color>       <!-- White -->
     <Color x:Key="CardHoverColor">#F9FAFB</Color>  <!-- Gray-50 -->
     
-    <Color x:Key="PrimaryColor">#10B981</Color>    <!-- Emerald Green -->
-    <Color x:Key="DangerColor">#F87171</Color>     <!-- Muted Coral Red -->
-    <Color x:Key="AccentColor">#F59E0B</Color>     <!-- Amber -->
+    <Color x:Key="PrimaryColor">#059669</Color>    <!-- Emerald-600 (Darker Green for contrast) -->
+    <Color x:Key="DangerColor">#DC2626</Color>     <!-- Red-600 (Darker Red for contrast) -->
+    <Color x:Key="AccentColor">#D97706</Color>     <!-- Amber-600 -->
     
-    <Color x:Key="BorderColor">#E2E8F0</Color>     <!-- Slate-200 (Softer Border) -->
-    <Color x:Key="TextMainColor">#1E293B</Color>   <!-- Slate-800 -->
-    <Color x:Key="TextMutedColor">#64748B</Color>  <!-- Slate-500 -->
+    <Color x:Key="BorderColor">#6B7280</Color>     <!-- Gray-500 (Dark Gris) -->
+    <Color x:Key="TextMainColor">#111827</Color>   <!-- Gray-900 (Black-ish) -->
+    <Color x:Key="TextMutedColor">#6B7280</Color>  <!-- Gray-500 -->
     
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
@@ -47,19 +47,13 @@
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <ScaleTransform ScaleX="1" ScaleY="1"/>
-            </Setter.Value>
-        </Setter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border Background="{TemplateBinding Background}" 
                             BorderBrush="{TemplateBinding BorderBrush}" 
                             BorderThickness="{TemplateBinding BorderThickness}" 
-                            CornerRadius="6">
+                            CornerRadius="4">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                 </ControlTemplate>
@@ -67,31 +61,10 @@
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.02" Duration="0:0:0.1" />
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.02" Duration="0:0:0.1" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.1" />
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.1" />
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
-                <Setter Property="Opacity" Value="0.95"/>
+                <Setter Property="Background" Value="#F3F4F6"/>
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="Background" Value="#E5E7EB"/>
-                <Setter Property="RenderTransform">
-                    <Setter.Value>
-                        <ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
-                    </Setter.Value>
-                </Setter>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -135,7 +108,7 @@
     <Style TargetType="DataGrid" x:Key="DarkDataGridStyle">
         <Setter Property="Background" Value="White"/>
         <Setter Property="RowBackground" Value="White"/>
-        <Setter Property="AlternatingRowBackground" Value="#FAFAFA"/>
+        <Setter Property="AlternatingRowBackground" Value="White"/>
         <Setter Property="Foreground" Value="{StaticResource TextDarkBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
@@ -173,14 +146,7 @@
     </Style>
 
     <Style TargetType="DataGridColumnHeader">
-        <Setter Property="Background">
-            <Setter.Value>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#F3F4F6" Offset="0.0"/>
-                    <GradientStop Color="#E5E7EB" Offset="1.0"/>
-                </LinearGradientBrush>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Background" Value="#E5E7EB"/> <!-- Excel Header Gray -->
         <Setter Property="Foreground" Value="{StaticResource TextMainBrush}"/>
         <Setter Property="Padding" Value="6,0"/>
         <Setter Property="BorderThickness" Value="0,0,1,1"/> <!-- Right/Bottom Border -->
@@ -332,13 +298,12 @@
 
     <!-- FLASH CELL STYLE -->
     <Style TargetType="DataGridCell" x:Key="FlashCellStyle" BasedOn="{StaticResource {x:Type DataGridCell}}">
-        <Setter Property="Background" Value="Transparent"/>
         <Style.Triggers>
             <EventTrigger RoutedEvent="Binding.TargetUpdated">
                 <BeginStoryboard>
                     <Storyboard>
                         <ColorAnimation Storyboard.TargetProperty="(Background).(SolidColorBrush.Color)"
-                                        From="#10B981" To="Transparent" Duration="0:0:0.8" AutoReverse="False" />
+                                        From="{StaticResource CardHoverColor}" To="Transparent" Duration="0:0:0.5"/>
                     </Storyboard>
                 </BeginStoryboard>
             </EventTrigger>

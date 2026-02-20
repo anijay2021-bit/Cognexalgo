@@ -10,9 +10,7 @@
         Height="{Binding WindowHeight, Mode=TwoWay}" 
         Width="{Binding WindowWidth, Mode=TwoWay}"
         Background="#F9FAFB" WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI Variable, Inter, Segoe UI, sans-serif"
-        TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="Segoe UI"
         Closing="Window_Closing"
         PreviewKeyDown="Window_PreviewKeyDown">
 
@@ -715,9 +713,9 @@
                 
                 <TextBlock Text="Global Settings" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" Margin="5,0,0,10"/>
 
-                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="24">
+                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="8" Padding="20">
                     <Border.Effect>
-                        <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="25" ShadowDepth="2"/>
+                        <DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="10" ShadowDepth="2"/>
                     </Border.Effect>
                     <Grid>
                         <Grid.RowDefinitions>
@@ -773,9 +771,9 @@
 
                 <TextBlock Text="Logs &amp; Events" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" Margin="5,0,0,10"/>
 
-                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="12">
+                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="8" Padding="10">
                     <Border.Effect>
-                        <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="25" ShadowDepth="2"/>
+                        <DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="10" ShadowDepth="2"/>
                     </Border.Effect>
                     <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent" 
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -795,54 +793,23 @@
         <Border Grid.Row="5" Background="{StaticResource BackgroundBrush}" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <!-- Connection Status (Left) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0">
-                    <TextBlock Text="Daily Protocol Check" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="#EF444433"/> <!-- Red background by default -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Margin="0,0,8,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Status}" Value="Running">
-                                        <Setter Property="Background" Value="#10B98133"/> <!-- Green background when running -->
+                                        <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Connecting...">
+                                        <Setter Property="Fill" Value="{StaticResource WarningBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </Border.Style>
-                        <StackPanel Orientation="Horizontal">
-                            <!-- SVG Path for Check Circle -->
-                            <Path x:Name="CheckIcon" Width="10" Height="10" Stretch="Uniform" Fill="{StaticResource DangerBrush}" Margin="0,0,4,0" VerticalAlignment="Center">
-                                <Path.Style>
-                                    <Style TargetType="Path">
-                                        <!-- Default X icon for disconnected -->
-                                        <Setter Property="Data" Value="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
-                                        <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Running">
-                                                <!-- Checkmark icon when running -->
-                                                <Setter Property="Data" Value="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                                <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Path.Style>
-                            </Path>
-                            <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Running">
-                                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Connecting...">
-                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource TextMainBrush}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Index Tickers (Center) -->
