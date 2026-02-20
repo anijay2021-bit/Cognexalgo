@@ -89,10 +89,12 @@ namespace Cognexalgo.UI.ViewModels
         public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
 
         public AccountManagerViewModel AccountManager { get; } 
+        public SafeExitService SafeExitService { get; private set; } // [NEW]
 
-        private BootstrapperService _bootstrapper; // [NEW]
+        private BootstrapperService _bootstrapper; 
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(StartEngineCommand))]
         private bool _isInitialized = false;
 
         [ObservableProperty]
@@ -107,17 +109,11 @@ namespace Cognexalgo.UI.ViewModels
             _engine = engine;
             _engine.IsPaperTrading = !IsLiveMode; // Sync initial state
             
+            // Initialize Services
+            SafeExitService = new SafeExitService(_engine, _engine.MetadataContext); // [NEW]
+
             // Initialize Sub-ViewModels
             AccountManager = new AccountManagerViewModel(_engine);
-            
-            // Initialize Bootstrapper
-            // Ideally injected, but for now instantiating with existing engine dependencies
-            // We need IConfiguration, let's assume Engine has it or we pass null/placeholder if not critical for now
-            // Or better, we can get it from App.Current if available as a static resource or similar. 
-            // The user prompt asked to write the service, integration implies usage.
-            // For this snippet, I will assume we can construct it or it should be passed in. 
-            // _bootstrapper = new BootstrapperService(_engine, _engine.DataService, _engine.Configuration); 
-            // We need to ensure Engine has these public or accessible. 
             
             // Subscribe to Engine Events
             _engine.Ticker.OnTickReceived += OnTick;
@@ -183,6 +179,7 @@ namespace Cognexalgo.UI.ViewModels
                 // Load UI Data after Bootstrap
                 await LoadStrategies();
                 await AccountManager.LoadAccountsAsync(); // Sequential load to avoid DbContext concurrency
+                Log("Initialization Complete. All systems Ready.");
             }
             catch (Exception ex)
             {

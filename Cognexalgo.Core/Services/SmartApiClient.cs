@@ -280,14 +280,34 @@ namespace Cognexalgo.Core.Services
                 CheckAuth(response);
                 
                 var responseString = await response.Content.ReadAsStringAsync();
-                var ltpResponse = JsonConvert.DeserializeObject<LTPResponse>(responseString);
+                
+                LTPResponse ltpResponse = null;
+                try 
+                {
+                    ltpResponse = JsonConvert.DeserializeObject<LTPResponse>(responseString);
+                }
+                catch (Exception)
+                {
+                    // If JSON parsing fails (e.g. "Internal Server Error" text), return null to trigger fallback
+                    System.Diagnostics.Debug.WriteLine($"Non-JSON response for {tradingSymbol}: {responseString.Substring(0, Math.Min(responseString.Length, 100))}");
+                    return null;
+                }
+
+                if (ltpResponse != null && ltpResponse.Status == false)
+                {
+                    // API returned valid JSON but with Status=False (e.g. specific error)
+                    // We log it but still return null to allow fallback to try Batch API
+                    System.Diagnostics.Debug.WriteLine($"API Error for {tradingSymbol}: {ltpResponse.Message}");
+                    return null;
+                }
 
                 return ltpResponse;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"GetLTPData Error for {tradingSymbol}: {ex.Message}");
-                return null;
+                // Network/HTTP errors
+                System.Diagnostics.Debug.WriteLine($"GetLTPData Failed: {ex.Message}");
+                return null; 
             }
         }
 
@@ -310,14 +330,31 @@ namespace Cognexalgo.Core.Services
                     throw new ArgumentException("Maximum 50 tokens allowed per batch request");
 
                 // Angel One batch market data API endpoint
-                var payload = new
+                // Angel One batch market data API endpoint
+                object payload;
+                
+                if (exchange == "NSE")
                 {
-                    mode = "FULL", // FULL mode includes LTP
-                    exchangeTokens = new
+                     payload = new
                     {
-                        NFO = tokens // Can also support NSE, BSE, etc.
-                    }
-                };
+                        mode = "FULL",
+                        exchangeTokens = new
+                        {
+                            NSE = tokens
+                        }
+                    };
+                }
+                else
+                {
+                    payload = new
+                    {
+                        mode = "FULL",
+                        exchangeTokens = new
+                        {
+                            NFO = tokens
+                        }
+                    };
+                }
 
                 var json = JsonConvert.SerializeObject(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -328,19 +365,21 @@ namespace Cognexalgo.Core.Services
                 var responseString = await response.Content.ReadAsStringAsync();
                 var batchResponse = JsonConvert.DeserializeObject<MarketDataBatchResponse>(responseString);
 
-                if (batchResponse?.Status != true || batchResponse.Data?.FetchedData == null)
+                if (batchResponse?.Status != true)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Batch market data request failed: {batchResponse?.Message}");
-                    return new System.Collections.Generic.Dictionary<string, double>();
+                    throw new Exception($"Batch API Error: {batchResponse?.Message ?? "Unknown Error"}");
                 }
 
                 // Map token -> LTP
                 var result = new System.Collections.Generic.Dictionary<string, double>();
-                foreach (var item in batchResponse.Data.FetchedData)
+                if (batchResponse.Data?.FetchedData != null)
                 {
-                    if (item?.SymbolToken != null && item.Ltp.HasValue)
+                    foreach (var item in batchResponse.Data.FetchedData)
                     {
-                        result[item.SymbolToken] = item.Ltp.Value;
+                        if (item?.SymbolToken != null && item.Ltp.HasValue)
+                        {
+                            result[item.SymbolToken] = item.Ltp.Value;
+                        }
                     }
                 }
 
@@ -348,8 +387,7 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"GetMarketDataBatch Error: {ex.Message}");
-                return new System.Collections.Generic.Dictionary<string, double>();
+                throw new Exception($"Batch Market Data Failed: {ex.Message}");
             }
         }
 

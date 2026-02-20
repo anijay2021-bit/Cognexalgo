@@ -700,6 +700,14 @@ namespace Cognexalgo.Core
         {
             try
             {
+                if (string.IsNullOrEmpty(leg.Index))
+                {
+                    Logger.Log("Hybrid", "ERROR: Strategy Leg is missing an Index symbol (e.g., NIFTY). Skipping leg.");
+                    return "FAILED";
+                }
+
+                Logger.Log("Hybrid", $"Executing Leg for {leg.Index} | {leg.OptionType} | {leg.Action}");
+
                 // 1. Get spot price for the index
                 double spotPrice = await GetSpotPriceWithRetry(leg.Index);
                 Logger.Log("Hybrid", $"Spot Price for {leg.Index}: ₹{spotPrice:N2}");

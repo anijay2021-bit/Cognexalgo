@@ -127,6 +127,37 @@ namespace Cognexalgo.Core.Rules
         Monthly
     }
 
+    public class ResilientRuleListConverter : JsonConverter<List<Rule>>
+    {
+        public override List<Rule> ReadJson(JsonReader reader, Type objectType, List<Rule> existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            if (reader.TokenType == JsonToken.String)
+            {
+                string json = (string)reader.Value;
+                if (string.IsNullOrEmpty(json) || json == "[]") return new List<Rule>();
+                try {
+                    return JsonConvert.DeserializeObject<List<Rule>>(json);
+                } catch {
+                    return new List<Rule>();
+                }
+            }
+            
+            if (reader.TokenType == JsonToken.Null) return new List<Rule>();
+            
+            try {
+                var JArray = Newtonsoft.Json.Linq.JArray.Load(reader);
+                return JArray.ToObject<List<Rule>>();
+            } catch {
+                return new List<Rule>();
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, List<Rule> value, JsonSerializer serializer)
+        {
+            serializer.Serialize(writer, value);
+        }
+    }
+
     public class DynamicStrategyConfig
     {
         public string StrategyName { get; set; }
@@ -142,9 +173,11 @@ namespace Cognexalgo.Core.Rules
         // Logic: N Rules. 
         // If "Match All", UI sends 1 Rule with N Conditions.
         // If "Match Any", UI sends N Rules with 1 Condition each.
+        [JsonConverter(typeof(ResilientRuleListConverter))]
         public System.Collections.Generic.List<Rule> EntryRules { get; set; } = new System.Collections.Generic.List<Rule>();
         
         // Standard signal-based exits (e.g., RSI > 80)
+        [JsonConverter(typeof(ResilientRuleListConverter))]
         public System.Collections.Generic.List<Rule> ExitRules { get; set; } = new System.Collections.Generic.List<Rule>();
         
         // Advanced risk-based exits

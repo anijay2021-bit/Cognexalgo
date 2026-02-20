@@ -14,6 +14,10 @@ namespace Cognexalgo.Core.Data
         public DbSet<AccountConfig> AccountConfigs { get; set; }
         public DbSet<ActivePosition> ActivePositions { get; set; }
         
+        // [NEW] Safe-Exit Protocol
+        public DbSet<ClientSession> ClientSessions { get; set; }
+        public DbSet<TradeHistory> TradeHistory { get; set; }
+        
         private readonly IConfiguration _configuration;
 
         public AlgoDbContext()

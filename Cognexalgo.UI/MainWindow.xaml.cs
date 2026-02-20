@@ -82,12 +82,50 @@ namespace Cognexalgo.UI
             Close();
         }
 
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        private bool _isSafeExitComplete = false;
+
+        private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isSafeExitComplete) return;
+
+            // 1. Cancel immediate close
+            e.Cancel = true;
+
+            // 2. Show Sync Overlay
+            // Assuming we'll add a Grid named "SyncOverlay" in XAML
+            if (SyncOverlay != null) SyncOverlay.Visibility = Visibility.Visible;
+
+            // 3. Run Safe Exit Logic
             if (DataContext is ViewModels.MainViewModel vm)
             {
                 vm.SaveSettings();
+                
+                // Get SafeExitService from VM
+                if (vm.SafeExitService != null)
+                {
+                    bool success = await vm.SafeExitService.ExecuteSafeExitAsync();
+                    
+                    if (!success)
+                    {
+                        var result = MessageBox.Show(
+                            "Safe-Exit Sync Failed! Data or Code might not be backed up.\n\n" +
+                            "Do you want to retry?",
+                            "Sync Failed",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            if (SyncOverlay != null) SyncOverlay.Visibility = Visibility.Collapsed;
+                            return; // User cancelled exit to retry
+                        }
+                    }
+                }
             }
+
+            // 4. Force Shutdown after sync
+            _isSafeExitComplete = true;
+            Application.Current.Shutdown();
         }
 
         private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
