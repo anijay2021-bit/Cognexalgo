@@ -230,11 +230,11 @@ namespace Cognexalgo.UI.ViewModels
         [NotifyPropertyChangedFor(nameof(IsHybridVisible))]
         private string _selectedStrategyType = "Dynamic (Rule Based)";
 
-        public ObservableCollection<string> StrategyTypes { get; } = new ObservableCollection<string> { "Dynamic (Rule Based)", "Calendar Straddle", "Hybrid" };
+        public ObservableCollection<string> StrategyTypes { get; } = new ObservableCollection<string> { "Dynamic (Rule Based)", "Calendar Straddle", "Hybrid", "Straddle/Strangle" };
 
-        public bool IsRuleBuilderVisible => SelectedStrategyType == "Dynamic (Rule Based)" || SelectedStrategyType == "Hybrid";
+        public bool IsRuleBuilderVisible => SelectedStrategyType == "Dynamic (Rule Based)" || SelectedStrategyType == "Hybrid" || SelectedStrategyType == "Straddle/Strangle";
         public bool IsCalendarVisible => SelectedStrategyType == "Calendar Straddle";
-        public bool IsHybridVisible => SelectedStrategyType == "Hybrid";
+        public bool IsHybridVisible => SelectedStrategyType == "Hybrid" || SelectedStrategyType == "Straddle/Strangle";
 
         [ObservableProperty]
         private string _calendarEntryTime = "09:30";

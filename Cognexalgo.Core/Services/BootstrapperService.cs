@@ -69,6 +69,26 @@ namespace Cognexalgo.Core.Services
             {
                 throw new Exception("Cannot connect to Database. Check internet connection.");
             }
+
+            // Ensure Database Schema Exists (Self-Healing)
+            // This is critical for new deployments or when new tables (like HybridStrategies) are added
+            try
+            {
+                await _engine.MetadataContext.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS ""hybrid_strategies"" (
+                        ""Id"" SERIAL PRIMARY KEY,
+                        ""Name"" TEXT,
+                        ""StrategyType"" TEXT,
+                        ""IsActive"" BOOLEAN,
+                        ""Parameters"" TEXT,
+                        ""Reason"" TEXT
+                    );
+                ");
+            }
+            catch (Exception ex)
+            {
+                _engine.Logger.Log("Bootstrapper", $"Schema Check Warning: {ex.Message}");
+            }
             
             // Pre-load Active Strategies into Engine Memory
             // This ensures the UI (StrategiesViewModel) can display them immediately

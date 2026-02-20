@@ -53,15 +53,18 @@ namespace Cognexalgo.Core.Rules
                 {
                     case IndicatorType.SMA:
                         var sma = Candidates.GetSma(period).ToList();
-                        return GetValue(sma, offset);
+                        if (sma.Count <= offset) return 0;
+                        return (double)(sma[sma.Count - 1 - offset].Sma ?? 0);
 
                     case IndicatorType.EMA:
                         var ema = Candidates.GetEma(period).ToList();
-                        return GetValue(ema, offset);
+                        if (ema.Count <= offset) return 0;
+                        return (double)(ema[ema.Count - 1 - offset].Ema ?? 0);
 
                     case IndicatorType.RSI:
                         var rsi = Candidates.GetRsi(period).ToList();
-                        return GetValue(rsi, offset);
+                        if (rsi.Count <= offset) return 0;
+                        return (double)(rsi[rsi.Count - 1 - offset].Rsi ?? 0);
                         
                     case IndicatorType.MACD:
                         var macd = Candidates.GetMacd(12, 26, 9).ToList(); 
@@ -73,34 +76,30 @@ namespace Cognexalgo.Core.Rules
 
                     case IndicatorType.ATR:
                         var atr = Candidates.GetAtr(period).ToList();
-                        return GetValue(atr, offset);
+                        if (atr.Count <= offset) return 0;
+                        return (double)(atr[atr.Count - 1 - offset].Atr ?? 0);
                     
                     case IndicatorType.BOLLINGER_BANDS:
                         var bb = Candidates.GetBollingerBands(period, 2).ToList();
+                        if (bb.Count <= offset) return 0;
                         return (double)(bb[bb.Count - 1 - offset].UpperBand ?? 0);
 
                      case IndicatorType.LTP:
+                        if (Candidates.Count <= offset) return 0;
                         return (double)Candidates[Candidates.Count - 1 - offset].Close;
 
                     default:
                         return 0;
                 }
             }
-            catch 
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Indicator Error] {type} Calculation Failed: {ex.Message}");
                 return 0;
             }
         }
 
-        private double GetValue<T>(List<T> results, int offset) 
-        {
-             if (results.Count <= offset) return 0;
-             // Reflection or dynamic to get "Value" property
-             // Most Skender results have "Value" as decimal?
-             dynamic item = results[results.Count - 1 - offset];
-             var val = item.Value;
-             return val != null ? (double)val : 0;
-        }
+        // Removed GetValue as it was causing dynamic dispatch errors with Skender results
 
         // Special helpers for complex results
         private double GetMacdValue(List<MacdResult> results, int offset, string component)
