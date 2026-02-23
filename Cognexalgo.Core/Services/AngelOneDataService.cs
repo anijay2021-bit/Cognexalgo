@@ -25,7 +25,7 @@ namespace Cognexalgo.Core.Services
             _api = api ?? throw new ArgumentNullException(nameof(api));
             _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
             _logger = logger;
-            _rateLimiter = new ApiRateLimiter(maxRequestsPerSecond: 10);
+            _rateLimiter = new ApiRateLimiter(maxRequestsPerSecond: 3);
         }
 
         #region Spot Price Fetching
@@ -116,7 +116,8 @@ namespace Cognexalgo.Core.Services
             {
                 try
                 {
-                    var history = await GetHistoryAsync(index, "ONE_MINUTE", 2);
+                    // Fetch 7 days instead of 2 to ensure we have enough data for 200 EMA, even over weekends
+                    var history = await GetHistoryAsync(index, "ONE_MINUTE", 7);
                     if (history != null && history.Any())
                     {
                         _indexHistory[index.ToUpper()] = history;
@@ -125,7 +126,7 @@ namespace Cognexalgo.Core.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger?.Log("DataService", $"EROR: Pre-fetching {index} failed: {ex.Message}");
+                    _logger?.Log("DataService", $"ERROR: Pre-fetching {index} failed: {ex.Message}");
                 }
             }
         }

@@ -103,6 +103,10 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty]
         private string _loadingStatus = "Initializing...";
 
+        private bool _isFetchingOptionChain = false;
+        private bool _isFetchingPositions = false;
+        private bool _isFetchingOrders = false;
+
         public MainViewModel(TradingEngine engine)
         {
             // Initialize Engine
@@ -514,14 +518,14 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task FetchOptionChain(string index = "NIFTY")
         {
-            if (_engine == null || _engine.DataService == null)
+            if (_engine == null || _engine.DataService == null || _isFetchingOptionChain)
             {
-                Log("DataService not initialized. Cannot fetch option chain.");
                 return;
             }
 
             try
             {
+                _isFetchingOptionChain = true;
                 var chain = await _engine.DataService.BuildOptionChainAsync(index, "WEEKLY");
                 if (chain == null) return;
 
@@ -547,9 +551,9 @@ namespace Cognexalgo.UI.ViewModels
                 });
                 Log($"✓ Fetched {OptionChain.Count} options for {index}. Greeks calculated.", "SUCCESS");
             }
-            catch (Exception ex)
+            finally
             {
-                Log($"Error Fetching Option Chain: {ex.Message}", "ERROR");
+                _isFetchingOptionChain = false;
             }
         }
         
@@ -577,14 +581,14 @@ namespace Cognexalgo.UI.ViewModels
         public async Task FetchPositions()
         {
             // Check if engine and API are initialized
-            if (_engine == null || _engine.Api == null) 
+            if (_engine == null || _engine.Api == null || _isFetchingPositions) 
             {
-                Log("Cannot fetch positions: Trading engine not initialized.");
                 return;
             }
             
             try 
             {
+                _isFetchingPositions = true;
                 var positions = await _engine.Api.GetPositionAsync();
                 
                 // Check if positions is null
@@ -612,15 +616,20 @@ namespace Cognexalgo.UI.ViewModels
             {
                 Log($"Error Fetching Positions: {ex.Message}");
             }
+            finally
+            {
+                _isFetchingPositions = false;
+            }
         }
 
         [RelayCommand]
         public async Task FetchOrders()
         {
-            if (_engine == null || _engine.Api == null) return;
+            if (_engine == null || _engine.Api == null || _isFetchingOrders) return;
 
             try
             {
+                _isFetchingOrders = true;
                 var orders = await _engine.Api.GetOrderBookAsync();
 
                 if (orders == null) return;
@@ -661,9 +670,9 @@ namespace Cognexalgo.UI.ViewModels
                 });
                 // Log($"Fetched {orders.Count} Orders."); // Verbose logging, maybe skip
             }
-            catch (Exception ex)
+            finally
             {
-                Log($"Error Fetching Orders: {ex.Message}");
+                _isFetchingOrders = false;
             }
         }
 

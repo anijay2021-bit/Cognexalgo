@@ -286,7 +286,7 @@ namespace Cognexalgo.Core.Services
                 {
                     ltpResponse = JsonConvert.DeserializeObject<LTPResponse>(responseString);
                 }
-                catch (JsonException ex)
+                catch (Newtonsoft.Json.JsonException ex)
                 {
                     // If JSON parsing fails (e.g. "Internal Server Error" text), return null to trigger fallback
                     string preview = responseString.Length > 200 ? responseString.Substring(0, 200) : responseString;
@@ -370,10 +370,10 @@ namespace Cognexalgo.Core.Services
                 {
                     batchResponse = JsonConvert.DeserializeObject<MarketDataBatchResponse>(responseString);
                 }
-                catch (JsonException ex)
+                catch (Newtonsoft.Json.JsonException ex)
                 {
                     string preview = responseString.Length > 200 ? responseString.Substring(0, 200) : responseString;
-                    throw new Exception($"Batch Market Data Failed: Non-JSON response (Status: {response.StatusCode}). Body: {preview}", ex);
+                    throw new Exception($"Non-JSON response (Status: {response.StatusCode}). Body: {preview}", ex);
                 }
 
                 if (batchResponse?.Status != true)
@@ -398,7 +398,7 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Batch Market Data Failed: {ex.Message}");
+                throw new Exception($"Batch Market Data Failed: {ex.Message}", ex);
             }
         }
 

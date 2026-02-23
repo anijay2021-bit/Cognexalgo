@@ -80,8 +80,9 @@ namespace Cognexalgo.Core.Strategies
         {
             if (history != null && history.Any())
             {
+                _history.Clear();
                 _history.AddRange(history);
-                Console.WriteLine($"[Strategy] {Name} initialized with {history.Count} historical candles.");
+                Console.WriteLine($"[Strategy] {Name} initialized with {_history.Count} historical candles.");
             }
             await Task.CompletedTask;
         }
@@ -121,6 +122,8 @@ namespace Cognexalgo.Core.Strategies
                     var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
                     liveHistory.Add(_aggregator.CurrentCandle);
 
+                    // Console.WriteLine($"[DynamicStrategy] Evaluator passing {liveHistory.Count} candles to context.");
+                    
                     var liveContext = new EvaluationContext(liveHistory);
                     await EvaluateEntryRulesAsync(liveContext, (double)_aggregator.CurrentCandle.Close);
                 }
@@ -129,9 +132,18 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task EvaluateEntryRulesAsync(EvaluationContext context, double currentPrice)
         {
+            if (_config.EntryRules == null || !_config.EntryRules.Any()) 
+            {
+                // _engine.Logger?.Log("Strategy", $"[{Name}] No entry rules defined.");
+                return;
+            }
+
             foreach (var rule in _config.EntryRules)
             {
-                if (_evaluator.Evaluate(rule, context))
+                bool isMatch = _evaluator.Evaluate(rule, context, (msg) => _engine.Logger?.Log("Strategy", msg));
+                // _engine.Logger?.Log("Strategy", $"[RuleEval] {Name} => Rule {rule.Action}: Match={isMatch}");
+
+                if (isMatch)
                 {
                     string actionMsg = $"[Dynamic] {Name} Live Entry Signal: {rule.Action} @ {currentPrice}";
                     _engine.Logger?.Log("Strategy", actionMsg);

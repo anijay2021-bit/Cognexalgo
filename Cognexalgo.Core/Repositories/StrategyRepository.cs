@@ -44,8 +44,23 @@ namespace Cognexalgo.Core.Repositories
                IsActive = h.IsActive, 
                StrategyType = h.StrategyType, 
                Parameters = h.Parameters,
-               Symbol = h.Legs.FirstOrDefault()?.Index ?? "NIFTY"
+               Symbol = GetSymbolFromParameters(h.Parameters) ?? h.Legs.FirstOrDefault()?.Index ?? "NIFTY"
             });
+        }
+        
+        private string GetSymbolFromParameters(string jsonParams)
+        {
+            if (string.IsNullOrEmpty(jsonParams)) return null;
+            try
+            {
+                var dict = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonParams);
+                if (dict != null && dict.TryGetValue("Symbol", out var symbolObj))
+                {
+                    return symbolObj?.ToString();
+                }
+            }
+            catch { }
+            return null;
         }
 
         public async Task AddAsync(StrategyConfig strategy) { }

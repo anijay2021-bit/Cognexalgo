@@ -446,11 +446,12 @@ namespace Cognexalgo.Core
             var strategies = await StrategyRepository.GetAllActiveAsync();
             _activeStrategies.Clear(); // Reset list on start
 
-            Console.WriteLine($"Found {strategies.Count()} active strategies.");
-            Logger.Log("Engine", $"Found {strategies.Count()} active strategies.");
+            Console.WriteLine($"Found {strategies.Count()} active strategies in DB.");
+            Logger.Log("Engine", $"Found {strategies.Count()} active strategies in DB.");
 
             foreach (var config in strategies)
             {
+                Logger.Log("Engine", $"Attempting to load strategy: {config.Name} (Type: {config.StrategyType})");
                 try 
                 {
                     if (config.StrategyType == "CUSTOM" || config.StrategyType == "DYNAMIC")
@@ -460,14 +461,15 @@ namespace Cognexalgo.Core
                         // [NEW] Fetch History for Technical Indicators (e.g. 200 EMA)
                         if (DataService != null)
                         {
-                            // Fetch 2 days of history to ensure 200 EMA has enough data
-                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 2);
+                            // Fetch 7 days of history to ensure 200 EMA has enough data
+                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 7);
                             await strategy.InitializeAsync(history);
                         }
 
                         strategy.IsActive = true;
                         strategy.OnSignalGenerated += (s) => OnSignalReceived?.Invoke(s);
                         _activeStrategies.Add(strategy);
+                        Logger.Log("Engine", $"Successfully loaded DynamicStrategy: {config.Name}");
                     }
                     else if (config.StrategyType == "HYBRID")
                     {
@@ -476,7 +478,7 @@ namespace Cognexalgo.Core
                         
                         if (DataService != null)
                         {
-                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 2);
+                            var history = await DataService.GetHistoryAsync(config.Symbol, "ONE_MINUTE", 7);
                             await strategy.InitializeAsync(history);
                         }
 
