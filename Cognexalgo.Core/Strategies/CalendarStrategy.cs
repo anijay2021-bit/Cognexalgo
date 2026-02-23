@@ -125,13 +125,18 @@ namespace Cognexalgo.Core.Strategies
             var leg3 = CreateLeg("CE", ActionType.Sell, "Weekly", 1);
             var leg4 = CreateLeg("PE", ActionType.Sell, "Weekly", 1);
 
-            await Task.WhenAll(ExecuteLeg(leg1), ExecuteLeg(leg2), ExecuteLeg(leg3), ExecuteLeg(leg4));
+            // [MARGIN OPTIMIZATION] Execute Buys (Monthly Long) first to get margin benefit
+            await Task.WhenAll(ExecuteLeg(leg1), ExecuteLeg(leg2));
+            
+            // Execute Sells (Weekly Short) only after Buys are confirmed
+            await Task.WhenAll(ExecuteLeg(leg3), ExecuteLeg(leg4));
         }
 
         private StrategyLeg CreateLeg(string type, ActionType action, string expiryType, int offset)
         {
              return new StrategyLeg 
              {
+                 Index = _config.Symbol, // FIX 1: Set Index so ExecuteLeg can resolve spot/chain
                  SymbolToken = $"{_config.Symbol} {expiryType} {type}", // Placeholder, will be resolved by Engine
                  OptionType = type == "CE" ? OptionType.Call : OptionType.Put,
                  Action = action,
@@ -192,45 +197,28 @@ namespace Cognexalgo.Core.Strategies
             await Task.WhenAll(ExecuteLeg(leg1), ExecuteLeg(leg2));
         }
 
+        /// <summary>
+        /// FIX 4: Uses authoritative TokenService expiry data from Scrip Master
+        /// instead of broken manual day-of-week calculations.
+        /// Returns true if the next weekly expiry == the monthly expiry (end of calendar cycle).
+        /// </summary>
         private bool IsLastWeekOfMonthlyCycle()
         {
-            // Simple heuristic for Nifty (Last Thursday is Expiry)
-            // If today is Tuesday, and Next Tuesday is in a different month, then this is the last Tuesday of the month?
-            // User says "Monthly Exit: If the current Weekly Expiry is the same as the Monthly Long Straddle Expiry"
-            
-            // Let's assume Valid Logic:
-            // Calculate Current Weekly Expiry Date
-            // Calculate Current Monthly Expiry Date
-            // If Weekly == Monthly, return true.
-            
-            DateTime today = DateTime.Today;
-            DateTime nextWeeklyExpiry = GetNextExpiry(today, DayOfWeek.Tuesday); // Weekly Expiry is Tuesday per user
-            DateTime monthlyExpiry = GetMonthlyExpiry(today);
-
-            // If the upcoming weekly expiry IS the monthly expiry
-            return nextWeeklyExpiry.Date == monthlyExpiry.Date;
-        }
-
-        private DateTime GetNextExpiry(DateTime fromDate, DayOfWeek day)
-        {
-             // Find next Tuesday
-             int daysUntil = ((int)day - (int)fromDate.DayOfWeek + 7) % 7;
-             if (daysUntil == 0) daysUntil = 7; // If today is Tuesday, next is today? No, user says "Every Tuesday", implies today if time matches?
-             // Actually, if we are AT 15:24 on Tuesday, the "Current Weekly" is expiring TODAY (or has expired?).
-             // User says "Expiry Day: Every Tuesday". So today IS Expiry.
-             // So "Next Weekly" is Today + 7.
-             return fromDate.AddDays(0); // Today is expiry
-        }
-
-        private DateTime GetMonthlyExpiry(DateTime fromDate)
-        {
-            // Last Tuesday of the month
-            DateTime lastDayOfMonth = new DateTime(fromDate.Year, fromDate.Month, DateTime.DaysInMonth(fromDate.Year, fromDate.Month));
-            while (lastDayOfMonth.DayOfWeek != DayOfWeek.Tuesday)
+            try
             {
-                lastDayOfMonth = lastDayOfMonth.AddDays(-1);
+                DateTime weeklyExpiry = _engine.TokenService.GetNextExpiry(_config.Symbol, "Weekly");
+                DateTime monthlyExpiry = _engine.TokenService.GetNextExpiry(_config.Symbol, "Monthly");
+
+                Console.WriteLine($"[Calendar] Expiry Check: Weekly={weeklyExpiry:dd-MMM-yyyy}, Monthly={monthlyExpiry:dd-MMM-yyyy}");
+
+                // If the upcoming weekly expiry IS the monthly expiry, this is the last week
+                return weeklyExpiry.Date == monthlyExpiry.Date;
             }
-            return lastDayOfMonth;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Calendar] ERROR in IsLastWeekOfMonthlyCycle: {ex.Message}");
+                return false; // Safe default: don't exit monthly positions on error
+            }
         }
 
         private async Task ManageRisk(TickerData ticker)
@@ -285,11 +273,17 @@ namespace Cognexalgo.Core.Strategies
             }
         }
         
+        /// <summary>
+        /// FIX 5: Uses the leg's live LTP (set by ExecuteLeg in TradingEngine)
+        /// instead of a hardcoded mock value.
+        /// </summary>
         private double GetLtp(StrategyLeg leg, TickerData ticker)
         {
-            // In real scenario, we need Option Chain data or specific token subscription
-            // For now, we return a mock value or 0 if not available
-            return 100.0;
+            // Use the LTP that was populated by the engine when the leg was executed
+            if (leg.Ltp > 0) return leg.Ltp;
+            // Fallback to entry price if LTP hasn't been updated yet
+            if (leg.EntryPrice > 0) return leg.EntryPrice;
+            return 0;
         }
 
         private double GetLtp(TickerData ticker, string symbol)
