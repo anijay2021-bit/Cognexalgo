@@ -22,7 +22,13 @@ namespace Cognexalgo.Core.Strategies
         public override async Task OnTickAsync(TickerData ticker)
         {
             if (!IsActive) return;
-            if (_history.Count < TrendEmaPeriod) return;
+            if (_history.Count < 2) return; // Need at least 2 for some checks, but don't block on 200
+            if (_history.Count < TrendEmaPeriod)
+            {
+                // Just log once a minute or so instead of every tick to avoid spam
+                if (DateTime.Now.Second == 0)
+                   Console.WriteLine($"[Strategy] {Name} waiting for trend data. Current: {_history.Count}/{TrendEmaPeriod}");
+            }
 
             var lastCandle = _history.Last();
             var fastEma = _history.GetEma(FastEmaPeriod).LastOrDefault()?.Ema;

@@ -286,11 +286,12 @@ namespace Cognexalgo.Core.Services
                 {
                     ltpResponse = JsonConvert.DeserializeObject<LTPResponse>(responseString);
                 }
-                catch (Exception)
+                catch (JsonException ex)
                 {
                     // If JSON parsing fails (e.g. "Internal Server Error" text), return null to trigger fallback
-                    System.Diagnostics.Debug.WriteLine($"Non-JSON response for {tradingSymbol}: {responseString.Substring(0, Math.Min(responseString.Length, 100))}");
-                    return null;
+                    string preview = responseString.Length > 200 ? responseString.Substring(0, 200) : responseString;
+                    System.Diagnostics.Debug.WriteLine($"Non-JSON response for {tradingSymbol} (Status: {response.StatusCode}): {preview}");
+                    throw new Exception($"API returned non-JSON response for LTP ({response.StatusCode}). Raw Body: {preview}", ex);
                 }
 
                 if (ltpResponse != null && ltpResponse.Status == false)
@@ -359,11 +360,21 @@ namespace Cognexalgo.Core.Services
                 var json = JsonConvert.SerializeObject(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _client.PostAsync("/rest/secure/angelbroking/market/v1/quote/", content);
+                var response = await _client.PostAsync("/rest/secure/angelbroking/market/v1/quote", content);
                 CheckAuth(response);
-                
+
                 var responseString = await response.Content.ReadAsStringAsync();
-                var batchResponse = JsonConvert.DeserializeObject<MarketDataBatchResponse>(responseString);
+                
+                MarketDataBatchResponse batchResponse = null;
+                try
+                {
+                    batchResponse = JsonConvert.DeserializeObject<MarketDataBatchResponse>(responseString);
+                }
+                catch (JsonException ex)
+                {
+                    string preview = responseString.Length > 200 ? responseString.Substring(0, 200) : responseString;
+                    throw new Exception($"Batch Market Data Failed: Non-JSON response (Status: {response.StatusCode}). Body: {preview}", ex);
+                }
 
                 if (batchResponse?.Status != true)
                 {

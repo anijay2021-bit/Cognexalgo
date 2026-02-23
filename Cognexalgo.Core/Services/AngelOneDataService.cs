@@ -98,7 +98,7 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
-                _logger?.Log("DataService", $"ERROR: Fetching spot price for {index}: {ex.Message}");
+                _logger?.Log("DataService", $"ERROR: Fetching spot price for {index}: {ex.Message}", "ERROR");
                 throw new Exception($"Failed to get spot price for {index}: {ex.Message}", ex);
             }
         }

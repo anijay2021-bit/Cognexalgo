@@ -24,12 +24,13 @@ namespace Cognexalgo.Core.Rules
             double leftValue = GetValue(condition.Indicator, condition.Period, context, 0);
             double rightValue = GetRightValue(condition, context, 0);
 
+            bool result = false;
             // 2. Check Standard Operators
             switch (condition.Operator)
             {
-                case Comparator.GREATER_THAN: return leftValue > rightValue;
-                case Comparator.LESS_THAN: return leftValue < rightValue;
-                case Comparator.EQUALS: return Math.Abs(leftValue - rightValue) < 0.0001;
+                case Comparator.GREATER_THAN: result = leftValue > rightValue; break;
+                case Comparator.LESS_THAN: result = leftValue < rightValue; break;
+                case Comparator.EQUALS: result = Math.Abs(leftValue - rightValue) < 0.0001; break;
                 
                 // 3. Check Crossover / Closes Operators (Requires Previous Values)
                 case Comparator.CROSS_ABOVE:
@@ -41,14 +42,27 @@ namespace Cognexalgo.Core.Rules
                     
                     if (condition.Operator == Comparator.CROSS_ABOVE || condition.Operator == Comparator.CLOSES_ABOVE)
                     {
-                        return (leftValue > rightValue) && (prevLeft <= prevRight);
+                        result = (leftValue > rightValue) && (prevLeft <= prevRight);
                     }
                     else // CROSS_BELOW or CLOSES_BELOW
                     {
-                        return (leftValue < rightValue) && (prevLeft >= prevRight);
+                        result = (leftValue < rightValue) && (prevLeft >= prevRight);
                     }
+                    break;
             }
-            return false;
+
+            if (!result)
+            {
+                string leftName = $"{condition.Indicator}({condition.Period})";
+                string rightName = condition.SourceType == ValueSource.StaticValue ? condition.StaticValue.ToString() : $"{condition.RightIndicator}({condition.RightPeriod})";
+                Console.WriteLine($"[Rule] Condition Failed: {leftName} [{leftValue:F2}] {condition.Operator} {rightName} [{rightValue:F2}]");
+            }
+            else
+            {
+                Console.WriteLine($"[Rule] Condition Passed: {condition.Indicator} {condition.Operator}");
+            }
+
+            return result;
         }
 
         private double GetRightValue(Condition condition, EvaluationContext context, int offset)

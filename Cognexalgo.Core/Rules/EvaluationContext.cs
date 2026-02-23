@@ -41,7 +41,13 @@ namespace Cognexalgo.Core.Rules
             // Only use override for offset 0 (Current Value)
             if (offset == 0 && _overrides.ContainsKey(key)) return _overrides[key];
 
-            if (Candidates.Count < period) return 0;
+            if (Candidates.Count < period) 
+            {
+                // [FIX] Relax requirement for long-period indicators (e.g. 200 EMA)
+                // Returning 0 prevents any signal from triggering. Skender will return null if data is too small.
+                // We'll proceed and let the indicator library handle the edge case.
+                Console.WriteLine($"[Indicator Warning] {type} requested with period {period} but only {Candidates.Count} candles available.");
+            }
 
             try 
             {
