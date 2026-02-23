@@ -594,12 +594,17 @@ namespace Cognexalgo.Core
                 if ((action == "BUY_CE" || action == "BUY_PE") && (symbol == "NIFTY" || symbol == "BANKNIFTY" || symbol == "FINNIFTY"))
                 {
                     string optionType = action.EndsWith("CE") ? "CE" : "PE";
+                    Logger.Log("Execution", $"Resolving ATM Option for {symbol} {optionType}...");
                     var (atmToken, atmSymbol) = await TokenService.GetAtmOptionAsync(symbol, optionType, DataService);
                     if (!string.IsNullOrEmpty(atmToken))
                     {
                         token = atmToken;
                         symbol = atmSymbol; 
-                        Console.WriteLine($"[Execution] Resolved {action} for Index -> ATM Option {symbol} ({token})");
+                        Logger.Log("Execution", $"Resolved {action} for Index -> ATM Option {symbol} ({token})");
+                    }
+                    else
+                    {
+                        Logger.Log("Execution", $"FAILED to resolve ATM Option for {symbol} {optionType}. Order will use default index token.");
                     }
                 }
 
@@ -634,15 +639,21 @@ namespace Cognexalgo.Core
                     // For performance analytics in paper trading, we use the trigger price or current market price
                     executionPrice = triggerPrice > 0 ? triggerPrice : 0; 
                     orderId = "PAPER_" + Guid.NewGuid().ToString().Substring(0, 8);
+                    Logger.Log("Execution", $"Paper Trade Order Generated: {orderId}");
                 }
                 else
                 {
+                    Logger.Log("Execution", $"Placing Real Order for {symbol} {qty}...");
                     orderId = await Api.PlaceOrderAsync(symbol, token, transactionType, qty, 0, "NORMAL", "MIS");
                     // In real execution, we would ideally fetch the average trade price from the API later
                     executionPrice = 0; 
                 }
 
-                if (!string.IsNullOrEmpty(orderId)) 
+                if (string.IsNullOrEmpty(orderId)) 
+                {
+                    Logger.Log("Execution", $"Order Placement FAILED (orderId is null or empty) for {symbol}.");
+                }
+                else 
                 {
                    Logger.Log("Order", $"Order Placed: {orderId} | Symbol: {symbol} | Qty: {qty} | Strategy: {strategy.Name}");
                    
