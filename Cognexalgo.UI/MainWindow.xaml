@@ -688,7 +688,77 @@
                         </DataGrid>
                     </Grid>
                 </TabItem>
-                -->
+
+                <!-- SIGNALS -->
+                <TabItem Header="Signals">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="📡 Live Strategy Signals" FontSize="14" FontWeight="SemiBold" 
+                                       Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Signals.Count, StringFormat='  ({0} signals)'}" 
+                                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" 
+                                       VerticalAlignment="Center" Margin="5,0,0,0"/>
+                        </StackPanel>
+
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding Signals}" 
+                                  AutoGenerateColumns="False" 
+                                  Style="{StaticResource DarkDataGridStyle}"
+                                  CanUserAddRows="False" RowHeight="35"
+                                  IsReadOnly="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" 
+                                                    Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" 
+                                                    Width="80" FontWeight="SemiBold"/>
+
+                                <DataGridTextColumn Header="Strategy" 
+                                                    Binding="{Binding StrategyName}" 
+                                                    Width="150" Foreground="{StaticResource PrimaryBrush}"/>
+
+                                <DataGridTextColumn Header="Signal" 
+                                                    Binding="{Binding SignalType}" 
+                                                    Width="100" FontWeight="Bold">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SignalType}" Value="BUY_CE">
+                                                    <Setter Property="Foreground" Value="#10B981"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SignalType}" Value="BUY_PE">
+                                                    <Setter Property="Foreground" Value="#10B981"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SignalType}" Value="SELL">
+                                                    <Setter Property="Foreground" Value="#EF4444"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SignalType}" Value="EXIT">
+                                                    <Setter Property="Foreground" Value="#F59E0B"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <DataGridTextColumn Header="Symbol" 
+                                                    Binding="{Binding Symbol}" 
+                                                    Width="150"/>
+
+                                <DataGridTextColumn Header="Price" 
+                                                    Binding="{Binding Price, StringFormat=₹{0:N2}}" 
+                                                    Width="100" FontWeight="Bold" 
+                                                    Foreground="{StaticResource PrimaryBrush}"/>
+
+                                <DataGridTextColumn Header="Reason" 
+                                                    Binding="{Binding Reason}" 
+                                                    Width="*" Foreground="{StaticResource TextMutedBrush}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
             </TabControl>
         </Border>
 
