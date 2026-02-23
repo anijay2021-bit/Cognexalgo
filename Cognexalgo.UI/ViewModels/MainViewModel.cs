@@ -86,8 +86,7 @@ namespace Cognexalgo.UI.ViewModels
         public ObservableCollection<Position> Positions { get; } = new ObservableCollection<Position>(); // Changed from Order
         public ObservableCollection<Signal> Signals { get; } = new ObservableCollection<Signal>();
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
-        // Option Chain Removed Temporarily
-        // public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
+        public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
 
         public AccountManagerViewModel AccountManager { get; } 
         public SafeExitService SafeExitService { get; private set; } // [NEW]

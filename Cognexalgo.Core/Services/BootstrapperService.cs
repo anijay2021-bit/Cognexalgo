@@ -133,7 +133,6 @@ namespace Cognexalgo.Core.Services
 
         private async Task Step3_InitializeOptionChainAsync()
         {
-            /* Temporarily Removed Option Chain
             string[] indices = { "NIFTY", "BANKNIFTY", "FINNIFTY" };
             foreach (var index in indices)
             {
@@ -176,9 +175,6 @@ namespace Cognexalgo.Core.Services
                     _engine.Logger.Log("Bootstrapper", $"ERROR: Option Chain init failed for {index}: {ex.Message}");
                 }
             }
-            */
-            // Resolve await warning
-            await Task.CompletedTask;
         }
 
         private async Task Step4_SystemHealthCheckAsync()

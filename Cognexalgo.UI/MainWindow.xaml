@@ -631,7 +631,7 @@
                     </Grid>
                 </TabItem>
 
-                <!-- OPTION CHAIN WITH GREEKS (Temporarily Removed)
+                <!-- OPTION CHAIN WITH GREEKS -->
                 <TabItem Header="Option Chain">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>

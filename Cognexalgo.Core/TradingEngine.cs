@@ -732,7 +732,6 @@ namespace Cognexalgo.Core
                 double spotPrice = await GetSpotPriceWithRetry(leg.Index);
                 Logger.Log("Hybrid", $"Spot Price for {leg.Index}: ₹{spotPrice:N2}");
 
-                /* Temporarily Removed Option Chain
                 // 2. Build option chain with real LTP data (with retry logic)
                 var chain = await BuildOptionChainWithRetry(leg.Index, leg.ExpiryType);
                 
@@ -746,10 +745,6 @@ namespace Cognexalgo.Core
 
                 // 3. Calculate target strike
                 int targetStrike = leg.GetTargetStrike(spotPrice, chain);
-                */
-                // Temporary Fallback Strike
-                int step = (leg.Index == "NIFTY") ? 50 : 100;
-                int targetStrike = (int)(Math.Round(spotPrice / step) * step);
 
                 if (targetStrike == 0 && leg.Mode == StrikeSelectionMode.ClosestPremium && leg.WaitForMatch)
                 {
@@ -763,10 +758,7 @@ namespace Cognexalgo.Core
                 }
 
                 leg.CalculatedStrike = targetStrike;
-
-                leg.CalculatedStrike = targetStrike;
                 
-                /* Temporarily Removed Option Chain
                 // 4. Find matching Option from Chain (Instead of rebuilding Symbol)
                 string optTypeStr = leg.OptionType == OptionType.Call ? "CE" : "PE";
                 var selectedOption = chain.FirstOrDefault(x => x.Strike == targetStrike && x.OptionType == optTypeStr);
@@ -780,23 +772,13 @@ namespace Cognexalgo.Core
                 string symbol = selectedOption.Symbol;
                 string token = selectedOption.Token;
                 int lotSize = selectedOption.LotSize;
-                
-                double ltp = selectedOption.LTP;
-                */
-
-                // Temporary Mock Values for Option
-                string optTypeStr = leg.OptionType == OptionType.Call ? "CE" : "PE";
-                string symbol = $"{leg.Index} {targetStrike} {optTypeStr}";
-                string token = "DUMMY_TOKEN";
-                int lotSize = (leg.Index == "NIFTY") ? 50 : 15;
-                double ltp = 100.50; // Mock LTP
 
                 Logger.Log("Hybrid", $"Selected Option: {symbol} (Token: {token}, LotSize: {lotSize})");
                 
                 leg.SymbolToken = token;
-                leg.EntryPrice = ltp; 
+                leg.EntryPrice = selectedOption.LTP; 
                 leg.EntryIndexLtp = spotPrice;       // Capture Underlying Spot for Simulation
-                leg.Ltp = ltp;        
+                leg.Ltp = selectedOption.LTP;        
                 leg.EntryTime = DateTime.Now;
 
                 // 5. Calculate quantity
@@ -814,25 +796,25 @@ namespace Cognexalgo.Core
                 double price = 0; 
                 
                 // Calculate Limit Price Buffer
-                double buffer = ltp * 0.005; // 0.5%
+                double buffer = selectedOption.LTP * 0.005; // 0.5%
                 if (leg.Action == ActionType.Buy)
                 {
-                    price = ltp + buffer; // Buy higher to ensure fill
+                    price = selectedOption.LTP + buffer; // Buy higher to ensure fill
                     // Round up to nearest 0.05
                     price = Math.Ceiling(price / 0.05) * 0.05;
                 }
                 else
                 {
-                    price = ltp - buffer; // Sell lower to ensure fill
+                    price = selectedOption.LTP - buffer; // Sell lower to ensure fill
                     // Round down to nearest 0.05
                     price = Math.Floor(price / 0.05) * 0.05;
                 }
 
-                Logger.Log("Hybrid", $"Slippage Mgmt: LTP={ltp}, Buffer={buffer:N2}, LimitPrice={price:N2}");
+                Logger.Log("Hybrid", $"Slippage Mgmt: LTP={selectedOption.LTP}, Buffer={buffer:N2}, LimitPrice={price:N2}");
 
                 if (IsPaperTrading)
                 {
-                    Console.WriteLine($"[PAPER] {transactionType} {qty} × {symbol} @ Limit {price:N2} (LTP: {ltp})");
+                    Console.WriteLine($"[PAPER] {transactionType} {qty} × {symbol} @ Limit {price:N2} (LTP: {selectedOption.LTP})");
                     orderId = "PAPER_" + Guid.NewGuid().ToString().Substring(0, 8);
                 }
                 else
@@ -922,7 +904,7 @@ namespace Cognexalgo.Core
         /// <summary>
         /// Build option chain with retry logic for API failures
         /// </summary>
-        /*
+
         private async Task<List<OptionChainItem>> BuildOptionChainWithRetry(string index, string expiryType, int maxRetries = 3)
         {
             for (int attempt = 1; attempt <= maxRetries; attempt++)
@@ -970,7 +952,7 @@ namespace Cognexalgo.Core
             
             return null;
         }
-        */
+
 
         #endregion
     }

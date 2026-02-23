@@ -229,7 +229,7 @@ namespace Cognexalgo.Core.Services
 
         #region Option Chain Building
 
-        /* Temporarily Removed Option Chain
+
         public async Task<List<OptionChainItem>> BuildOptionChainAsync(string index, string expiryType)
         {
             try
@@ -336,7 +336,7 @@ namespace Cognexalgo.Core.Services
                 throw new Exception($"Failed to build option chain for {index}: {ex.Message}", ex);
             }
         }
-        */
+
 
         #endregion
 
@@ -358,7 +358,7 @@ namespace Cognexalgo.Core.Services
             return Math.Round(basePrice + fluctuation, 2);
         }
 
-        /*
+
         private List<OptionChainItem> GenerateMockOptionChain(string index)
         {
             var list = new List<OptionChainItem>();
@@ -384,7 +384,7 @@ namespace Cognexalgo.Core.Services
             }
             return list;
         }
-        */
+
 
         #endregion
 
