@@ -229,6 +229,7 @@ namespace Cognexalgo.Core.Services
 
         #region Option Chain Building
 
+        /* Temporarily Removed Option Chain
         public async Task<List<OptionChainItem>> BuildOptionChainAsync(string index, string expiryType)
         {
             try
@@ -335,10 +336,9 @@ namespace Cognexalgo.Core.Services
                 throw new Exception($"Failed to build option chain for {index}: {ex.Message}", ex);
             }
         }
+        */
 
         #endregion
-
-
 
         #region Mock Data Generation
 
@@ -358,6 +358,7 @@ namespace Cognexalgo.Core.Services
             return Math.Round(basePrice + fluctuation, 2);
         }
 
+        /*
         private List<OptionChainItem> GenerateMockOptionChain(string index)
         {
             var list = new List<OptionChainItem>();
@@ -381,9 +382,9 @@ namespace Cognexalgo.Core.Services
                 list.Add(new OptionChainItem { Symbol = $"{index} {strike} CE", Token = $"MOCK_CE_{strike}", Strike = strike, OptionType = "CE", LTP = Math.Round(ceIntrinsic + timeValue, 2), LotSize = 50 });
                 list.Add(new OptionChainItem { Symbol = $"{index} {strike} PE", Token = $"MOCK_PE_{strike}", Strike = strike, OptionType = "PE", LTP = Math.Round(peIntrinsic + timeValue, 2), LotSize = 50 });
             }
-
             return list;
         }
+        */
 
         #endregion
 

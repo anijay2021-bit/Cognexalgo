@@ -86,7 +86,8 @@ namespace Cognexalgo.UI.ViewModels
         public ObservableCollection<Position> Positions { get; } = new ObservableCollection<Position>(); // Changed from Order
         public ObservableCollection<Signal> Signals { get; } = new ObservableCollection<Signal>();
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
-        public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
+        // Option Chain Removed Temporarily
+        // public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
 
         public AccountManagerViewModel AccountManager { get; } 
         public SafeExitService SafeExitService { get; private set; } // [NEW]
@@ -214,7 +215,7 @@ namespace Cognexalgo.UI.ViewModels
              {
                  _ = FetchPositions();
                  _ = FetchOrders();
-                 _ = FetchOptionChain(SelectedOptionIndex);
+                 // _ = FetchOptionChain(SelectedOptionIndex); // Temporarily removed
              }
         }
 
@@ -515,6 +516,7 @@ namespace Cognexalgo.UI.ViewModels
 
         public ObservableCollection<Holding> Holdings { get; } = new ObservableCollection<Holding>();
         
+        /* 
         [RelayCommand]
         public async Task FetchOptionChain(string index = "NIFTY")
         {
@@ -556,6 +558,7 @@ namespace Cognexalgo.UI.ViewModels
                 _isFetchingOptionChain = false;
             }
         }
+        */
         
         [RelayCommand]
         public async Task FetchHoldings()

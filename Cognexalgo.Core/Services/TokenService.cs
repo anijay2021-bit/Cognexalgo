@@ -423,31 +423,48 @@ namespace Cognexalgo.Core.Services
             {
                 // 1. Get Spot Price
                 double spot = await dataService.GetSpotPriceAsync(index);
-                if (spot <= 0) return (null, null);
+                if (spot <= 0)
+                {
+                    Console.WriteLine($"[TokenService] ATM Error: Spot price for {index} is {spot}");
+                    return (null, null);
+                }
 
                 // 2. Round to ATM Strike
                 int strikeStep = index == "NIFTY" ? 50 : 100;
                 int atmStrike = (int)(Math.Round(spot / strikeStep) * strikeStep);
 
-                // 3. Get Expiry String
-                string expiryStr = GetCurrentWeeklyExpiryStr(index);
+                // 3. Try multiple Expiry Formats
+                DateTime expiryDate = GetNextExpiry(index);
+                var expiryFormats = new List<string> {
+                    expiryDate.ToString("ddMMMyy").ToUpper(),   // 26FEB26
+                    expiryDate.ToString("ddMMMyyyy").ToUpper(), // 26FEB2026
+                    expiryDate.ToString("dMMMyy").ToUpper()     // 6MAR26 (if leading zero is missing)
+                };
+
+                Console.WriteLine($"[TokenService] Resolving ATM {index} {optionType} | Spot: {spot} | ATM: {atmStrike} | Expiry: {expiryDate:yyyy-MM-dd}");
 
                 // 4. Find matching instrument
-                foreach (var kvp in _symbolToToken)
+                foreach (var expiryStr in expiryFormats)
                 {
-                    string symbol = kvp.Key;
-                    if (symbol.StartsWith(index, StringComparison.OrdinalIgnoreCase) && 
-                        symbol.Contains(expiryStr) && 
-                        symbol.EndsWith(optionType, StringComparison.OrdinalIgnoreCase))
+                    foreach (var kvp in _symbolToToken)
                     {
-                        // Check if this symbol contains the strike
-                        // Simple check: symbol should contain the strike number
-                        if (symbol.Contains(atmStrike.ToString()))
+                        string symbol = kvp.Key;
+                        // Match format: NIFTY + Expiry + Strike + CE/PE
+                        if (symbol.StartsWith(index, StringComparison.OrdinalIgnoreCase) && 
+                            symbol.Contains(expiryStr) && 
+                            symbol.EndsWith(optionType, StringComparison.OrdinalIgnoreCase))
                         {
-                             return (kvp.Value, symbol);
+                            // Precision match for strike: symbol should contain the strike and it should be numeric right before optionType
+                            if (symbol.Contains(atmStrike.ToString()))
+                            {
+                                 Console.WriteLine($"[TokenService] ✓ Success: Found {symbol} for strike {atmStrike}");
+                                 return (kvp.Value, symbol);
+                            }
                         }
                     }
                 }
+                
+                Console.WriteLine($"[TokenService] ⚠️ Failed to find ATM option for {index} {optionType} {atmStrike} in formats: {string.Join(", ", expiryFormats)}");
             }
             catch (Exception ex)
             {

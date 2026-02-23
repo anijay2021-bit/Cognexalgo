@@ -225,6 +225,7 @@ namespace Cognexalgo.Core.Strategies
             
             if (_settings.SelectionType == StrikeSelectionType.PremiumMatch)
             {
+                /* Temporarily Removed Option Chain
                 // Logic: Fetch Option Chain -> Find Strike closely matching TargetValue
                 var chain = await _engine.DataService.BuildOptionChainAsync(Symbol, leg.ExpiryType ?? "WEEKLY");
                 if (chain != null)
@@ -236,6 +237,7 @@ namespace Cognexalgo.Core.Strategies
                         
                     if (bestMatch != null) return bestMatch.Strike;
                 }
+                */
             }
             else if (_settings.SelectionType == StrikeSelectionType.Delta)
             {

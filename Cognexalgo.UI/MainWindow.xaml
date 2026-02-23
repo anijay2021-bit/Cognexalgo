@@ -631,15 +631,14 @@
                     </Grid>
                 </TabItem>
 
-                <!-- OPTION CHAIN WITH GREEKS -->
+                <!-- OPTION CHAIN WITH GREEKS (Temporarily Removed)
                 <TabItem Header="Option Chain">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Header/Filters -->
-                            <RowDefinition Height="*"/>    <!-- Chain Grid -->
+                            <RowDefinition Height="Auto"/> 
+                            <RowDefinition Height="*"/>    
                         </Grid.RowDefinitions>
 
-                        <!-- Filters -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
                             <TextBlock Text="Select Index:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0"/>
                             <ComboBox Width="120" Text="{Binding SelectedOptionIndex}" Style="{StaticResource DarkComboBoxStyle}">
@@ -658,7 +657,6 @@
                                        VerticalAlignment="Center" Margin="20,0,0,0" FontSize="11"/>
                         </StackPanel>
 
-                        <!-- Option Chain Grid -->
                         <DataGrid Grid.Row="1" ItemsSource="{Binding OptionChain}" 
                                   AutoGenerateColumns="False" 
                                   Style="{StaticResource DarkDataGridStyle}"
@@ -670,10 +668,10 @@
                                         <Style TargetType="TextBlock">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding OptionType}" Value="CE">
-                                                    <Setter Property="Foreground" Value="#10B981"/> <!-- Green for calls -->
+                                                    <Setter Property="Foreground" Value="#10B981"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding OptionType}" Value="PE">
-                                                    <Setter Property="Foreground" Value="#EF4444"/> <!-- Red for puts -->
+                                                    <Setter Property="Foreground" Value="#EF4444"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -681,7 +679,6 @@
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Header="LTP" Binding="{Binding LTP, StringFormat=N2}" Width="100" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                                 
-                                <!-- Greeks Columns -->
                                 <DataGridTextColumn Header="Delta" Binding="{Binding Delta, StringFormat=N3}" Width="80"/>
                                 <DataGridTextColumn Header="Theta" Binding="{Binding Theta, StringFormat=N2}" Width="80"/>
                                 <DataGridTextColumn Header="Vega" Binding="{Binding Vega, StringFormat=N2}" Width="80"/>
@@ -691,6 +688,7 @@
                         </DataGrid>
                     </Grid>
                 </TabItem>
+                -->
             </TabControl>
         </Border>
 
