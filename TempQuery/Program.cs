@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
+using Newtonsoft.Json;
+using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Rules;
 
 namespace TempQuery
 {
@@ -14,89 +18,85 @@ namespace TempQuery
                 using var conn = new NpgsqlConnection(connStr);
                 await conn.OpenAsync();
 
-                string json21ce = @"{
-  ""StrategyName"": ""21ce"",
-  ""Symbol"": ""NIFTY"",
-  ""Timeframe"": ""1min"",
-  ""ExpiryType"": ""Weekly"",
-  ""ProductType"": ""MIS"",
-  ""TotalLots"": 1,
-  ""EntryRules"": [
-    {
-      ""Conditions"": [
-        {
-          ""Indicator"": ""LTP"",
-          ""Period"": 1,
-          ""Multiplier"": 0,
-          ""Operator"": ""CROSS_ABOVE"",
-          ""SourceType"": ""Indicator"",
-          ""StaticValue"": 0.0,
-          ""RightIndicator"": ""EMA"",
-          ""RightPeriod"": 21
-        }
-      ],
-      ""Action"": ""BUY_CE""
-    }
-  ],
-  ""ExitRules"": [],
-  ""ExitSettings"": {
-    ""TargetType"": ""Percentage"",
-    ""TargetValue"": 0.0,
-    ""StopLossType"": ""Percentage"",
-    ""StopLossValue"": 0.0,
-    ""AtrPeriod"": 14,
-    ""AtrMultiplier"": 2.0,
-    ""TrailingStopLoss"": false,
-    ""TrailingStopDistance"": 1.0,
-    ""TrailingStopIsPercent"": true,
-    ""EnableTimeBasedExit"": false,
-    ""EnableBreakevenStop"": false,
-    ""EnablePartialExits"": false,
-    ""EnableProfitProtection"": false
-  }
-}";
+                // ------------------ 21CE Configuration ------------------
+                var ceRules = new List<Rule>
+                {
+                    new Rule {
+                        Action = "BUY_CE",
+                        Conditions = new List<Condition> {
+                            new Condition { Indicator = IndicatorType.LTP, Period = 1, Operator = Comparator.CROSS_ABOVE, SourceType = ValueSource.Indicator, RightIndicator = IndicatorType.EMA, RightPeriod = 21 }
+                        }
+                    }
+                };
+                
+                var ceParamsDict = new Dictionary<string, string>
+                {
+                    { "Symbol", "NIFTY" },
+                    { "Timeframe", "1min" },
+                    { "IsMatchAllConditions", "True" },
+                    { "SelectedTargetType", "Percentage" },
+                    { "TargetValue", "1" },
+                    { "SelectedStopLossType", "Percentage" },
+                    { "StopLossValue", "1" },
+                    { "EntryRules", JsonConvert.SerializeObject(ceRules) },
+                    { "ExitRules", "[]" }
+                };
 
-                string json21pe = @"{
-  ""StrategyName"": ""21PE"",
-  ""Symbol"": ""NIFTY"",
-  ""Timeframe"": ""1min"",
-  ""ExpiryType"": ""Weekly"",
-  ""ProductType"": ""MIS"",
-  ""TotalLots"": 1,
-  ""EntryRules"": [
-    {
-      ""Conditions"": [
-        {
-          ""Indicator"": ""LTP"",
-          ""Period"": 1,
-          ""Multiplier"": 0,
-          ""Operator"": ""CROSS_BELOW"",
-          ""SourceType"": ""Indicator"",
-          ""StaticValue"": 0.0,
-          ""RightIndicator"": ""EMA"",
-          ""RightPeriod"": 21
-        }
-      ],
-      ""Action"": ""BUY_PE""
-    }
-  ],
-  ""ExitRules"": [],
-  ""ExitSettings"": {
-    ""TargetType"": ""Percentage"",
-    ""TargetValue"": 0.0,
-    ""StopLossType"": ""Percentage"",
-    ""StopLossValue"": 0.0,
-    ""AtrPeriod"": 14,
-    ""AtrMultiplier"": 2.0,
-    ""TrailingStopLoss"": false,
-    ""TrailingStopDistance"": 1.0,
-    ""TrailingStopIsPercent"": true,
-    ""EnableTimeBasedExit"": false,
-    ""EnableBreakevenStop"": false,
-    ""EnablePartialExits"": false,
-    ""EnableProfitProtection"": false
-  }
-}";
+                var ceConfig = new HybridStrategyConfig
+                {
+                    Name = "21ce",
+                    IsActive = true,
+                    ProductType = "MIS",
+                    ExpiryType = "Weekly",
+                    StrategyType = "CUSTOM",
+                    Legs = new List<StrategyLeg>(), // Dynamic logic doesn't use static legs collection
+                    Parameters = JsonConvert.SerializeObject(ceParamsDict),
+                    AutoExecute = true,
+                    MaxProfitPercent = 1,
+                    MaxLossPercent = 1
+                };
+
+                // ------------------ 21PE Configuration ------------------
+                var peRules = new List<Rule>
+                {
+                    new Rule {
+                        Action = "BUY_PE",
+                        Conditions = new List<Condition> {
+                            new Condition { Indicator = IndicatorType.LTP, Period = 1, Operator = Comparator.CROSS_BELOW, SourceType = ValueSource.Indicator, RightIndicator = IndicatorType.EMA, RightPeriod = 21 }
+                        }
+                    }
+                };
+                
+                var peParamsDict = new Dictionary<string, string>
+                {
+                    { "Symbol", "NIFTY" },
+                    { "Timeframe", "1min" },
+                    { "IsMatchAllConditions", "True" },
+                    { "SelectedTargetType", "Percentage" },
+                    { "TargetValue", "1" },
+                    { "SelectedStopLossType", "Percentage" },
+                    { "StopLossValue", "1" },
+                    { "EntryRules", JsonConvert.SerializeObject(peRules) },
+                    { "ExitRules", "[]" }
+                };
+
+                var peConfig = new HybridStrategyConfig
+                {
+                    Name = "21PE",
+                    IsActive = true,
+                    ProductType = "MIS",
+                    ExpiryType = "Weekly",
+                    StrategyType = "CUSTOM",
+                    Legs = new List<StrategyLeg>(), // Dynamic logic doesn't use static legs collection
+                    Parameters = JsonConvert.SerializeObject(peParamsDict),
+                    AutoExecute = true,
+                    MaxProfitPercent = 1,
+                    MaxLossPercent = 1
+                };
+
+                // Insert into DB exactly as EF Core would serialize HybridStrategyConfig
+                string jsonCE = JsonConvert.SerializeObject(ceConfig);
+                string jsonPE = JsonConvert.SerializeObject(peConfig);
 
                 string sql = @"
                     INSERT INTO hybrid_strategies (""Name"", ""ConfigJson"", ""IsActive"", ""CreatedAt"", ""LastModified"", ""CreatedBy"", ""LastModifiedBy"", ""Version"")
@@ -108,8 +108,8 @@ namespace TempQuery
                 ";
 
                 using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("jsonCE", json21ce);
-                cmd.Parameters.AddWithValue("jsonPE", json21pe);
+                cmd.Parameters.AddWithValue("jsonCE", jsonCE);
+                cmd.Parameters.AddWithValue("jsonPE", jsonPE);
                 
                 int rows = await cmd.ExecuteNonQueryAsync();
                 Console.WriteLine($"Successfully saved settings into database. Rows affected: {rows}");
