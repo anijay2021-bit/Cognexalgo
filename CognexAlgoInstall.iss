@@ -2,7 +2,7 @@
 ; --- BASIC APP INFO ---
 AppId={{5C16C5A9-FBAE-41F4-8EAA-2DC68B50CF97}
 AppName=Cognex Algo
-AppVersion=1.0.0
+AppVersion=1.1.0
 AppPublisher=Cognex
 AppPublisherURL=https://cognexalgo.in
 AppSupportURL=https://cognexalgo.in
@@ -14,7 +14,7 @@ ArchitecturesInstallIn64BitMode=x64
 
 ; --- OUTPUT SETTINGS ---
 OutputDir=.\InstallerOutput
-OutputBaseFilename=CognexAlgo_Setup_v1.0.0
+OutputBaseFilename=Cognexalgo setup_v1.1
 SetupIconFile=.\publish_x64\Assets\icon.ico
 UninstallDisplayIcon={app}\Cognexalgo.UI.exe
 

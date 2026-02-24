@@ -1,32 +1,35 @@
 using System;
-using Microsoft.Data.Sqlite;
+using System.Linq;
+using Cognexalgo.Core.Data;
 
-class Program
+namespace TempQuery
 {
-    static void Main(string[] args)
+    class Program
     {
-        string dbPath = @"c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\bin\Debug\net8.0-windows\cognex.db";
-        string connString = $"Data Source={dbPath}";
-        using (var conn = new SqliteConnection(dbPath)) // Simplified path
+        static void Main(string[] args)
         {
-             try {
-                conn.ConnectionString = connString;
-                conn.Open();
-                using (var cmd = new SqliteCommand("SELECT * FROM Orders ORDER BY Timestamp DESC LIMIT 5;", conn))
-                using (var reader = cmd.ExecuteReader())
+            try 
+            {
+                using var db = new AlgoDbContext();
+                var strategy = db.HybridStrategies.FirstOrDefault(s => s.Name == "21ema ce");
+                if (strategy != null)
                 {
-                    Console.WriteLine("--- DB AUDIT: LATEST ORDERS ---");
-                    int count = 0;
-                    while (reader.Read())
-                    {
-                        Console.WriteLine($"Order: {reader["OrderId"]}, Symbol: {reader["Symbol"]}, Status: {reader["Status"]}");
-                        count++;
-                    }
-                    if (count == 0) Console.WriteLine("No orders found in local DB.");
+                    Console.WriteLine("------------------------------------------------------------------");
+                    Console.WriteLine($"Strategy: {strategy.Name}");
+                    Console.WriteLine($"Active: {strategy.IsActive}");
+                    Console.WriteLine($"ConfigJson:");
+                    Console.WriteLine(strategy.ConfigJson);
+                    Console.WriteLine("------------------------------------------------------------------");
                 }
-             } catch (Exception ex) {
-                 Console.WriteLine($"DB Error: {ex.Message}");
-             }
+                else 
+                {
+                    Console.WriteLine("Strategy '21ema ce' not found in database.");
+                }
+            } 
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex.Message);
+            }
         }
     }
 }
