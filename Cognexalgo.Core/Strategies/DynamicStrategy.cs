@@ -120,17 +120,22 @@ namespace Cognexalgo.Core.Strategies
             {
                 // 3. Evaluate Entries on EVERY TICK
                 // We construct a temporary context that includes the historically closed
-                // candles PLUS the currently forming candle from the aggregator.
-                if (_aggregator.CurrentCandle != null)
-                {
-                    var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
-                    liveHistory.Add(_aggregator.CurrentCandle);
+                // candles PLUS the currently forming synthetic candle at this exact tick.
+                var syntheticCandle = new Skender.Stock.Indicators.Quote 
+                { 
+                    Date = DateTime.Now, 
+                    Open = (decimal)ltp, 
+                    High = (decimal)ltp, 
+                    Low = (decimal)ltp, 
+                    Close = (decimal)ltp, 
+                    Volume = 1 
+                };
 
-                    // Console.WriteLine($"[DynamicStrategy] Evaluator passing {liveHistory.Count} candles to context.");
-                    
-                    var liveContext = new EvaluationContext(liveHistory);
-                    await EvaluateEntryRulesAsync(liveContext, (double)_aggregator.CurrentCandle.Close);
-                }
+                var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
+                liveHistory.Add(syntheticCandle);
+
+                var liveContext = new EvaluationContext(liveHistory);
+                await EvaluateEntryRulesAsync(liveContext, ltp);
             }
         }
 

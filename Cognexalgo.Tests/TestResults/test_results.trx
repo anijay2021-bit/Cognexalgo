@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="78588220-8ff9-45ed-9039-c339ad197510" name="anijay@AJLAPPY 2026-02-24 12:02:05" runUser="AJLappy\anijay" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-02-24T12:02:05.5444495+05:30" queuing="2026-02-24T12:02:05.5444503+05:30" start="2026-02-24T12:02:03.4372979+05:30" finish="2026-02-24T12:02:08.1463064+05:30" />
+  <TestSettings name="default" id="cdd1015f-0ca4-41ce-a111-b314ec760ecf">
+    <Deployment runDeploymentRoot="anijay_AJLAPPY_2026-02-24_12_02_05" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="ef14910f-0bd4-46b8-b791-98dbe9d4ff24" testId="8b185003-b12c-3c77-3438-cbfa503f8e79" testName="Cognexalgo.Tests.IndicatorHistoryTest.Test_EMA200_WithShortHistory_ReturnsNonZero" computerName="AJLAPPY" duration="00:00:00.0244729" startTime="2026-02-24T12:02:04.2966521+05:30" endTime="2026-02-24T12:02:04.2966864+05:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ef14910f-0bd4-46b8-b791-98dbe9d4ff24">
+      <Output>
+        <ErrorInfo>
+          <Message>EMA 200 should return a value &gt; 0 even with 20 candles, but got 0</Message>
+          <StackTrace>   at Cognexalgo.Tests.IndicatorHistoryTest.Test_EMA200_WithShortHistory_ReturnsNonZero() in c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Tests\IndicatorHistoryTest.cs:line 38&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="64df36de-08e1-47db-bbe7-46618e527414" testId="7464f85c-d721-22c1-b9c2-a7b4c0659a2f" testName="Cognexalgo.Tests.DatabasePersistenceTest.CanConnectAndSaveStrategy" computerName="AJLAPPY" duration="00:00:03.7600020" startTime="2026-02-24T12:02:08.0089166+05:30" endTime="2026-02-24T12:02:08.0089176+05:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="64df36de-08e1-47db-bbe7-46618e527414" />
+    <UnitTestResult executionId="7a0b46da-c085-45ae-b462-eb9304e88e07" testId="6bcf9df2-190a-a3a8-28dc-720f3ce89057" testName="Cognexalgo.Tests.MissedSignalTest.Test_DynamicStrategy_GeneratesSignal_MidCandle" computerName="AJLAPPY" duration="00:00:00.3552501" startTime="2026-02-24T12:02:04.6048725+05:30" endTime="2026-02-24T12:02:04.6048733+05:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7a0b46da-c085-45ae-b462-eb9304e88e07" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Cognexalgo.Tests.MissedSignalTest.Test_DynamicStrategy_GeneratesSignal_MidCandle" storage="c:\users\anijay\.gemini\antigravity\scratch\cognex\cognexalgo.tests\bin\debug\net8.0\cognexalgo.tests.dll" id="6bcf9df2-190a-a3a8-28dc-720f3ce89057">
+      <Execution id="7a0b46da-c085-45ae-b462-eb9304e88e07" />
+      <TestMethod codeBase="c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Tests\bin\Debug\net8.0\Cognexalgo.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Cognexalgo.Tests.MissedSignalTest" name="Test_DynamicStrategy_GeneratesSignal_MidCandle" />
+    </UnitTest>
+    <UnitTest name="Cognexalgo.Tests.DatabasePersistenceTest.CanConnectAndSaveStrategy" storage="c:\users\anijay\.gemini\antigravity\scratch\cognex\cognexalgo.tests\bin\debug\net8.0\cognexalgo.tests.dll" id="7464f85c-d721-22c1-b9c2-a7b4c0659a2f">
+      <Execution id="64df36de-08e1-47db-bbe7-46618e527414" />
+      <TestMethod codeBase="c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Tests\bin\Debug\net8.0\Cognexalgo.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Cognexalgo.Tests.DatabasePersistenceTest" name="CanConnectAndSaveStrategy" />
+    </UnitTest>
+    <UnitTest name="Cognexalgo.Tests.IndicatorHistoryTest.Test_EMA200_WithShortHistory_ReturnsNonZero" storage="c:\users\anijay\.gemini\antigravity\scratch\cognex\cognexalgo.tests\bin\debug\net8.0\cognexalgo.tests.dll" id="8b185003-b12c-3c77-3438-cbfa503f8e79">
+      <Execution id="ef14910f-0bd4-46b8-b791-98dbe9d4ff24" />
+      <TestMethod codeBase="c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Tests\bin\Debug\net8.0\Cognexalgo.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Cognexalgo.Tests.IndicatorHistoryTest" name="Test_EMA200_WithShortHistory_ReturnsNonZero" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="8b185003-b12c-3c77-3438-cbfa503f8e79" executionId="ef14910f-0bd4-46b8-b791-98dbe9d4ff24" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7464f85c-d721-22c1-b9c2-a7b4c0659a2f" executionId="64df36de-08e1-47db-bbe7-46618e527414" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6bcf9df2-190a-a3a8-28dc-720f3ce89057" executionId="7a0b46da-c085-45ae-b462-eb9304e88e07" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="2" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.6+bf9b858c26 (64-bit .NET 8.0.24)&#xD;
+[xUnit.net 00:00:00.12]   Discovering: Cognexalgo.Tests&#xD;
+[xUnit.net 00:00:00.16]   Discovered:  Cognexalgo.Tests&#xD;
+[xUnit.net 00:00:00.16]   Starting:    Cognexalgo.Tests&#xD;
+[xUnit.net 00:00:00.26]       EMA 200 should return a value &gt; 0 even with 20 candles, but got 0&#xD;
+[xUnit.net 00:00:00.26]       Stack Trace:&#xD;
+[xUnit.net 00:00:00.26]         c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Tests\IndicatorHistoryTest.cs(38,0): at Cognexalgo.Tests.IndicatorHistoryTest.Test_EMA200_WithShortHistory_ReturnsNonZero()&#xD;
+[xUnit.net 00:00:00.26]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+[xUnit.net 00:00:00.26]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:03.98]   Finished:    Cognexalgo.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="AJLAPPY" outcome="Error" timestamp="2026-02-24T12:02:04.2938845+05:30">
+        <Text>[xUnit.net 00:00:00.26]     Cognexalgo.Tests.IndicatorHistoryTest.Test_EMA200_WithShortHistory_ReturnsNonZero [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

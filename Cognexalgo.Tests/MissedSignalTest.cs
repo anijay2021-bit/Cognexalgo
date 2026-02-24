@@ -24,28 +24,8 @@ namespace Cognexalgo.Tests
                 ""Symbol"": ""NIFTY"",
                 ""Timeframe"": ""1m"",
                 ""TotalLots"": 1,
-                ""EntryRules"": [
-                    {
-                        ""Action"": ""BUY"",
-                        ""Conditions"": [
-                            {
-                                ""Indicator"": ""EMA"",
-                                ""Period"": 9,
-                                ""Operator"": ""GREATER_THAN"",
-                                ""SourceType"": ""StaticValue"",
-                                ""StaticValue"": 10000 
-                            },
-                            {
-                                ""Indicator"": ""LTP"",
-                                ""Period"": 1,
-                                ""Operator"": ""GREATER_THAN"",
-                                ""SourceType"": ""StaticValue"",
-                                ""StaticValue"": 25050 
-                            }
-                        ]
-                    }
-                ],
-                ""ExitRules"": [],
+                ""EntryRules"": ""[{\""Action\"":\""BUY\"",\""Conditions\"":[{\""Indicator\"":\""EMA\"",\""Period\"":9,\""Operator\"":\""GREATER_THAN\"",\""SourceType\"":\""StaticValue\"",\""StaticValue\"":10000},{\""Indicator\"":\""LTP\"",\""Period\"":1,\""Operator\"":\""GREATER_THAN\"",\""SourceType\"":\""StaticValue\"",\""StaticValue\"":25050}]}]"",
+                ""ExitRules"": ""[]"",
                 ""ExitSettings"": {}
             }";
 

@@ -60,12 +60,14 @@ namespace Cognexalgo.Core.Rules
                     case IndicatorType.SMA:
                         var sma = Candidates.GetSma(period).ToList();
                         if (sma.Count <= offset) return 0;
-                        return (double)(sma[sma.Count - 1 - offset].Sma ?? 0);
+                        var smaItem = sma[sma.Count - 1 - offset];
+                        return (double)(smaItem.Sma ?? (double)Candidates[Candidates.Count - 1 - offset].Close);
 
                     case IndicatorType.EMA:
                         var ema = Candidates.GetEma(period).ToList();
                         if (ema.Count <= offset) return 0;
-                        return (double)(ema[ema.Count - 1 - offset].Ema ?? 0);
+                        var emaItem = ema[ema.Count - 1 - offset];
+                        return (double)(emaItem.Ema ?? (double)Candidates[Candidates.Count - 1 - offset].Close);
 
                     case IndicatorType.RSI:
                         var rsi = Candidates.GetRsi(period).ToList();
@@ -83,7 +85,8 @@ namespace Cognexalgo.Core.Rules
                     case IndicatorType.ATR:
                         var atr = Candidates.GetAtr(period).ToList();
                         if (atr.Count <= offset) return 0;
-                        return (double)(atr[atr.Count - 1 - offset].Atr ?? 0);
+                        var atrItem = atr[atr.Count - 1 - offset];
+                        return (double)(atrItem.Atr ?? 1d);
                     
                     case IndicatorType.BOLLINGER_BANDS:
                         var bb = Candidates.GetBollingerBands(period, 2).ToList();

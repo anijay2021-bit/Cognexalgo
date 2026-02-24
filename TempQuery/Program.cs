@@ -1,36 +1,67 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
+using Cognexalgo.Core;
+using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Rules;
+using Cognexalgo.Core.Strategies;
+using Newtonsoft.Json;
+using Skender.Stock.Indicators;
 using System.Threading.Tasks;
-using Npgsql;
 
 namespace TempQuery
 {
     class Program
     {
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
-            string connStr = "Host=aws-1-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.dcsjwozwltcixdlgzalr;Password=3GTeWMvIwGBHMQXd;SSL Mode=Require;Trust Server Certificate=true;Command Timeout=60;";
-            try 
+            var engine = new TradingEngine();
+            string configJson = @"{
+                ""StrategyName"": ""EMA_Touch_Test"",
+                ""Symbol"": ""NIFTY"",
+                ""Timeframe"": ""1m"",
+                ""TotalLots"": 1,
+                ""EntryRules"": ""[{\""Action\"":\""BUY\"",\""Conditions\"":[{\""Indicator\"":\""EMA\"",\""Period\"":9,\""Operator\"":\""GREATER_THAN\"",\""SourceType\"":\""StaticValue\"",\""StaticValue\"":10000},{\""Indicator\"":\""LTP\"",\""Period\"":1,\""Operator\"":\""GREATER_THAN\"",\""SourceType\"":\""StaticValue\"",\""StaticValue\"":25050}]}]"",
+                ""ExitRules"": ""[]"",
+                ""ExitSettings"": {}
+            }";
+
+            var strategy = new DynamicStrategy(engine, configJson);
+            strategy.IsActive = true;
+            
+            var config = JsonConvert.DeserializeObject<DynamicStrategyConfig>(configJson);
+            Console.WriteLine($"Deserialized {config.EntryRules.Count} Entry Rules.");
+            
+            int signals = 0;
+            strategy.OnSignalGenerated += (s) => 
             {
-                using var conn = new NpgsqlConnection(connStr);
-                await conn.OpenAsync();
-                
-                using var cmd = new NpgsqlCommand("SELECT \"Name\", \"ConfigJson\" FROM hybrid_strategies WHERE \"Id\" = 26", conn);
-                using var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    File.WriteAllText("lid26_config.json", reader.GetString(1));
-                    Console.WriteLine("Saved LID 26 config to lid26_config.json");
-                }
-                else
-                {
-                    Console.WriteLine("Strategy ID 26 not found.");
-                }
-            } 
-            catch (Exception ex)
+                signals++;
+                Console.WriteLine($"Signal Fired: {s.SignalType}");
+            };
+
+            var history = new List<Skender.Stock.Indicators.Quote>();
+            var startTime = DateTime.Now.AddHours(-1);
+            for (int i = 0; i < 15; i++)
             {
-                Console.WriteLine("Error: " + ex.Message);
+                history.Add(new Skender.Stock.Indicators.Quote { Date = startTime.AddMinutes(i), Open = 25000, High = 25000, Low = 25000, Close = 25000, Volume = 100 });
             }
+
+            strategy.InitializeAsync(history).Wait();
+            
+            Console.WriteLine("Simulating Tick > 25050");
+            strategy.OnTickAsync(new TickerData { Nifty = new InstrumentInfo { Ltp = 25060 } }).Wait();
+            
+            Console.WriteLine("================ EVALUATOR CHECK ================");
+            var ctx = new EvaluationContext(history);
+            ctx.AddCandidate(new Quote { Date = DateTime.Now, Open=25060, High=25060, Low=25060, Close=25060, Volume=100 });
+            var eval = new RuleEvaluator();
+            foreach (var rule in config.EntryRules)
+            {
+                 bool match = eval.Evaluate(rule, ctx, "TEST", (msg) => Console.WriteLine(msg));
+                 Console.WriteLine($"Direct Evaluator Result: {match}");
+            }
+            Console.WriteLine("=================================================");
+
+            Console.WriteLine($"Total Signals: {signals}");
         }
     }
 }
