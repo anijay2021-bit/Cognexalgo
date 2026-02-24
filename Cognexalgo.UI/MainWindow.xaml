@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
         xmlns:conv="clr-namespace:Cognexalgo.UI.Converters"
+        xmlns:local="clr-namespace:Cognexalgo.UI.Views"
         mc:Ignorable="d"
         Title="Cognexalgo Live Operations" 
         Height="{Binding WindowHeight, Mode=TwoWay}" 
@@ -22,6 +23,8 @@
         <conv:IsNegativeConverter x:Key="IsNegativeConverter"/>
         <conv:LogColorConverter x:Key="LogColorConverter"/>
         <conv:GridLengthConverter x:Key="GridLengthConverter"/>
+        <conv:PnlToBrushConverter x:Key="PnlToBrushConverter"/>
+        <conv:KillSwitchStatusToBrushConverter x:Key="KillSwitchStatusToBrushConverter"/>
 
         <!-- DataGrid Header (Moved to DarkTheme.xaml or implied) -->
         <!-- But since specific TabItem style was removed, we re-add it here suited for Dark Theme -->
@@ -109,6 +112,9 @@
         <!-- 2. Main Content (The Workspace) -->
         <Border Grid.Row="2" Background="{StaticResource CardBrush}" Margin="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8">
              <TabControl Background="Transparent" BorderThickness="0" Margin="10">
+                <TabItem Header="ENTERPRISE">
+                    <local:EnterpriseDashboardView DataContext="{Binding EnterpriseDashboard}"/>
+                </TabItem>
                 <TabItem Header="Strategies">
                             <DataGrid ItemsSource="{Binding Strategies}" 
                                       AutoGenerateColumns="False" 

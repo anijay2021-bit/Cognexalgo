@@ -23,6 +23,7 @@ namespace Cognexalgo.UI.ViewModels
 
         // ─── V2 Integration ──────────────────────────────────────
         private V2Bridge? _v2;
+        [ObservableProperty] private EnterpriseDashboardViewModel _enterpriseDashboard;
 
         // Window Bindings
         [ObservableProperty] private double _windowHeight;
@@ -186,6 +187,7 @@ namespace Cognexalgo.UI.ViewModels
                     LoadingStatus = "Initializing V2 services...";
                     LoadingProgress = 85;
                     _v2 = await V2Bridge.InitializeAsync(config);
+                    EnterpriseDashboard = new EnterpriseDashboardViewModel(_v2);
                     _v2.Orchestrator.OnLog += (level, msg) =>
                     {
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
