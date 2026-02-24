@@ -11,6 +11,9 @@ namespace Cognexalgo.Core.Services
         private string _signalFile;
         private string _positionFile;
 
+        // Global lock to prevent interleaved logs from multiple threads
+        private static readonly object _fileLock = new object();
+
         // Custom Event for UI to subscribe to
         public event Action<string, string, string> OnLog;
 
@@ -73,8 +76,8 @@ namespace Cognexalgo.Core.Services
         {
             try
             {
-                // Simple append, thread-safe enough for low volume, ideally utilize a lock or queue for high freq
-                lock(this) 
+                // Ensure thread-safe writing across all instances using a static lock
+                lock(_fileLock) 
                 {
                     File.AppendAllText(filePath, content + Environment.NewLine);
                 }

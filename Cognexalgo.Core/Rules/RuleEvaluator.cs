@@ -4,13 +4,13 @@ namespace Cognexalgo.Core.Rules
 {
     public class RuleEvaluator
     {
-        public bool Evaluate(Rule rule, EvaluationContext context, Action<string> logAction = null)
+        public bool Evaluate(Rule rule, EvaluationContext context, string strategyName = "Unknown", Action<string> logAction = null)
         {
             // Default: All conditions must be Met (AND logic)
             // You could extend this to support OR groups later
             foreach (var condition in rule.Conditions)
             {
-                if (!EvaluateCondition(condition, context, logAction))
+                if (!EvaluateCondition(condition, context, strategyName, logAction))
                 {
                     return false;
                 }
@@ -18,7 +18,7 @@ namespace Cognexalgo.Core.Rules
             return true;
         }
 
-        private bool EvaluateCondition(Condition condition, EvaluationContext context, Action<string> logAction = null)
+        private bool EvaluateCondition(Condition condition, EvaluationContext context, string strategyName = "Unknown", Action<string> logAction = null)
         {
             // 1. Get Current Values (Offset 0)
             double leftValue = GetValue(condition.Indicator, condition.Period, context, 0);
@@ -55,14 +55,16 @@ namespace Cognexalgo.Core.Rules
             {
                 string leftName = $"{condition.Indicator}({condition.Period})";
                 string rightName = condition.SourceType == ValueSource.StaticValue ? condition.StaticValue.ToString() : $"{condition.RightIndicator}({condition.RightPeriod})";
-                string logMsg = $"[Rule] Condition Failed: {leftName} [{leftValue:F2}] {condition.Operator} {rightName} [{rightValue:F2}]";
-                Console.WriteLine(logMsg);
+                string logMsg = $"[{strategyName}] Condition Failed: {leftName} [{leftValue:F2}] {condition.Operator} {rightName} [{rightValue:F2}]";
+                // Console.WriteLine(logMsg);
                 logAction?.Invoke(logMsg);
             }
             else
             {
-                string logMsg = $"[Rule] Condition Passed: {condition.Indicator} {condition.Operator}";
-                Console.WriteLine(logMsg);
+                string leftName = $"{condition.Indicator}({condition.Period})";
+                string rightName = condition.SourceType == ValueSource.StaticValue ? condition.StaticValue.ToString() : $"{condition.RightIndicator}({condition.RightPeriod})";
+                string logMsg = $"[{strategyName}] Condition Passed: {leftName} [{leftValue:F2}] {condition.Operator} {rightName} [{rightValue:F2}]";
+                // Console.WriteLine(logMsg);
                 logAction?.Invoke(logMsg);
             }
 

@@ -1,10 +1,7 @@
 using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Npgsql;
-using Newtonsoft.Json;
-using Cognexalgo.Core.Models;
-using Cognexalgo.Core.Rules;
 
 namespace TempQuery
 {
@@ -17,102 +14,18 @@ namespace TempQuery
             {
                 using var conn = new NpgsqlConnection(connStr);
                 await conn.OpenAsync();
-
-                // ------------------ 21CE Configuration ------------------
-                var ceRules = new List<Rule>
-                {
-                    new Rule {
-                        Action = "BUY_CE",
-                        Conditions = new List<Condition> {
-                            new Condition { Indicator = IndicatorType.LTP, Period = 1, Operator = Comparator.CROSS_ABOVE, SourceType = ValueSource.Indicator, RightIndicator = IndicatorType.EMA, RightPeriod = 21 }
-                        }
-                    }
-                };
                 
-                var ceParamsDict = new Dictionary<string, string>
+                using var cmd = new NpgsqlCommand("SELECT \"Name\", \"ConfigJson\" FROM hybrid_strategies WHERE \"Id\" = 26", conn);
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
                 {
-                    { "Symbol", "NIFTY" },
-                    { "Timeframe", "1min" },
-                    { "IsMatchAllConditions", "True" },
-                    { "SelectedTargetType", "Percentage" },
-                    { "TargetValue", "1" },
-                    { "SelectedStopLossType", "Percentage" },
-                    { "StopLossValue", "1" },
-                    { "EntryRules", JsonConvert.SerializeObject(ceRules) },
-                    { "ExitRules", "[]" }
-                };
-
-                var ceConfig = new HybridStrategyConfig
+                    File.WriteAllText("lid26_config.json", reader.GetString(1));
+                    Console.WriteLine("Saved LID 26 config to lid26_config.json");
+                }
+                else
                 {
-                    Name = "21ce",
-                    IsActive = true,
-                    ProductType = "MIS",
-                    ExpiryType = "Weekly",
-                    StrategyType = "CUSTOM",
-                    Legs = new List<StrategyLeg>(), // Dynamic logic doesn't use static legs collection
-                    Parameters = JsonConvert.SerializeObject(ceParamsDict),
-                    AutoExecute = true,
-                    MaxProfitPercent = 1,
-                    MaxLossPercent = 1
-                };
-
-                // ------------------ 21PE Configuration ------------------
-                var peRules = new List<Rule>
-                {
-                    new Rule {
-                        Action = "BUY_PE",
-                        Conditions = new List<Condition> {
-                            new Condition { Indicator = IndicatorType.LTP, Period = 1, Operator = Comparator.CROSS_BELOW, SourceType = ValueSource.Indicator, RightIndicator = IndicatorType.EMA, RightPeriod = 21 }
-                        }
-                    }
-                };
-                
-                var peParamsDict = new Dictionary<string, string>
-                {
-                    { "Symbol", "NIFTY" },
-                    { "Timeframe", "1min" },
-                    { "IsMatchAllConditions", "True" },
-                    { "SelectedTargetType", "Percentage" },
-                    { "TargetValue", "1" },
-                    { "SelectedStopLossType", "Percentage" },
-                    { "StopLossValue", "1" },
-                    { "EntryRules", JsonConvert.SerializeObject(peRules) },
-                    { "ExitRules", "[]" }
-                };
-
-                var peConfig = new HybridStrategyConfig
-                {
-                    Name = "21PE",
-                    IsActive = true,
-                    ProductType = "MIS",
-                    ExpiryType = "Weekly",
-                    StrategyType = "CUSTOM",
-                    Legs = new List<StrategyLeg>(), // Dynamic logic doesn't use static legs collection
-                    Parameters = JsonConvert.SerializeObject(peParamsDict),
-                    AutoExecute = true,
-                    MaxProfitPercent = 1,
-                    MaxLossPercent = 1
-                };
-
-                // Insert into DB exactly as EF Core would serialize HybridStrategyConfig
-                string jsonCE = JsonConvert.SerializeObject(ceConfig);
-                string jsonPE = JsonConvert.SerializeObject(peConfig);
-
-                string sql = @"
-                    INSERT INTO hybrid_strategies (""Name"", ""ConfigJson"", ""IsActive"", ""CreatedAt"", ""LastModified"", ""CreatedBy"", ""LastModifiedBy"", ""Version"")
-                    VALUES 
-                    ('21ce', @jsonCE, true, NOW(), NOW(), 'System', 'System', 1),
-                    ('21PE', @jsonPE, true, NOW(), NOW(), 'System', 'System', 1)
-                    ON CONFLICT (""Name"") 
-                    DO UPDATE SET ""ConfigJson"" = EXCLUDED.""ConfigJson"", ""LastModified"" = NOW();
-                ";
-
-                using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("jsonCE", jsonCE);
-                cmd.Parameters.AddWithValue("jsonPE", jsonPE);
-                
-                int rows = await cmd.ExecuteNonQueryAsync();
-                Console.WriteLine($"Successfully saved settings into database. Rows affected: {rows}");
+                    Console.WriteLine("Strategy ID 26 not found.");
+                }
             } 
             catch (Exception ex)
             {

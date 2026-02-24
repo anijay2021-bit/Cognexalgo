@@ -36,9 +36,13 @@ namespace Cognexalgo.Core.Strategies
                     
                     if (string.IsNullOrEmpty(_config.StrategyName))
                     {
-                        // Try to infer name from metadata or description if available, or just append ID
+                        // Generate a fallback name only if it's truly missing
                         Name = $"Strategy_{_config.Symbol}_{DateTime.Now.Ticks}";
-                        engine.Logger?.Log("Strategy", $"[WARNING] StrategyName missing in config. Assigned: {Name}");
+                        engine.Logger?.Log("Strategy", $"[WARNING] StrategyName missing in config. Assigned fallback: {Name}");
+                    }
+                    else
+                    {
+                        Name = _config.StrategyName;
                     }
                 }
                 else 
@@ -140,7 +144,7 @@ namespace Cognexalgo.Core.Strategies
 
             foreach (var rule in _config.EntryRules)
             {
-                bool isMatch = _evaluator.Evaluate(rule, context, (msg) => _engine.Logger?.Log("Strategy", msg));
+                bool isMatch = _evaluator.Evaluate(rule, context, Name, (msg) => _engine.Logger?.Log("Strategy", msg));
                 // _engine.Logger?.Log("Strategy", $"[RuleEval] {Name} => Rule {rule.Action}: Match={isMatch}");
 
                 if (isMatch)
