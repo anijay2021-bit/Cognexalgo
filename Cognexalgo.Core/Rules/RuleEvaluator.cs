@@ -32,19 +32,20 @@ namespace Cognexalgo.Core.Rules
                 case Comparator.LESS_THAN: result = leftValue < rightValue; break;
                 case Comparator.EQUALS: result = Math.Abs(leftValue - rightValue) < 0.0001; break;
                 
-                // 3. Check Crossover / Closes Operators (Requires Previous Values)
+                case Comparator.CLOSES_ABOVE: result = leftValue > rightValue; break;
+                case Comparator.CLOSES_BELOW: result = leftValue < rightValue; break;
+                
+                // 3. Check Crossover Operators (Requires Previous Values)
                 case Comparator.CROSS_ABOVE:
-                case Comparator.CLOSES_ABOVE:
                 case Comparator.CROSS_BELOW:
-                case Comparator.CLOSES_BELOW:
                     double prevLeft = GetValue(condition.Indicator, condition.Period, context, 1);
                     double prevRight = GetRightValue(condition, context, 1);
                     
-                    if (condition.Operator == Comparator.CROSS_ABOVE || condition.Operator == Comparator.CLOSES_ABOVE)
+                    if (condition.Operator == Comparator.CROSS_ABOVE)
                     {
                         result = (leftValue > rightValue) && (prevLeft <= prevRight);
                     }
-                    else // CROSS_BELOW or CLOSES_BELOW
+                    else // CROSS_BELOW
                     {
                         result = (leftValue < rightValue) && (prevLeft >= prevRight);
                     }

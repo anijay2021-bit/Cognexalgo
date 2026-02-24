@@ -8,6 +8,7 @@ namespace Cognexalgo.Core.Repositories
     public interface IOrderRepository
     {
         Task AddAsync(Order order);
+        Task<System.Collections.Generic.List<Order>> GetAllAsync();
     }
 
     public class OrderRepository : IOrderRepository
@@ -42,6 +43,37 @@ namespace Cognexalgo.Core.Repositories
 
                 await command.ExecuteNonQueryAsync();
             }
+        }
+        
+        public async Task<System.Collections.Generic.List<Order>> GetAllAsync()
+        {
+            var result = new System.Collections.Generic.List<Order>();
+            using (var connection = _dbService.GetConnection())
+            {
+                await connection.OpenAsync();
+                var command = connection.CreateCommand();
+                command.CommandText = "SELECT OrderId, StrategyId, StrategyName, Symbol, TransactionType, Qty, Price, Status, Timestamp FROM Orders ORDER BY Timestamp DESC";
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var o = new Order
+                        {
+                            OrderId = reader.GetString(0),
+                            StrategyId = reader.GetInt32(1),
+                            StrategyName = !reader.IsDBNull(2) ? reader.GetString(2) : "",
+                            Symbol = reader.GetString(3),
+                            TransactionType = reader.GetString(4),
+                            Qty = reader.GetInt32(5),
+                            Price = reader.GetDouble(6),
+                            Status = reader.GetString(7),
+                            Timestamp = reader.GetDateTime(8)
+                        };
+                        result.Add(o);
+                    }
+                }
+            }
+            return result;
         }
     }
 }

@@ -582,8 +582,8 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task FetchPositions()
         {
-            // Check if engine and API are initialized
-            if (_engine == null || _engine.Api == null || _isFetchingPositions) 
+            // Check if engine is initialized
+            if (_engine == null || _isFetchingPositions) 
             {
                 return;
             }
@@ -591,28 +591,65 @@ namespace Cognexalgo.UI.ViewModels
             try 
             {
                 _isFetchingPositions = true;
-                var positions = await _engine.Api.GetPositionAsync();
-                
-                // Check if positions is null
-                if (positions == null)
-                {
-                    Log("No positions data received from API.");
-                    return;
-                }
                 
                 System.Windows.Application.Current.Dispatcher.Invoke(() => 
                 {
                     Positions.Clear();
-                    foreach(var p in positions)
-                    {
-                        // Calculate Status based on NetQty
-                        int.TryParse(p.NetQty, out int netQty);
-                        p.Status = (netQty == 0) ? "CLOSED" : "OPEN";
-
-                        Positions.Add(p);
-                    }
                 });
-                Log($"Fetched {positions.Count} Positions.");
+
+                if (_engine.IsPaperTrading)
+                {
+                    var allOrders = await _engine.OrderRepository.GetAllAsync();
+                    var orders = allOrders.Where(o => o.Timestamp.Date == DateTime.Today).ToList();
+                    if (orders.Any())
+                    {
+                        var mockPositions = new System.Collections.Generic.List<Position>();
+                        // Group by Symbol (including strike/expiry string)
+                        foreach (var g in orders.GroupBy(o => o.Symbol))
+                        {
+                            double netQty = g.Sum(o => (o.TransactionType == "BUY" ? 1 : -1) * o.Qty);
+                            if (netQty != 0)
+                            {
+                                mockPositions.Add(new Position 
+                                {
+                                    TradingSymbol = g.Key,
+                                    NetQty = netQty.ToString(),
+                                    BuyAvgPrice = g.Where(o => o.TransactionType == "BUY").Select(o => o.Price).DefaultIfEmpty(0).Average(),
+                                    SellAvgPrice = g.Where(o => o.TransactionType == "SELL").Select(o => o.Price).DefaultIfEmpty(0).Average(),
+                                    Status = "OPEN"
+                                });
+                            }
+                        }
+                        
+                        System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                        {
+                            foreach(var p in mockPositions) Positions.Add(p);
+                        });
+                        Log($"Fetched {mockPositions.Count} Paper Positions.");
+                    }
+                }
+                else if (_engine.Api != null)
+                {
+                    var positions = await _engine.Api.GetPositionAsync();
+                    if (positions == null)
+                    {
+                        Log("No positions data received from API.");
+                        return;
+                    }
+                    
+                    System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                    {
+                        foreach(var p in positions)
+                        {
+                            // Calculate Status based on NetQty
+                            double parsedQty = 0;
+                            double.TryParse(p.NetQty, out parsedQty);
+                            p.Status = (parsedQty == 0) ? "CLOSED" : "OPEN";
+                            Positions.Add(p);
+                        }
+                    });
+                    Log($"Fetched {positions.Count} Live Positions.");
+                }
             }
             catch(Exception ex)
             {
@@ -627,14 +664,26 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task FetchOrders()
         {
-            if (_engine == null || _engine.Api == null || _isFetchingOrders) return;
+            if (_engine == null || _isFetchingOrders) return;
 
             try
             {
                 _isFetchingOrders = true;
-                var orders = await _engine.Api.GetOrderBookAsync();
+                
+                var orders = new System.Collections.Generic.List<Order>();
+                
+                if (_engine.IsPaperTrading)
+                {
+                     var allOrders = await _engine.OrderRepository.GetAllAsync();
+                     orders = allOrders.Where(o => o.Timestamp.Date == DateTime.Today).ToList();
+                }
+                else if (_engine.Api != null)
+                {
+                     var apiOrders = await _engine.Api.GetOrderBookAsync();
+                     if (apiOrders != null) orders.AddRange(apiOrders);
+                }
 
-                if (orders == null) return;
+                if (orders == null || !orders.Any()) return;
 
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
