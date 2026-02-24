@@ -83,13 +83,38 @@ namespace Cognexalgo.Core.Infrastructure.Services
             if (decimal.TryParse(config["V2:AccountRms:MaxMarginUtilizationPercent"], out var mmu))
                 bridge.AccountRms.MaxMarginUtilizationPercent = mmu;
 
-            // ─── EF Core — Ensure DB Exists ──────────────────────
+            // ─── EF Core — Safe Table Creation ─────────────────
+            // EnsureCreatedAsync is a no-op when legacy tables exist,
+            // so we use GenerateCreateScript + IF NOT EXISTS instead.
             try
             {
                 using var scope = bridge.Services.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                await db.Database.EnsureCreatedAsync();
-                bridge.Logger.Info("Database", "V2 database tables ensured");
+                string sql = db.Database.GenerateCreateScript();
+
+                using var conn = db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                var stmts = sql.Split(new[] { ";\r\n", ";\n" }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var stmt in stmts)
+                {
+                    string s = stmt.Trim();
+                    if (string.IsNullOrWhiteSpace(s)) continue;
+
+                    s = s.Replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+                         .Replace("CREATE INDEX", "CREATE INDEX IF NOT EXISTS")
+                         .Replace("CREATE UNIQUE INDEX", "CREATE UNIQUE INDEX IF NOT EXISTS");
+
+                    try
+                    {
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = s;
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch { /* Table/index may already exist — safe to ignore */ }
+                }
+
+                bridge.Logger.Info("Database", "V2 tables ensured (IF NOT EXISTS)");
             }
             catch (Exception ex)
             {

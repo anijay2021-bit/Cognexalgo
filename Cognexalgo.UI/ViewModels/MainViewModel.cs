@@ -397,8 +397,28 @@ namespace Cognexalgo.UI.ViewModels
         {
             var vm = new StrategyBuilderViewModel(_engine, () => 
             {
-                 // On Save Success
+                 // On Save Success — legacy save done
                  LoadStrategies();
+                 
+                 // ─── V2: Sync to V2 DB ─────────────────────────
+                 if (_v2?.IsInitialized == true && Strategies.Count > 0)
+                 {
+                     var latest = Strategies.LastOrDefault();
+                     if (latest != null)
+                     {
+                         var adapter = new V2StrategyAdapter(_v2);
+                         _ = Task.Run(async () =>
+                         {
+                             var v2Id = await adapter.SyncToV2Async(latest);
+                             if (v2Id != null)
+                             {
+                                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                                     Log($"V2 Strategy synced: {v2Id}"));
+                             }
+                         });
+                     }
+                 }
+
                  Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w is Views.StrategyBuilderWindow)?.Close();
             });
 
