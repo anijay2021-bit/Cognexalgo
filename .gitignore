@@ -13,8 +13,23 @@ x86/
 
 # Packages
 /packages/
-/bin/
-/obj/
 .vs/
 .idea/
 .vscode/
+
+# V2 Runtime Artifacts
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+database/logs/
+build_*.txt
+
+# Secrets (never commit real credentials)
+appsettings.Development.json
+appsettings.Local.json
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

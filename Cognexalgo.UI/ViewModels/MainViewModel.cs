@@ -12,6 +12,7 @@ using System.Linq; // For Close logic
 using System.Windows; // For Window handling
 using Cognexalgo.UI.Services; // [NEW]
 using Cognexalgo.Core.Services; // [NEW]
+using Cognexalgo.Core.Infrastructure.Services; // V2
 
 namespace Cognexalgo.UI.ViewModels
 {
@@ -19,6 +20,9 @@ namespace Cognexalgo.UI.ViewModels
     {
         private readonly TradingEngine _engine;
         private readonly UiSettingsService _settingsService;
+
+        // ─── V2 Integration ──────────────────────────────────────
+        private V2Bridge? _v2;
 
         // Window Bindings
         [ObservableProperty] private double _windowHeight;
@@ -175,6 +179,24 @@ namespace Cognexalgo.UI.ViewModels
                 };
 
                 await _bootstrapper.InitializeAsync();
+
+                // ─── V2 Bridge Init ──────────────────────────
+                try
+                {
+                    LoadingStatus = "Initializing V2 services...";
+                    LoadingProgress = 85;
+                    _v2 = await V2Bridge.InitializeAsync(config);
+                    _v2.Orchestrator.OnLog += (level, msg) =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            Log($"[V2-{level}] {msg}"));
+                    };
+                    Log("V2 Bridge initialized successfully.");
+                }
+                catch (Exception v2ex)
+                {
+                    Log($"V2 Bridge init warning (non-fatal): {v2ex.Message}", "WARN");
+                }
                 
                 IsInitialized = true;
                 Status = "Ready";
@@ -286,6 +308,12 @@ namespace Cognexalgo.UI.ViewModels
                         // TODO: Map strategy to specific underline (NIFTY/BANKNIFTY)
                         strategy.Ltp = (decimal)LtpNifty; 
                     }
+                }
+
+                // ─── V2: Forward tick to V2 Orchestrator ─────
+                if (_v2?.IsInitialized == true)
+                {
+                    _ = _v2.DispatchTickAsync(LtpNifty, LtpBankNifty, LtpFinnifty);
                 }
             });
         }
@@ -450,6 +478,10 @@ namespace Cognexalgo.UI.ViewModels
         public async Task ExitAll()
         {
             Log("Global Exit Triggered. Squaring off all positions...");
+            
+            // V2: Kill Switch — stop all V2 strategies immediately
+            _v2?.KillAll();
+            
             await _engine.SquareOffAll();
             Log("Global Square-off completed.", "SUCCESS");
         }
