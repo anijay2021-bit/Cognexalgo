@@ -307,33 +307,6 @@ namespace Cognexalgo.Core.Services
             }
         }
 
-        private List<Skender.Stock.Indicators.Quote> GenerateMockHistory(string index, string interval, int days)
-        {
-            var list = new List<Skender.Stock.Indicators.Quote>();
-            double basePrice = GenerateMockSpotPrice(index);
-            DateTime start = DateTime.Now.AddDays(-days);
-            
-            var random = new Random();
-
-            for (int i = 0; i < 250; i++)
-            {
-                double change = basePrice * 0.001 * (random.NextDouble() * 2 - 1);
-                double close = basePrice + change;
-                
-                list.Add(new Skender.Stock.Indicators.Quote
-                {
-                    Date = start.AddMinutes(i),
-                    Open = (decimal)basePrice,
-                    High = (decimal)Math.Max(basePrice, close) + 2,
-                    Low = (decimal)Math.Min(basePrice, close) - 2,
-                    Close = (decimal)close,
-                    Volume = 1000
-                });
-                basePrice = close;
-            }
-            return list;
-        }
-
         #endregion
 
         #region Option Chain Building
