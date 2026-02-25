@@ -47,7 +47,15 @@ namespace Cognexalgo.Core
         // [NEW] Track active strategies for PnL aggregation
         private List<Cognexalgo.Core.Strategies.StrategyBase> _activeStrategies = new List<Cognexalgo.Core.Strategies.StrategyBase>();
 
-        public TradingEngine()
+        public TradingEngine() : this(null, null) { }
+
+        /// <summary>
+        /// Constructor with pre-loaded services from the Pre-Login Data Download Protocol.
+        /// If TokenService/DataService are provided, they are reused (already warmed up with data).
+        /// </summary>
+        public TradingEngine(
+            TokenService? preLoadedTokenService = null,
+            AngelOneDataService? preLoadedDataService = null)
         {
             // Load Configuration
             var config = new ConfigurationBuilder()
@@ -65,14 +73,12 @@ namespace Cognexalgo.Core
             }
             else 
             {
-                // Fallback (or throw) - prevents crash if config missing in tests
-                // But ideally should throw if DB is required
                 optionsBuilder.UseNpgsql("Host=localhost;Database=algopro;Username=postgres;Password=password");
             }
             
             MetadataContext = new AlgoDbContext(optionsBuilder.Options);
             
-            // Legacy SQLite Service (keep for Order/Auth repos if they are not migrated yet)
+            // Legacy SQLite Service
             _dbService = new DatabaseService();
             
             // Repositories
@@ -80,20 +86,26 @@ namespace Cognexalgo.Core
             OrderRepository = new OrderRepository(_dbService);
             CredentialsRepository = new CredentialsRepository(_dbService);
 
-            TokenService = new TokenService();
+            // [PRE-LOGIN PROTOCOL] Use pre-loaded services if available, otherwise create new
+            TokenService = preLoadedTokenService ?? new TokenService();
             Ticker = new TickerService("wss://smartapi.angelbroking.com/websocket");
             
             // Initialize Logger
             Logger = new FileLoggingService();
             _totpService = new TotpService();
             
-            // [NEW] Initialize API and DataService (Key set later on Connect)
+            // [PRE-LOGIN PROTOCOL] Reuse pre-loaded DataService or create new
             Api = new SmartApiClient(); 
-            DataService = new AngelOneDataService(Api, TokenService, Logger);
+            DataService = preLoadedDataService ?? new AngelOneDataService(Api, TokenService, Logger);
 
             _clientId = Environment.MachineName;
-            Logger.Log("Engine", "Trading Engine Constructed.");
+
+            if (preLoadedTokenService != null)
+                Logger.Log("Engine", $"Trading Engine Constructed with PRE-LOADED data ({preLoadedTokenService.GetSymbolCount()} symbols).");
+            else
+                Logger.Log("Engine", "Trading Engine Constructed (fresh — no pre-loaded data).");
         }
+
 
         public async Task InitializeDatabaseAsync()
         {

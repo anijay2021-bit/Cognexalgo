@@ -23,10 +23,19 @@ namespace Cognexalgo.Core.Domain.Strategies
         private readonly IndicatorEngine _indicatorEngine;
         private readonly ConditionEvaluator _conditionEvaluator;
         private readonly Services.CandleAggregatorV2 _aggregator;
+        private readonly Cognexalgo.Core.Services.AngelOneDataService? _dataService;
+        private DateTime _lastWarmupLogTime = DateTime.MinValue;
 
-        public CustomIndicatorStrategy(CustomStrategyConfig config)
+        /// <summary>
+        /// Create a custom indicator strategy.
+        /// Pass dataService to auto-load deep history from the pre-login cache.
+        /// </summary>
+        public CustomIndicatorStrategy(
+            CustomStrategyConfig config,
+            Cognexalgo.Core.Services.AngelOneDataService? dataService = null)
         {
             _config = config;
+            _dataService = dataService;
             Type = StrategyType.CSTM;
             Name = config.Name ?? "Custom Indicator";
 
@@ -34,7 +43,10 @@ namespace Cognexalgo.Core.Domain.Strategies
             {
                 MinimumBarsRequired = config.WarmupBars
             };
-            _conditionEvaluator = new ConditionEvaluator(_indicatorEngine);
+
+            // [DIAGNOSTIC] Wire condition evaluator with logging callback
+            _conditionEvaluator = new ConditionEvaluator(_indicatorEngine, 
+                msg => Log("DIAG", $"[{Name}] {msg}"));
 
             // Initialize candle aggregator for the primary timeframe
             _aggregator = new Services.CandleAggregatorV2(ParseTimeframeMinutes(config.PrimaryTimeFrame));
@@ -43,11 +55,34 @@ namespace Cognexalgo.Core.Domain.Strategies
 
         public override async Task InitializeAsync(CancellationToken ct)
         {
+            // Priority 1: Use manually provided historical candles from config
             if (_config.HistoricalCandles != null && _config.HistoricalCandles.Count > 0)
             {
                 _indicatorEngine.LoadHistory(_config.PrimaryTimeFrame, _config.HistoricalCandles);
-                Log("INFO", $"[{Name}] Initialized with {_config.HistoricalCandles.Count} historical candles on {_config.PrimaryTimeFrame}");
+                Log("INFO", $"[{Name}] Initialized with {_config.HistoricalCandles.Count} config-supplied candles on {_config.PrimaryTimeFrame}");
             }
+            // Priority 2: Auto-load from deep history cache (pre-login data)
+            else if (_dataService != null)
+            {
+                string angelInterval = TimeFrameToAngelInterval(_config.PrimaryTimeFrame);
+                string symbol = _config.Symbol?.ToUpper() ?? "NIFTY";
+                var cached = _dataService.GetCachedHistory(symbol, angelInterval);
+
+                if (cached != null && cached.Count > 0)
+                {
+                    _indicatorEngine.LoadHistory(_config.PrimaryTimeFrame, cached);
+                    Log("INFO", $"[{Name}] ⚡ AUTO-LOADED {cached.Count} candles from deep cache [{symbol}|{angelInterval}]");
+                }
+                else
+                {
+                    Log("WARN", $"[{Name}] No cached data found for [{symbol}|{angelInterval}] — will warm up from live ticks");
+                }
+            }
+            else
+            {
+                Log("WARN", $"[{Name}] No historical data or DataService — will warm up from live ticks (slow)");
+            }
+
             await Task.CompletedTask;
         }
 
@@ -66,8 +101,17 @@ namespace Cognexalgo.Core.Domain.Strategies
                 switch (CurrentState)
                 {
                     case SignalState.WAITING:
-                        // Evaluate entry conditions on every tick using live synthetic candle
-                        if (_indicatorEngine.IsWarmedUp)
+                        // [DIAGNOSTIC] Log warm-up progress every 10 seconds
+                        if (!_indicatorEngine.IsWarmedUp)
+                        {
+                            if ((DateTime.Now - _lastWarmupLogTime).TotalSeconds > 10)
+                            {
+                                int currentBars = _indicatorEngine.GetCandleCount(_config.PrimaryTimeFrame);
+                                Log("DIAG", $"[{Name}] ⏳ WARMING UP: {currentBars}/{_config.WarmupBars} candles on {_config.PrimaryTimeFrame}");
+                                _lastWarmupLogTime = DateTime.Now;
+                            }
+                        }
+                        else
                         {
                             EvaluateEntryOnTick(tick, ltp);
                         }
@@ -188,6 +232,26 @@ namespace Cognexalgo.Core.Domain.Strategies
                 TimeFrame.Hour1 => 60,
                 TimeFrame.Day1 => 1440,
                 _ => 1
+            };
+        }
+
+        /// <summary>
+        /// Maps internal TimeFrame enum to Angel One API interval strings
+        /// used as cache keys in AngelOneDataService.
+        /// </summary>
+        private static string TimeFrameToAngelInterval(TimeFrame tf)
+        {
+            return tf switch
+            {
+                TimeFrame.Min1 => "ONE_MINUTE",
+                TimeFrame.Min3 => "THREE_MINUTE",
+                TimeFrame.Min5 => "FIVE_MINUTE",
+                TimeFrame.Min10 => "TEN_MINUTE",
+                TimeFrame.Min15 => "FIFTEEN_MINUTE",
+                TimeFrame.Min30 => "THIRTY_MINUTE",
+                TimeFrame.Hour1 => "ONE_HOUR",
+                TimeFrame.Day1 => "ONE_DAY",
+                _ => "ONE_MINUTE"
             };
         }
     }

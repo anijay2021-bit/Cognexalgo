@@ -12,6 +12,7 @@ namespace Cognexalgo.UI;
     public partial class App : Application
     {
         private Cognexalgo.Core.CloudServices.FirebaseService _firebaseService;
+        private ViewModels.LoginViewModel _loginViewModel; // [NEW] Keep reference for pre-loaded services
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -48,7 +49,7 @@ namespace Cognexalgo.UI;
             splash.Show();
 
             // Simulate Initialization
-            await System.Threading.Tasks.Task.Delay(3000); 
+            await System.Threading.Tasks.Task.Delay(2000); 
 
             splash.Close();
 
@@ -58,17 +59,26 @@ namespace Cognexalgo.UI;
         private void ShowLoginWindow()
         {
             _firebaseService = new Cognexalgo.Core.CloudServices.FirebaseService();
-            var loginViewModel = new ViewModels.LoginViewModel(_firebaseService, OnLoginSuccess);
-            var loginWindow = new Views.LoginWindow(loginViewModel);
+            _loginViewModel = new ViewModels.LoginViewModel(_firebaseService, OnLoginSuccess);
+            var loginWindow = new Views.LoginWindow(_loginViewModel);
             loginWindow.Show();
+
+            // [NEW] ─── PRE-LOGIN DATA DOWNLOAD PROTOCOL ───────────────
+            // Fire-and-forget: download data in background while user sees login screen.
+            // LOGIN button remains disabled until download completes via IsDataReady binding.
+            _ = _loginViewModel.StartDataDownloadAsync();
         }
 
         private async void OnLoginSuccess()
         {
             try 
             {
-                var engine = new Cognexalgo.Core.TradingEngine();
-                await engine.InitializeDatabaseAsync(); // [NEW] Ensure DB tables are created
+                // [NEW] Pass pre-loaded services to TradingEngine
+                var engine = new Cognexalgo.Core.TradingEngine(
+                    preLoadedTokenService: _loginViewModel?.PreLoadedTokenService,
+                    preLoadedDataService: _loginViewModel?.PreLoadedDataService);
+
+                await engine.InitializeDatabaseAsync();
                 
                 engine.SetCloudService(_firebaseService); 
                 var mainViewModel = new ViewModels.MainViewModel(engine);
@@ -101,4 +111,3 @@ namespace Cognexalgo.UI;
             catch { }
         }
     }
-

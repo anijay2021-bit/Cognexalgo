@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
         mc:Ignorable="d"
-        Title="Cognexalgo Login" Height="350" Width="400"
+        Title="Cognexalgo Login" Height="450" Width="420"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="NoResize"
@@ -23,24 +23,92 @@
     <Border BorderBrush="#333" BorderThickness="1" CornerRadius="8">
         <Grid Margin="20">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>  <!-- Header -->
+                <RowDefinition Height="Auto"/>  <!-- Data Download Status -->
+                <RowDefinition Height="*"/>     <!-- Login Inputs -->
+                <RowDefinition Height="Auto"/>  <!-- Actions -->
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <StackPanel HorizontalAlignment="Center" Margin="0,10,0,20">
+            <StackPanel HorizontalAlignment="Center" Margin="0,10,0,15">
                 <TextBlock Text="COGNEXALGO" FontSize="24" FontWeight="Bold" Foreground="#00C853" HorizontalAlignment="Center"/>
                 <TextBlock Text="ALGORITHMIC TRADING MACHINE" FontSize="10" Foreground="#888" HorizontalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Inputs -->
-            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <!-- Data Download Protocol Status -->
+            <Border Grid.Row="1" Background="#2A2A2A" CornerRadius="6" Padding="15,12" Margin="0,0,0,15">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="DAILY PROTOCOL CHECK" FontSize="10" Foreground="#666" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                    <ProgressBar Grid.Row="1" 
+                                 Value="{Binding DataProgress}" 
+                                 Maximum="100" Height="6" 
+                                 Margin="0,0,0,8"
+                                 Foreground="#1ABC9C" Background="#444">
+                    </ProgressBar>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding DataStatusMessage}" 
+                                   Foreground="#CCC" FontSize="11" 
+                                   TextWrapping="Wrap" VerticalAlignment="Center"/>
+
+                        <!-- RETRY button: visible only when download failed -->
+                        <Button Grid.Column="1" Content="⟳ RETRY" 
+                                Command="{Binding RetryDownloadCommand}"
+                                Background="#444" Foreground="#1ABC9C" 
+                                FontWeight="Bold" FontSize="10"
+                                Padding="10,4" Margin="8,0,0,0"
+                                BorderThickness="1" BorderBrush="#1ABC9C"
+                                Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" 
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsDataReady}" Value="False"/>
+                                                <Condition Binding="{Binding IsDownloading}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Login Inputs -->
+            <StackPanel Grid.Row="2" VerticalAlignment="Center">
                 <TextBlock Text="LICENSE KEY" Foreground="#AAA" FontSize="12" Margin="0,0,0,5"/>
                 <TextBox Text="{Binding LicenseKey, UpdateSourceTrigger=PropertyChanged}" 
                          Style="{StaticResource DarkTextBoxStyle}" 
                          Padding="10" FontSize="14"
-                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+                         IsEnabled="{Binding IsDataReady}"/>
                 
                 <TextBlock Text="{Binding StatusMessage}" 
                            Foreground="#FF5555" 
@@ -54,13 +122,13 @@
             </StackPanel>
 
             <!-- Actions -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
                 <Button Content="EXIT" Command="{Binding ExitCommand}" 
                         Style="{StaticResource SecondaryButtonStyle}" Width="100" Margin="0,0,10,0"/>
                 <Button Content="LOGIN" Command="{Binding LoginCommand}" 
-                        Style="{StaticResource ActionPushButtonStyle}" Width="100"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"/>
+                        Style="{StaticResource ActionPushButtonStyle}" Width="100"/>
             </StackPanel>
         </Grid>
     </Border>
 </Window>
+

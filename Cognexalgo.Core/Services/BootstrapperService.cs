@@ -40,7 +40,16 @@ namespace Cognexalgo.Core.Services
                 OnProgressChanged?.Invoke("Database Synced.", 20);
 
                 // Step 2: Historical Data
-                await Step2_FetchHistoricalDataAsync();
+                // [PRE-LOGIN PROTOCOL] Skip if data was already pre-loaded before login
+                bool isTokenPreLoaded = _engine.TokenService.GetSymbolCount() > 0;
+                if (isTokenPreLoaded)
+                {
+                    _engine.Logger.Log("Bootstrapper", $"⏭️ SKIP Step 2: TokenService already has {_engine.TokenService.GetSymbolCount()} symbols (pre-loaded).");
+                }
+                else
+                {
+                    await Step2_FetchHistoricalDataAsync();
+                }
                 OnProgressChanged?.Invoke("Market Data Buffered.", 40);
 
                 // Step 3: Option Chain & Greeks

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Cognexalgo.Core.CloudServices;
 using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Services;
 
 namespace Cognexalgo.UI.ViewModels
 {
@@ -22,15 +23,98 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty]
         private bool _isBusy;
 
+        // ─── Pre-Login Data Download Protocol ─────────────────────
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
+        private bool _isDataReady = false;
+
+        [ObservableProperty]
+        private string _dataStatusMessage = "Preparing data download...";
+
+        [ObservableProperty]
+        private double _dataProgress = 0;
+
+        [ObservableProperty]
+        private bool _isDownloading = false;
+
+        // Expose pre-loaded services for TradingEngine
+        public TokenService? PreLoadedTokenService { get; private set; }
+        public AngelOneDataService? PreLoadedDataService { get; private set; }
+
         public LoginViewModel(IFirebaseService firebaseService, Action onLoginSuccess)
         {
             _firebaseService = firebaseService;
             _onLoginSuccess = onLoginSuccess;
-            // Load License Key from Settings if available (TODO)
-             _licenseKey = "OFFLINE"; 
+            _licenseKey = "OFFLINE"; 
         }
 
+        /// <summary>
+        /// Pre-Login Protocol: Download expiries + historical data.
+        /// Called by App.xaml.cs immediately after showing the Login window.
+        /// </summary>
+        public async Task StartDataDownloadAsync()
+        {
+            IsDownloading = true;
+            IsDataReady = false;
+
+            try
+            {
+                // ─── Step 1: Download Scrip Master (Expiry Data) ──────
+                // NOTE: Scrip Master is a file download, does NOT need API auth
+                DataStatusMessage = "📥 Downloading Scrip Master (expiries)...";
+                DataProgress = 10;
+
+                var tokenService = new TokenService();
+                await tokenService.LoadMasterAsync();
+
+                int symbolCount = tokenService.GetSymbolCount();
+                if (symbolCount == 0)
+                {
+                    DataStatusMessage = "❌ Failed to download Scrip Master. Check internet.";
+                    IsDownloading = false;
+                    return;
+                }
+
+                DataStatusMessage = $"✓ Scrip Master loaded: {symbolCount} symbols";
+                DataProgress = 60;
+                PreLoadedTokenService = tokenService;
+
+                // ─── Step 2: Prepare DataService (no history yet) ─────────
+                // Deep history download requires JWT auth (Angel One login).
+                // It will happen AFTER login via BootstrapperService.Step2_FetchHistoricalDataAsync()
+                var apiClient = new SmartApiClient();
+                var logger = new FileLoggingService();
+                var dataService = new AngelOneDataService(apiClient, tokenService, logger);
+                PreLoadedDataService = dataService;
+
+                DataStatusMessage = $"✅ Data Ready — {symbolCount} symbols loaded. History will download after login.";
+                DataProgress = 100;
+                IsDataReady = true;
+            }
+            catch (Exception ex)
+            {
+                DataStatusMessage = $"❌ Download failed: {ex.Message}";
+                DataProgress = 0;
+                IsDataReady = false;
+            }
+            finally
+            {
+                IsDownloading = false;
+            }
+        }
+
+        /// <summary>
+        /// Retry download if it failed. Bound to a "RETRY" button on the login screen.
+        /// </summary>
         [RelayCommand]
+        public async Task RetryDownload()
+        {
+            await StartDataDownloadAsync();
+        }
+
+        private bool CanLogin() => IsDataReady && !IsBusy;
+
+        [RelayCommand(CanExecute = nameof(CanLogin))]
         public async Task Login()
         {
             if (string.IsNullOrWhiteSpace(LicenseKey))
@@ -53,8 +137,6 @@ namespace Cognexalgo.UI.ViewModels
             IsBusy = true;
             StatusMessage = "Connecting to Cloud...";
 
-            // Connect First (In a real app, connection parameters might be obfuscated or fetched securely)
-            // For now, using placeholders. You'll need to replace these with REAL Firebase credentials.
             bool connected = await _firebaseService.ConnectAsync("https://YOUR-FIREBASE-URL.firebaseio.com/", "YOUR-FIREBASE-SECRET"); 
             
             if (!connected)
@@ -72,7 +154,7 @@ namespace Cognexalgo.UI.ViewModels
             if (result.IsActive)
             {
                 StatusMessage = "Success! Access Granted.";
-                await Task.Delay(500); // Small delay for UX
+                await Task.Delay(500);
                 _onLoginSuccess?.Invoke();
             }
             else

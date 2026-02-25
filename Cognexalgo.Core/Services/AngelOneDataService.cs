@@ -15,7 +15,27 @@ namespace Cognexalgo.Core.Services
         private readonly TokenService _tokenService;
         private readonly FileLoggingService _logger;
         private readonly ApiRateLimiter _rateLimiter;
+        // Multi-timeframe cache: key = "NIFTY|ONE_MINUTE", "NIFTY|FIVE_MINUTE", etc.
         private readonly Dictionary<string, List<Skender.Stock.Indicators.Quote>> _indexHistory = new Dictionary<string, List<Skender.Stock.Indicators.Quote>>();
+
+        /// <summary>
+        /// Progress callback for pre-login UI: (statusMessage, progressPercent)
+        /// </summary>
+        public event Action<string, int>? OnDownloadProgress;
+
+        /// <summary>
+        /// Angel One interval spec: (apiIntervalName, maxDaysAllowed, displayName)
+        /// </summary>
+        private static readonly (string Interval, int MaxDays, string Display)[] DeepIntervals = new[]
+        {
+            ("ONE_MINUTE",    30,  "1m"),
+            ("THREE_MINUTE",  60,  "3m"),
+            ("FIVE_MINUTE",   100, "5m"),
+            ("TEN_MINUTE",    100, "10m"),
+            ("FIFTEEN_MINUTE",200, "15m"),
+            ("THIRTY_MINUTE", 200, "30m"),
+            ("ONE_HOUR",      400, "1h"),
+        };
 
         public AngelOneDataService(
             SmartApiClient api, 
@@ -107,28 +127,82 @@ namespace Cognexalgo.Core.Services
 
         #region Historical Data
 
-        public async Task PreFetchGlobalHistoryAsync()
+        /// <summary>
+        /// [DEEP PRE-LOGIN PROTOCOL] Downloads historical data for ALL intervals 
+        /// for major indices. This ensures strategies on any timeframe start warm.
+        /// 
+        /// Downloads: 1m(30d), 3m(60d), 5m(100d), 10m(100d), 15m(200d), 30m(200d), 1h(400d)
+        /// For: NIFTY, BANKNIFTY, FINNIFTY
+        /// Total calls: 3 indices × 7 intervals = 21 API calls
+        /// </summary>
+        public async Task PreFetchDeepHistoryAsync()
         {
-            _logger?.Log("DataService", "Pre-fetching global history for Indices...");
             string[] indices = { "NIFTY", "BANKNIFTY", "FINNIFTY" };
-            
+            int totalSteps = indices.Length * DeepIntervals.Length;
+            int currentStep = 0;
+
+            _logger?.Log("DataService", $"═══ DEEP HISTORY DOWNLOAD: {totalSteps} calls ({indices.Length} indices × {DeepIntervals.Length} intervals) ═══");
+
             foreach (var index in indices)
             {
-                try
+                foreach (var (interval, maxDays, display) in DeepIntervals)
                 {
-                    // Fetch 7 days instead of 2 to ensure we have enough data for 200 EMA, even over weekends
-                    var history = await GetHistoryAsync(index, "ONE_MINUTE", 7);
-                    if (history != null && history.Any())
+                    currentStep++;
+                    int progressPercent = (int)((double)currentStep / totalSteps * 100);
+
+                    try
                     {
-                        _indexHistory[index.ToUpper()] = history;
-                        _logger?.Log("DataService", $"✓ Global cache populated for {index}");
+                        string statusMsg = $"📥 {index} {display} ({currentStep}/{totalSteps})";
+                        OnDownloadProgress?.Invoke(statusMsg, progressPercent);
+
+                        var history = await GetHistoryAsync(index, interval, maxDays);
+                        string cacheKey = $"{index.ToUpper()}|{interval}";
+
+                        if (history != null && history.Any())
+                        {
+                            _indexHistory[cacheKey] = history;
+                            _logger?.Log("DataService", $"  ✓ {index} {display}: {history.Count} candles ({maxDays}d)");
+                        }
+                        else
+                        {
+                            _logger?.Log("DataService", $"  ⚠ {index} {display}: 0 candles returned");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.Log("DataService", $"  ✗ {index} {display}: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger?.Log("DataService", $"ERROR: Pre-fetching {index} failed: {ex.Message}");
-                }
             }
+
+            int totalCandles = _indexHistory.Values.Sum(v => v.Count);
+            _logger?.Log("DataService", $"═══ DEEP HISTORY COMPLETE: {_indexHistory.Count} buffers, {totalCandles:N0} total candles ═══");
+            OnDownloadProgress?.Invoke($"✅ Data Ready — {totalCandles:N0} candles across all timeframes", 100);
+        }
+
+        /// <summary>
+        /// Legacy shallow prefetch — now calls deep version.
+        /// </summary>
+        public async Task PreFetchGlobalHistoryAsync()
+        {
+            await PreFetchDeepHistoryAsync();
+        }
+
+        /// <summary>
+        /// Get cached history for a specific index and interval.
+        /// </summary>
+        public List<Skender.Stock.Indicators.Quote>? GetCachedHistory(string index, string interval)
+        {
+            string key = $"{index.ToUpper()}|{interval}";
+            return _indexHistory.ContainsKey(key) ? _indexHistory[key].ToList() : null;
+        }
+
+        /// <summary>
+        /// Get total cached candle count across all buffers.
+        /// </summary>
+        public int GetTotalCachedCandles()
+        {
+            return _indexHistory.Values.Sum(v => v.Count);
         }
 
         public async Task<List<Skender.Stock.Indicators.Quote>> GetHistoryAsync(string index, string interval = "ONE_MINUTE", int days = 1)
@@ -137,11 +211,19 @@ namespace Cognexalgo.Core.Services
             {
                 index = index.ToUpper();
 
-                // Check Cache first if it's a standard index request
-                if (interval == "ONE_MINUTE" && days <= 2 && _indexHistory.ContainsKey(index))
+                // Check multi-timeframe cache first
+                string cacheKey = $"{index}|{interval}";
+                if (_indexHistory.ContainsKey(cacheKey))
                 {
-                    _logger?.Log("DataService", $"Using cached history for {index}");
-                    return _indexHistory[index].ToList(); // Return copy
+                    _logger?.Log("DataService", $"Using cached history for {index} [{interval}]");
+                    return _indexHistory[cacheKey].ToList(); // Return copy
+                }
+
+                // Legacy single-key cache fallback
+                if (interval == "ONE_MINUTE" && _indexHistory.ContainsKey(index))
+                {
+                    _logger?.Log("DataService", $"Using legacy cached history for {index}");
+                    return _indexHistory[index].ToList();
                 }
 
                 // Map index to token
