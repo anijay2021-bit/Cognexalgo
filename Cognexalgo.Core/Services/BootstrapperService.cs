@@ -40,16 +40,11 @@ namespace Cognexalgo.Core.Services
                 OnProgressChanged?.Invoke("Database Synced.", 20);
 
                 // Step 2: Historical Data
-                // [PRE-LOGIN PROTOCOL] Skip if data was already pre-loaded before login
-                bool isTokenPreLoaded = _engine.TokenService.GetSymbolCount() > 0;
-                if (isTokenPreLoaded)
-                {
-                    _engine.Logger.Log("Bootstrapper", $"⏭️ SKIP Step 2: TokenService already has {_engine.TokenService.GetSymbolCount()} symbols (pre-loaded).");
-                }
-                else
-                {
-                    await Step2_FetchHistoricalDataAsync();
-                }
+                // [POST-LOGIN] Always download real history here — JWT is now available.
+                // The pre-login phase only downloaded Scrip Master (no auth needed).
+                // Historical data REQUIRES JWT auth, so it MUST be fetched here.
+                _engine.Logger.Log("Bootstrapper", "📥 Downloading real historical data (JWT available)...");
+                await Step2_FetchHistoricalDataAsync();
                 OnProgressChanged?.Invoke("Market Data Buffered.", 40);
 
                 // Step 3: Option Chain & Greeks
@@ -111,32 +106,39 @@ namespace Cognexalgo.Core.Services
 
         private async Task Step2_FetchHistoricalDataAsync()
         {
-            string[] indices = { "NIFTY", "BANKNIFTY", "FINNIFTY" };
-            foreach (var index in indices)
+            // [POST-LOGIN DEEP DOWNLOAD] Now that JWT is available,
+            // fetch the full depth for all timeframes using the DataService.
+            try
             {
-                try 
+                _engine.Logger.Log("Bootstrapper", "═══ DEEP HISTORY DOWNLOAD (post-login, real data) ═══");
+                await _dataService.PreFetchDeepHistoryAsync();
+
+                int totalCandles = _dataService.GetTotalCachedCandles();
+                _engine.Logger.Log("Bootstrapper", $"✓ Deep history complete: {totalCandles:N0} real candles cached across all timeframes.");
+            }
+            catch (Exception ex)
+            {
+                _engine.Logger.Log("Bootstrapper", $"ERROR: Deep history download failed: {ex.Message}");
+                _engine.Logger.Log("Bootstrapper", "Falling back to shallow 1-min fetch...");
+
+                // Fallback: at minimum, get 5 days of 1-min data for the major indices
+                string[] indices = { "NIFTY", "BANKNIFTY", "FINNIFTY" };
+                foreach (var index in indices)
                 {
-                    // Fetch 5 days of history for indicators (USER REQUIREMENT)
-                    var history = await _dataService.GetHistoryAsync(index, "ONE_MINUTE", 5);
-                    
-                    if (history != null && history.Any())
+                    try
                     {
-                        // TODO: Store in a centralized MarketBuffer if not already handled by DataService
-                        // _engine.MarketBuffer.Add(index, history);
-                        _engine.Logger.Log("Bootstrapper", $"✓ Buffered {history.Count} candles for {index}.");
+                        var history = await _dataService.GetHistoryAsync(index, "ONE_MINUTE", 5);
+                        if (history != null && history.Any())
+                        {
+                            _engine.Logger.Log("Bootstrapper", $"  ✓ Fallback: {history.Count} candles for {index}.");
+                        }
                     }
-                    else
+                    catch (Exception fallbackEx)
                     {
-                        _engine.Logger.Log("Bootstrapper", $"WARNING: No history data for {index}. Indicators may be delayed.");
+                        _engine.Logger.Log("Bootstrapper", $"  ✗ Fallback failed for {index}: {fallbackEx.Message}");
                     }
+                    await Task.Delay(200);
                 }
-                catch (Exception ex)
-                {
-                    _engine.Logger.Log("Bootstrapper", $"ERROR: Failed to fetch history for {index}: {ex.Message}");
-                    // Evaluate if this should block start. Usually yes for technical strategies.
-                    // throw; 
-                }
-                await Task.Delay(200); // Slight delay to respect rate limits
             }
         }
 

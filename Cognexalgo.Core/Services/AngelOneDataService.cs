@@ -15,6 +15,7 @@ namespace Cognexalgo.Core.Services
         private readonly TokenService _tokenService;
         private readonly FileLoggingService _logger;
         private readonly ApiRateLimiter _rateLimiter;
+        private readonly HistoryCacheService _cacheService;
         // Multi-timeframe cache: key = "NIFTY|ONE_MINUTE", "NIFTY|FIVE_MINUTE", etc.
         private readonly Dictionary<string, List<Skender.Stock.Indicators.Quote>> _indexHistory = new Dictionary<string, List<Skender.Stock.Indicators.Quote>>();
 
@@ -46,6 +47,7 @@ namespace Cognexalgo.Core.Services
             _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
             _logger = logger;
             _rateLimiter = new ApiRateLimiter(maxRequestsPerSecond: 3);
+            _cacheService = new HistoryCacheService();
         }
 
         #region Spot Price Fetching
@@ -57,11 +59,11 @@ namespace Cognexalgo.Core.Services
         {
             try
             {
-                // MOCK DATA CHECK
+                // NO MOCK FALLBACK - Return 0 if not logged in
                 if (_api.JwtToken == null)
                 {
-                     _logger?.Log("DataService", $"[MOCK] Fetching spot price for {index}");
-                     return GenerateMockSpotPrice(index);
+                     _logger?.Log("DataService", $"WARNING: No JWT token. Cannot fetch live spot price for {index}. Providing 0.");
+                     return 0;
                 }
 
                 if (string.IsNullOrEmpty(index))
@@ -76,6 +78,8 @@ namespace Cognexalgo.Core.Services
                     "NIFTY" => ("99926000", "Nifty 50"),
                     "BANKNIFTY" => ("99926009", "Nifty Bank"),
                     "FINNIFTY" => ("99926037", "Nifty Fin Service"),
+                    "MIDCPNIFTY" => ("99926030", "NIFTY MID SELECT"),
+                    "SENSEX" => ("99919017", "SENSEX"),
                     _ => throw new ArgumentException($"Unsupported index: {index}")
                 };
 
@@ -161,7 +165,11 @@ namespace Cognexalgo.Core.Services
                         if (history != null && history.Any())
                         {
                             _indexHistory[cacheKey] = history;
-                            _logger?.Log("DataService", $"  ✓ {index} {display}: {history.Count} candles ({maxDays}d)");
+                            
+                            // [NEW] Persist to SQLite
+                            await _cacheService.SaveHistoryAsync(index, interval, history);
+                            
+                            _logger?.Log("DataService", $"  ✓ {index} {display}: {history.Count} candles ({maxDays}d) [SAVED TO CACHE]");
                         }
                         else
                         {
@@ -211,12 +219,21 @@ namespace Cognexalgo.Core.Services
             {
                 index = index.ToUpper();
 
-                // Check multi-timeframe cache first
+                // Priority 1: In-memory cache (fastest)
                 string cacheKey = $"{index}|{interval}";
                 if (_indexHistory.ContainsKey(cacheKey))
                 {
-                    _logger?.Log("DataService", $"Using cached history for {index} [{interval}]");
-                    return _indexHistory[cacheKey].ToList(); // Return copy
+                    _logger?.Log("DataService", $"Using in-memory history for {index} [{interval}]");
+                    return _indexHistory[cacheKey].ToList();
+                }
+
+                // Priority 2: SQLite Local Cache (Persistence)
+                var localCached = await _cacheService.GetHistoryAsync(index, interval, days);
+                if (localCached != null && localCached.Count > 50) // Only use if we have significant history
+                {
+                    _logger?.Log("DataService", $"Using SQLite local cache for {index} [{interval}] ({localCached.Count} candles)");
+                    _indexHistory[cacheKey] = localCached; // Optmize for next call
+                    return localCached;
                 }
 
                 // Legacy single-key cache fallback
@@ -240,10 +257,13 @@ namespace Cognexalgo.Core.Services
 
                 _logger?.Log("DataService", $"Fetching History for {index} from {fromDate:yyyy-MM-dd} to {toDate:yyyy-MM-dd}");
 
-                // MOCK DATA CHECK
+                // MOCK DATA CHECK - REMOVED Mock fallback if JWT is missing
+                // Instead of generating mock data, we should attempt to use the local cache 
+                // or just return empty to avoid polluting indicators with fake 2 price values.
                 if (_api.JwtToken == null)
                 {
-                     return GenerateMockHistory(index, interval, days);
+                    _logger?.Log("DataService", $"WARNING: No JWT token. Cannot fetch live history for {index}. Providing local cache only.");
+                    return localCached ?? new List<Quote>();
                 }
 
                 await _rateLimiter.WaitAsync();
@@ -271,12 +291,19 @@ namespace Cognexalgo.Core.Services
                 }
 
                 _logger?.Log("DataService", $"✓ History loaded: {quotes.Count} candles for {index}");
+                
+                // [NEW] Update local cache with fresh data
+                if (quotes.Any())
+                {
+                    await _cacheService.SaveHistoryAsync(index, interval, quotes);
+                }
+
                 return quotes;
             }
             catch (Exception ex)
             {
                 _logger?.Log("DataService", $"ERROR: Fetching history for {index}: {ex.Message}");
-                return new List<Skender.Stock.Indicators.Quote>();
+                return new List<Quote>();
             }
         }
 
@@ -331,10 +358,11 @@ namespace Cognexalgo.Core.Services
                 // DO NOT use "Nifty 50" or "Nifty Bank" - those are for NSE cash segment
                 _logger?.Log("DataService", $"Searching for {index} options with expiry {expiryStr} in NFO segment");
                 
-                // MOCK DATA CHECK
+                // MOCK DATA CHECK - REMOVED
                 if (_api.JwtToken == null)
                 {
-                     return GenerateMockOptionChain(index);
+                     _logger?.Log("DataService", "WARNING: No JWT token. Cannot fetch live option chain.");
+                     return new List<OptionChainItem>();
                 }
 
                 var instruments = _tokenService.GetInstrumentsByExpiry(index, expiryStr);
@@ -413,58 +441,10 @@ namespace Cognexalgo.Core.Services
             catch (Exception ex)
             {
                 _logger?.Log("DataService", $"ERROR: Building option chain: {ex.Message}");
-                // Fallback to Mock if API fails completely
-                if (_api.JwtToken == null) return GenerateMockOptionChain(index);
+                // Fallback
+                if (_api.JwtToken == null) return new List<OptionChainItem>();
                 throw new Exception($"Failed to build option chain for {index}: {ex.Message}", ex);
             }
-        }
-
-
-        #endregion
-
-        #region Mock Data Generation
-
-        private double GenerateMockSpotPrice(string index)
-        {
-            var random = new Random();
-            double basePrice = index.ToUpper() switch
-            {
-                "NIFTY" => 22000,
-                "BANKNIFTY" => 47000,
-                "FINNIFTY" => 20500,
-                _ => 10000
-            };
-
-            // Add +/- 0.5% fluctuation
-            double fluctuation = basePrice * 0.005 * (random.NextDouble() * 2 - 1);
-            return Math.Round(basePrice + fluctuation, 2);
-        }
-
-
-        private List<OptionChainItem> GenerateMockOptionChain(string index)
-        {
-            var list = new List<OptionChainItem>();
-            double spot = GenerateMockSpotPrice(index);
-            int step = index == "NIFTY" ? 50 : 100;
-            int startStrike = ((int)spot / step) * step - (step * 10);
-
-            var random = new Random();
-
-            for (int i = 0; i < 20; i++)
-            {
-                int strike = startStrike + (i * step);
-                
-                // Intrinsic Value
-                double ceIntrinsic = Math.Max(0, spot - strike);
-                double peIntrinsic = Math.Max(0, strike - spot);
-
-                // Time Value (Random for mock)
-                double timeValue = 50 + (random.NextDouble() * 20);
-
-                list.Add(new OptionChainItem { Symbol = $"{index} {strike} CE", Token = $"MOCK_CE_{strike}", Strike = strike, OptionType = "CE", LTP = Math.Round(ceIntrinsic + timeValue, 2), LotSize = 50 });
-                list.Add(new OptionChainItem { Symbol = $"{index} {strike} PE", Token = $"MOCK_PE_{strike}", Strike = strike, OptionType = "PE", LTP = Math.Round(peIntrinsic + timeValue, 2), LotSize = 50 });
-            }
-            return list;
         }
 
 

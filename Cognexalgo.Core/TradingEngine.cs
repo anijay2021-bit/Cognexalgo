@@ -21,6 +21,7 @@ namespace Cognexalgo.Core
         public TickerService Ticker { get; private set; }
         public SmartApiClient Api { get; private set; }
         public TokenService TokenService { get; private set; }
+        public SmartStreamService SmartStream { get; private set; } // [NEW] Binary Stream
         public AngelOneDataService DataService { get; private set; } // [NEW] Real-time data service
 
         public bool IsRunning { get; private set; }
@@ -97,6 +98,9 @@ namespace Cognexalgo.Core
             // [PRE-LOGIN PROTOCOL] Reuse pre-loaded DataService or create new
             Api = new SmartApiClient(); 
             DataService = preLoadedDataService ?? new AngelOneDataService(Api, TokenService, Logger);
+            SmartStream = new SmartStreamService();
+            // Relay SmartStream statuses/ticks if needed, or strategies can listen directly
+            SmartStream.OnTickReceived += (data) => Ticker.EmitTick(data);
 
             _clientId = Environment.MachineName;
 
@@ -430,6 +434,14 @@ namespace Cognexalgo.Core
                 // DataService already initialized with Api reference, so no need to recreate
                 // DataService = new AngelOneDataService(Api, TokenService, Logger);
 
+                // [NEW] Start SmartStream
+                SmartStream.SetCredentials(Api.JwtToken, Api.FeedToken, apiKey, clientCode);
+                await SmartStream.ConnectAsync();
+                
+                // Subscribe to Indices for "Massive Coverage"
+                // Nifty (99926000), BankNifty (99926009), FinNifty (99926037), Midcap (99926030), Sensex (99919017)
+                await SmartStream.SubscribeAsync(new List<string> { "99926000", "99926009", "99926037", "99926030" }, "NSE");
+                await SmartStream.SubscribeAsync(new List<string> { "99919017" }, "BSE");
                 // [NEW] Global History Fetch for Indices
                 _ = Task.Run(async () => {
                     try {
@@ -529,10 +541,29 @@ namespace Cognexalgo.Core
                 {
                     try
                     {
-                        // 1. Fetch Real-Time Spot Prices
-                        try { lastNifty = await DataService.GetSpotPriceAsync("NIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"Nifty Fetch Failed: {ex.Message}"); }
-                        try { lastBankNifty = await DataService.GetSpotPriceAsync("BANKNIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"BankNifty Fetch Failed: {ex.Message}"); }
-                        try { lastFinNifty = await DataService.GetSpotPriceAsync("FINNIFTY"); } catch (Exception ex) { Logger.Log("Engine", $"FinNifty Fetch Failed: {ex.Message}"); }
+                        // 1. Fetch Spot Prices from SmartStream (Priority)
+                        // This achieves low-latency "Observation 2"
+                        double stNifty = SmartStream.GetLastLtp("99926000");
+                        double stBankNifty = SmartStream.GetLastLtp("99926009");
+                        double stFinNifty = SmartStream.GetLastLtp("99926037");
+                        double stMidcap = SmartStream.GetLastLtp("99926030");
+                        double stSensex = SmartStream.GetLastLtp("99919017");
+
+                        // Fallback to REST polling if Stream is lagging or 0
+                        if (stNifty > 0) lastNifty = stNifty;
+                        else try { lastNifty = await DataService.GetSpotPriceAsync("NIFTY"); } catch { }
+
+                        if (stBankNifty > 0) lastBankNifty = stBankNifty;
+                        else try { lastBankNifty = await DataService.GetSpotPriceAsync("BANKNIFTY"); } catch { }
+
+                        if (stFinNifty > 0) lastFinNifty = stFinNifty;
+                        else try { lastFinNifty = await DataService.GetSpotPriceAsync("FINNIFTY"); } catch { }
+                        
+                        if (stMidcap > 0) lastMidcpNifty = stMidcap;
+                        else try { lastMidcpNifty = await DataService.GetSpotPriceAsync("MIDCPNIFTY"); } catch { }
+                        
+                        if (stSensex > 0) lastSensex = stSensex;
+                        else try { lastSensex = await DataService.GetSpotPriceAsync("SENSEX"); } catch { }
 
                         // 2. Create Ticker Data
                         var data = new TickerData 
@@ -540,6 +571,8 @@ namespace Cognexalgo.Core
                             Nifty = new InstrumentInfo { Ltp = lastNifty }, 
                             BankNifty = new InstrumentInfo { Ltp = lastBankNifty },
                             FinNifty = new InstrumentInfo { Ltp = lastFinNifty },
+                            MidcpNifty = new InstrumentInfo { Ltp = lastMidcpNifty },
+                            Sensex = new InstrumentInfo { Ltp = lastSensex }
                         };
 
                         // 3. Emit to UI
