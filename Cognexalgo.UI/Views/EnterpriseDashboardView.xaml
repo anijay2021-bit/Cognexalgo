@@ -14,100 +14,35 @@
         <conv:KillSwitchStatusToBrushConverter x:Key="KillSwitchStatusToBrushConverter"/>
     </UserControl.Resources>
     
-    <Grid Background="{StaticResource BackgroundBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Stats Ribbon -->
-            <RowDefinition Height="Auto"/> <!-- Risk Header -->
-            <RowDefinition Height="*"/>    <!-- Legs Grid -->
-            <RowDefinition Height="Auto"/> <!-- Status Bar -->
-        </Grid.RowDefinitions>
-
-        <!-- 1. STATS RIBBON -->
-        <Border Grid.Row="0" Margin="15,15,15,10" Style="{StaticResource CardBorderStyle}" Padding="20,15">
-            <StackPanel Orientation="Horizontal">
-                <!-- Total PnL -->
-                <StackPanel Margin="0,0,40,0">
-                    <TextBlock Text="TOTAL MTM" Style="{StaticResource LabelTextStyle}"/>
-                    <TextBlock Text="{Binding TotalMtm, StringFormat='₹ {0:N2}'}" FontSize="24" FontWeight="Bold">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource HeaderTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding TotalMtm, Converter={StaticResource PnlToBrushConverter}}" Value="Negative">
-                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
-
-                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="0,5,30,5"/>
-
-                <!-- Active Strategies -->
-                <StackPanel Margin="0,0,40,0">
-                    <TextBlock Text="ACTIVE STRATEGIES" Style="{StaticResource LabelTextStyle}"/>
-                    <TextBlock Text="{Binding ActiveStrategiesCount}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                </StackPanel>
-
-                <!-- Kill Switch Status -->
-                <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
-                    <Border CornerRadius="12" Padding="12,4" Background="{Binding KillSwitchStatus, Converter={StaticResource KillSwitchStatusToBrushConverter}}">
-                        <TextBlock Text="{Binding KillSwitchStatus}" Foreground="White" FontWeight="Bold" FontSize="11"/>
-                    </Border>
-                </StackPanel>
-
-                <!-- Emergency Button -->
-                <Button Content="EXIT ALL" Style="{StaticResource DangerButtonStyle}" 
-                        Command="{Binding ExitAllCommand}" Width="120" Height="40" HorizontalAlignment="Right" Margin="20,0,0,0"/>
-            </StackPanel>
-        </Border>
-
-        <!-- 2. RISK MANAGEMENT HEADER -->
-        <Grid Grid.Row="1" Margin="15,0,15,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock Text="QUANTLEG ENTERPRISE DASHBOARD" Style="{StaticResource HeaderTextStyle}" VerticalAlignment="Center"/>
-            
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <StackPanel Margin="0,0,15,0">
-                    <TextBlock Text="MAX LOSS" Style="{StaticResource LabelTextStyle}"/>
-                    <TextBox Text="{Binding DailyMaxLoss, UpdateSourceTrigger=PropertyChanged}" Width="100" Style="{StaticResource DarkTextBoxStyle}"/>
-                </StackPanel>
-                <StackPanel Margin="0,0,15,0">
-                    <TextBlock Text="MAX PROFIT" Style="{StaticResource LabelTextStyle}"/>
-                    <TextBox Text="{Binding DailyMaxProfit, UpdateSourceTrigger=PropertyChanged}" Width="100" Style="{StaticResource DarkTextBoxStyle}"/>
-                </StackPanel>
-                <Button Content="APPLY" Command="{Binding UpdateRiskSettingsCommand}" Style="{StaticResource ActionPushButtonStyle}" VerticalAlignment="Bottom" Height="34" Width="80"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- 3. UNIFIED LEGS GRID -->
-        <Border Grid.Row="2" Margin="15,0,15,15" Style="{StaticResource CardBorderStyle}">
+    <Grid Background="Transparent">
+        <!-- UNIFIED LEGS GRID -->
+        <Border Margin="15" Style="{StaticResource CardBorderStyle}" Background="White">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 
-                <Border Background="#F8FAFC" Padding="10,8" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
-                    <TextBlock Text="ACTIVE TRADE POSITIONS" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextMainBrush}"/>
+                <Border Background="White" Padding="15,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
+                    <TextBlock Text="ACTIVE TRADE POSITIONS" FontWeight="Bold" FontSize="14" Foreground="#1E3A8A"/>
                 </Border>
                 
                 <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveLegs}" 
                           Style="{StaticResource DarkDataGridStyle}" 
                           AutoGenerateColumns="False" IsReadOnly="True"
-                          RowStyle="{StaticResource DarkDataGridRowStyle}">
+                          GridLinesVisibility="Horizontal"
+                          RowStyle="{StaticResource DarkDataGridRowStyle}"
+                          Background="White" BorderThickness="0">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="1.5*"/>
+                        <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="*"/>
                         <DataGridTextColumn Header="TYPE" Binding="{Binding Type}" Width="100"/>
-                        <DataGridTextColumn Header="ENTRY" Binding="{Binding EntryPrice, StringFormat='N2'}" Width="100"/>
-                        <DataGridTextColumn Header="LTP" Binding="{Binding Ltp, StringFormat='N2'}" Width="100" CellStyle="{StaticResource FlashCellStyle}"/>
-                        <DataGridTextColumn Header="PNL" Binding="{Binding Pnl, StringFormat='N2'}" Width="120">
+                        <DataGridTextColumn Header="ENTRY" Binding="{Binding EntryPrice, StringFormat='N2'}" Width="120"/>
+                        <DataGridTextColumn Header="LTP" Binding="{Binding Ltp, StringFormat='N2'}" Width="120" CellStyle="{StaticResource FlashCellStyle}"/>
+                        <DataGridTextColumn Header="PNL" Binding="{Binding Pnl, StringFormat='N2'}" Width="150">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Pnl, Converter={StaticResource PnlToBrushConverter}}" Value="Negative">
                                             <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
@@ -119,15 +54,10 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="100"/>
+                        <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
-        </Border>
-
-        <!-- 4. BOTTOM STATUS -->
-        <Border Grid.Row="3" Background="#F1F5F9" Padding="15,5">
-            <TextBlock Text="Enterprise Engine: V2 ACTIVE | Paper Trading Mode" FontSize="11" Foreground="{StaticResource TextMutedBrush}"/>
         </Border>
     </Grid>
 </UserControl>

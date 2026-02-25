@@ -29,11 +29,14 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public StrategyRmsService StrategyRms { get; private set; }
         public AccountRmsService AccountRms { get; private set; }
         public IAngelOneAdapter BrokerAdapter { get; private set; }
+        public SignalEngine SignalEngine { get; private set; }
+        public PaperTradeSimulator Simulator { get; private set; }
         public V2LoggingService Logger { get; private set; }
         public TelegramNotifier Telegram { get; private set; }
         public WindowsToastNotifier Toast { get; private set; }
 
         public bool IsInitialized { get; private set; } = false;
+        public event Action<TickContext>? OnTickProcessed;
 
         /// <summary>
         /// Initialize the V2 DI container and all services.
@@ -59,6 +62,8 @@ namespace Cognexalgo.Core.Infrastructure.Services
             bridge.StrategyRms = bridge.Services.GetRequiredService<StrategyRmsService>();
             bridge.AccountRms = bridge.Services.GetRequiredService<AccountRmsService>();
             bridge.BrokerAdapter = bridge.Services.GetRequiredService<IAngelOneAdapter>();
+            bridge.SignalEngine = bridge.Services.GetRequiredService<SignalEngine>();
+            bridge.Simulator = bridge.Services.GetRequiredService<PaperTradeSimulator>();
             bridge.Logger = bridge.Services.GetRequiredService<V2LoggingService>();
             bridge.Toast = bridge.Services.GetRequiredService<WindowsToastNotifier>();
 
@@ -170,6 +175,7 @@ namespace Cognexalgo.Core.Infrastructure.Services
             };
 
             await Orchestrator.DispatchTickAsync(tick);
+            OnTickProcessed?.Invoke(tick);
         }
 
         /// <summary>Kill Switch — immediately stop everything.</summary>

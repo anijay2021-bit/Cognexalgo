@@ -38,6 +38,47 @@ namespace Cognexalgo.UI.ViewModels
             _v2.AccountRms.OnAccountBreach += (rule, msg) => UpdateAccountStatus();
             _v2.Orchestrator.OnStatusChanged += (id, status) => UpdateStrategyStats();
             
+            // Real-time Leg Tracking
+            _v2.Simulator.OnOrderFilled += (order) => {
+                _dispatcher.Invoke(() => {
+                    var leg = ActiveLegs.FirstOrDefault(l => l.Symbol == order.TradingSymbol);
+                    if (leg == null) {
+                        leg = new LegDisplayMetadata { 
+                            Symbol = order.TradingSymbol,
+                            Type = order.Direction.ToString(),
+                            EntryPrice = order.FilledPrice,
+                            Status = "IN_POSITION"
+                        };
+                        ActiveLegs.Add(leg);
+                    } else {
+                        leg.Status = "ACTIVE"; // Update if already exists
+                    }
+                });
+            };
+
+            _v2.OnTickProcessed += (tick) => {
+                _dispatcher.Invoke(() => {
+                    TotalMtm = _v2.AccountRms.TotalDailyPnl;
+                    ActiveStrategiesCount = _v2.Orchestrator.ActiveCount;
+
+                    foreach (var leg in ActiveLegs) {
+                        if (leg.Symbol.Contains("NIFTY")) {
+                            leg.Ltp = tick.NiftyLtp;
+                        } else if (leg.Symbol.Contains("BANKNIFTY")) {
+                            leg.Ltp = tick.BankNiftyLtp;
+                        }
+
+                        // Basic P&L: (Current Price - Buy Price) * Typical Qty (50 for Nifty)
+                        // If Sell: (Sell Price - Current Price) * Qty
+                        decimal qty = 50; 
+                        if (leg.Type == "BUY")
+                            leg.Pnl = (leg.Ltp - leg.EntryPrice) * qty;
+                        else
+                            leg.Pnl = (leg.EntryPrice - leg.Ltp) * qty;
+                    }
+                });
+            };
+
             // Initialization
             UpdateStrategyStats();
         }
@@ -56,6 +97,26 @@ namespace Cognexalgo.UI.ViewModels
             _v2.KillAll();
             KillSwitchStatus = "ACTIVATED";
             _v2.Logger.Warn("UI", "CRITICAL: EXIT ALL triggered from Enterprise Dashboard");
+        }
+
+        [RelayCommand]
+        private async Task ForceTestSignal()
+        {
+            // Simulate a "Test Signal" -> "Test Order" flow
+            var order = new Order
+            {
+                OrderId = "TEST-" + Guid.NewGuid().ToString().Substring(0, 8),
+                TradingSymbol = "NIFTY-MAR-2026-24000-CE",
+                Direction = Direction.BUY,
+                Quantity = 50,
+                Status = OrderStatus.PENDING,
+                TradingMode = TradingMode.PaperTrade
+            };
+
+            // Trigger fill via Simulator (this will fire the OnOrderFilled event we are subbed to)
+            await _v2.Simulator.ExecuteAsync(order, 24000);
+            
+            _v2.Logger.Info("UI", "Test Signal Forced: " + order.TradingSymbol);
         }
 
         private void UpdateStrategyStats()

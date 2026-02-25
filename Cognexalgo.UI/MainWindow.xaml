@@ -79,40 +79,62 @@
             <MenuItem Header="Help" Foreground="{StaticResource TextMainBrush}"/>
         </Menu>
 
-        <!-- 1. Metrics Strip -->
-        <Border Grid.Row="1" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="20,15">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="RUNNING" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,5,0" VerticalAlignment="Bottom"/>
-                <TextBlock Text="{Binding RunningStrategiesCount}" Foreground="{StaticResource PrimaryBrush}" FontSize="18" FontWeight="Bold" Margin="0,0,25,0"/>
+        <!-- 1. Enhanced Header (Mockup Match) -->
+        <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="20,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Logo -->
+                    <ColumnDefinition Width="*"/>    <!-- Stats -->
+                    <ColumnDefinition Width="Auto"/> <!-- Total MTM -->
+                </Grid.ColumnDefinitions>
 
-                <TextBlock Text="PENDING" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,5,0" VerticalAlignment="Bottom"/>
-                <TextBlock Text="{Binding PendingOrdersCount}" Foreground="{StaticResource AccentBrush}" FontSize="18" FontWeight="Bold" Margin="0,0,25,0"/>
+                <!-- Logo Section -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="Assets/logo.png" Height="45" Margin="0,0,10,0"/>
+                    <TextBlock Text="cognexalgo" FontSize="18" FontWeight="Bold" Foreground="#444" VerticalAlignment="Center" Visibility="Collapsed"/>
+                </StackPanel>
 
-                <TextBlock Text="EXITED" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,5,0" VerticalAlignment="Bottom"/>
-                <TextBlock Text="{Binding ExitedStrategiesCount}" Foreground="{StaticResource TextMutedBrush}" FontSize="18" FontWeight="Bold" Margin="0,0,25,0"/>
+                <!-- Labeled Stats -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                        <TextBlock Text="ACTIVE STRATEGIES" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding RunningStrategiesCount}" Foreground="#2ECC71" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <Border Width="1" Background="{StaticResource BorderBrush}" Margin="0,2,25,2"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                        <TextBlock Text="PENDING" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding PendingOrdersCount}" Foreground="#F39C12" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <TextBlock Text="Total MTM" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,10,0" VerticalAlignment="Bottom"/>
-                <TextBlock Text="{Binding TotalMtm, StringFormat=₹ {0:N2}}" FontSize="20" FontWeight="Bold">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding TotalMtm, Converter={StaticResource IsNegativeConverter}}" Value="True">
-                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="EXITED" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding ExitedStrategiesCount}" Foreground="#3498DB" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Total MTM (Right Aligned) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Total MTM" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <TextBlock Text="{Binding TotalMtm, StringFormat=₹ {0:N2}}" FontSize="28" FontWeight="Bold">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#1ABC9C"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding TotalMtm, Converter={StaticResource IsNegativeConverter}}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- 2. Main Content (The Workspace) -->
         <Border Grid.Row="2" Background="{StaticResource CardBrush}" Margin="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8">
              <TabControl Background="Transparent" BorderThickness="0" Margin="10">
-                <TabItem Header="ENTERPRISE">
+                <TabItem Header="Dashboard">
                     <local:EnterpriseDashboardView DataContext="{Binding EnterpriseDashboard}"/>
                 </TabItem>
                 <TabItem Header="Strategies">
@@ -790,12 +812,9 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 
-                <TextBlock Text="Global Settings" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" Margin="5,0,0,10"/>
+                <TextBlock Text="Global Settings" Foreground="#888" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
 
-                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="24">
-                    <Border.Effect>
-                        <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="25" ShadowDepth="2"/>
-                    </Border.Effect>
+                <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/> <!-- Buttons -->
@@ -805,36 +824,57 @@
 
                         <!-- Top: Control Buttons -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left">
-                            <!-- EXIT ALL: Solid Red -->
                             <Button Command="{Binding ExitAllCommand}" Content="EXIT ALL" 
-                                    Style="{StaticResource DangerButtonStyle}"
-                                    Width="100" Margin="0,0,15,0" FontWeight="Bold"/>
+                                    Background="#EF5350" Foreground="White" BorderThickness="0"
+                                    Width="100" Height="32" Margin="0,0,15,0" FontWeight="Bold">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="16"/>
+                                    </Style>
+                                </Button.Resources>
+                            </Button>
                             
-                            <!-- CREATE STRATEGY -->
                             <Button Command="{Binding CreateStrategyCommand}" Content="Create Strategy" 
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    BorderBrush="{StaticResource PrimaryBrush}" Foreground="{StaticResource PrimaryBrush}"
-                                    Padding="15,10" Margin="0,0,15,0"/>
+                                    Background="Transparent" Foreground="#1ABC9C" BorderBrush="#1ABC9C" BorderThickness="1.5"
+                                    Width="120" Height="32" Margin="0,0,15,0" FontWeight="Bold">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="16"/>
+                                    </Style>
+                                </Button.Resources>
+                            </Button>
 
-                            <!-- START ENGINE: Green -->
                             <Button Command="{Binding StartEngineCommand}" Content="START ENGINE" 
-                                    Style="{StaticResource ActionPushButtonStyle}"
-                                    Padding="15,10"/>
+                                    Background="#2ECC71" Foreground="White" BorderThickness="0"
+                                    Width="120" Height="32" FontWeight="Bold">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="16"/>
+                                    </Style>
+                                </Button.Resources>
+                            </Button>
                         </StackPanel>
 
                         <!-- Bottom: RMS Settings -->
-                        <Border Grid.Row="2" Background="{StaticResource BackgroundBrush}" CornerRadius="4" Padding="15,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <Border Grid.Row="2" Background="#F8FAFC" CornerRadius="4" Padding="15,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Risk Management" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" Margin="0,0,20,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Risk Management" Foreground="#444" FontWeight="Bold" Margin="0,0,20,0" VerticalAlignment="Center" FontSize="12"/>
                                 
-                                <TextBlock Text="Max Loss (-)" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="12"/>
-                                <TextBox Text="{Binding MaxLoss}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,15,0"/>
+                                <TextBlock Text="Max Loss (-)" Foreground="#666" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
+                                <TextBox Text="{Binding MaxLoss}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,20,0" Height="28"/>
 
-                                <TextBlock Text="Max Profit (+)" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="12"/>
-                                <TextBox Text="{Binding MaxProfit}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,15,0"/>
+                                <TextBlock Text="Max Profit (+)" Foreground="#666" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
+                                <TextBox Text="{Binding MaxProfit}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,20,0" Height="28"/>
                                 
                                 <Button Command="{Binding SaveRmsCommand}" Content="SAVE" 
-                                        Style="{StaticResource SecondaryButtonStyle}" FontWeight="Bold" Padding="15,5"/>
+                                        Background="#E2E8F0" Foreground="#475569" BorderThickness="0"
+                                        FontWeight="Bold" Padding="15,4" Height="28">
+                                    <Button.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="4"/>
+                                        </Style>
+                                    </Button.Resources>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -848,19 +888,16 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Logs &amp; Events" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" Margin="5,0,0,10"/>
+                <TextBlock Text="Logs &amp; Events" Foreground="#888" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
 
-                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="12" Padding="12">
-                    <Border.Effect>
-                        <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="25" ShadowDepth="2"/>
-                    </Border.Effect>
+                <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                     <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent" 
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}" 
-                                            Foreground="{Binding Converter={StaticResource LogColorConverter}}" 
-                                            FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+                                            Foreground="#444" 
+                                            FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,2"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -868,76 +905,36 @@
             </Grid>
         </Grid>
 
-        <!-- 5. Status Bar (Index Ticker) - Dark Footer -->
-        <Border Grid.Row="5" Background="{StaticResource BackgroundBrush}" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+        <!-- 5. Status Bar Indices (Mockup Matched Tickers) -->
+        <Border Grid.Row="5" Background="#F8FAFC" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <!-- Connection Status (Left) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0">
-                    <TextBlock Text="Daily Protocol Check" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="#EF444433"/> <!-- Red background by default -->
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Status}" Value="Running">
-                                        <Setter Property="Background" Value="#10B98133"/> <!-- Green background when running -->
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Daily Protocol Check" Foreground="#666" FontWeight="SemiBold" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <Border CornerRadius="8" Padding="8,3" VerticalAlignment="Center" Background="#B22222">
                         <StackPanel Orientation="Horizontal">
-                            <!-- SVG Path for Check Circle -->
-                            <Path x:Name="CheckIcon" Width="10" Height="10" Stretch="Uniform" Fill="{StaticResource DangerBrush}" Margin="0,0,4,0" VerticalAlignment="Center">
-                                <Path.Style>
-                                    <Style TargetType="Path">
-                                        <!-- Default X icon for disconnected -->
-                                        <Setter Property="Data" Value="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
-                                        <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Running">
-                                                <!-- Checkmark icon when running -->
-                                                <Setter Property="Data" Value="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                                                <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Path.Style>
-                            </Path>
-                            <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Running">
-                                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Connecting...">
-                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Ready" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
-                <!-- Index Tickers (Center) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="NIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding LtpNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                <!-- Index Tickers (Right-Center) -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="NIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpNifty}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="BANKNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding LtpBankNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                    <TextBlock Text="BANKNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpBankNifty}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="FINNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                    <TextBlock Text="FINNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="MIDCPNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0"/>
+                    <TextBlock Text="MIDCPNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
                     
-                    <TextBlock Text="SENSEX:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0"/>
-                    <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold"/>
+                    <TextBlock Text="SENSEX:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" FontSize="12"/>
                 </StackPanel>
             </Grid>
         </Border>

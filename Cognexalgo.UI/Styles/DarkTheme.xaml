@@ -8,11 +8,11 @@
     <Color x:Key="CardColor">#CCFFFFFF</Color>       <!-- White (80% Opacity) -->
     <Color x:Key="CardHoverColor">#D9F9FAFB</Color>  <!-- Gray-50 (85% Opacity) -->
     
-    <Color x:Key="PrimaryColor">#10B981</Color>    <!-- Emerald Green -->
-    <Color x:Key="DangerColor">#F87171</Color>     <!-- Muted Coral Red -->
-    <Color x:Key="AccentColor">#F59E0B</Color>     <!-- Amber -->
+    <Color x:Key="PrimaryColor">#1ABC9C</Color>    <!-- Turquoise Cyan (Mockup) -->
+    <Color x:Key="DangerColor">#EF5350</Color>     <!-- Soft Red -->
+    <Color x:Key="AccentColor">#3498DB</Color>     <!-- Bright Blue -->
     
-    <Color x:Key="BorderColor">#CAD1D9</Color>     <!-- Slate-300 (Slightly darker for transparency contrast) -->
+    <Color x:Key="BorderColor">#E2E8F0</Color>     <!-- Slate-200 -->
     <Color x:Key="TextMainColor">#1E293B</Color>   <!-- Slate-800 -->
     <Color x:Key="TextMutedColor">#64748B</Color>  <!-- Slate-500 -->
     
