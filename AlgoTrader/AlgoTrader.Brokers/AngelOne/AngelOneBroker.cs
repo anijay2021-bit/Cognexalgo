@@ -336,4 +336,34 @@ public class AngelOneBroker : IBroker
             _ => OrderStatus.OPEN
         };
     }
+
+    // ── Portfolio queries ────────────────────────────────────────────────────
+
+    public async Task<List<HoldingRecord>> GetHoldingsAsync(string token)
+    {
+        if (_restClient == null) return new List<HoldingRecord>();
+        try
+        {
+            return await _restClient.GetHoldingsAsync(token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetHoldings failed");
+            return new List<HoldingRecord>();
+        }
+    }
+
+    public async Task<List<TradeRecord>> GetTradeBookAsync(string token)
+    {
+        if (_restClient == null) return new List<TradeRecord>();
+        try
+        {
+            return await _restClient.GetTradeBookAsync(token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetTradeBook failed");
+            return new List<TradeRecord>();
+        }
+    }
 }

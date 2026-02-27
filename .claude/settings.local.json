@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build AlgoTrader.sln)",
-      "Bash(dotnet build Cognexalgo.sln --configuration Debug)"
+      "Bash(dotnet build Cognexalgo.sln --configuration Debug)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")",
+      "Bash(powershell -Command \"Get-Content ''C:\\\\Users\\\\anijay\\\\.claude\\\\projects\\\\c--Users-anijay--gemini-antigravity-scratch-COGNEX\\\\ec787c05-9b77-4f7b-b8d7-7d6a2b9e427e\\\\tool-results\\\\toolu_017gPQJUSM6ZufAz3tCDpRmn.txt'' | Select-Object -First 500\")"
     ]
   }
 }

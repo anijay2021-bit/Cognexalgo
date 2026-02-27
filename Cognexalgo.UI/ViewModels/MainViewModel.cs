@@ -193,6 +193,17 @@ namespace Cognexalgo.UI.ViewModels
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                             Log($"[V2-{level}] {msg}"));
                     };
+
+                    // Reflect Orchestrator status changes onto the Strategies list in real time
+                    _v2.Orchestrator.OnStatusChanged += (id, status) =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            var s = Strategies.FirstOrDefault(x => x.V2Id == id);
+                            if (s != null) s.V2Status = status.ToString();
+                        });
+                    };
+
                     Log("V2 Bridge initialized successfully.");
                 }
                 catch (Exception v2ex)
@@ -312,6 +323,32 @@ namespace Cognexalgo.UI.ViewModels
                     }
                 }
 
+                // ── Live unrealized P&L for paper positions ──────────────────────
+                if (_engine.IsPaperTrading && Positions.Count > 0)
+                {
+                    foreach (var pos in Positions)
+                    {
+                        if (!double.TryParse(pos.NetQty, out double netQty) || netQty == 0)
+                            continue; // closed position — skip
+
+                        double ltp = pos.TradingSymbol switch
+                        {
+                            var s when s != null && s.Contains("BANKNIFTY")  => LtpBankNifty,
+                            var s when s != null && s.Contains("FINNIFTY")   => LtpFinnifty,
+                            var s when s != null && s.Contains("MIDCPNIFTY") => LtpMidcpNifty,
+                            var s when s != null && s.Contains("SENSEX")     => LtpSensex,
+                            var s when s != null && s.Contains("NIFTY")      => LtpNifty,
+                            _                                                 => 0
+                        };
+                        if (ltp <= 0) continue;
+
+                        pos.Ltp = ltp;
+                        pos.Pnl = netQty > 0
+                            ? (ltp - pos.BuyAvgPrice)  * netQty
+                            : (pos.SellAvgPrice - ltp) * Math.Abs(netQty);
+                    }
+                }
+
                 // ─── V2: Forward tick to V2 Orchestrator ─────
                 if (_v2?.IsInitialized == true)
                 {
@@ -409,13 +446,29 @@ namespace Cognexalgo.UI.ViewModels
                      if (latest != null)
                      {
                          var adapter = new V2StrategyAdapter(_v2);
+                         var latestSnapshot = latest; // capture for closure
                          _ = Task.Run(async () =>
                          {
-                             var v2Id = await adapter.SyncToV2Async(latest);
+                             var v2Id = await adapter.SyncToV2Async(latestSnapshot);
                              if (v2Id != null)
                              {
                                  System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                                     Log($"V2 Strategy synced: {v2Id}"));
+                                 {
+                                     latestSnapshot.V2Id = v2Id;
+                                     Log($"V2 Strategy synced: {v2Id}");
+                                 });
+                                 // Persist V2Id back to DB so it survives app restarts.
+                                 // SaveHybridStrategyAsync does upsert-by-name and serialises
+                                 // the full HybridStrategyConfig (including V2Id) to ConfigJson.
+                                 try
+                                 {
+                                     await _engine.StrategyRepository.SaveHybridStrategyAsync(latestSnapshot);
+                                 }
+                                 catch (Exception saveEx)
+                                 {
+                                     System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                                         Log($"V2Id save-back failed (non-fatal): {saveEx.Message}", "WARN"));
+                                 }
                              }
                          });
                      }
@@ -450,6 +503,67 @@ namespace Cognexalgo.UI.ViewModels
             await _engine.StrategyRepository.DeleteHybridStrategyAsync(strategy.Id);
             await LoadStrategies();
             Log($"Deleted Strategy: {strategy.Name}");
+        }
+
+        /// <summary>
+        /// Stop a V2 strategy that is running in the Orchestrator.
+        /// Only active when the strategy has been synced (V2Id is populated).
+        /// </summary>
+        [RelayCommand]
+        private void StopV2Strategy(object parameter)
+        {
+            if (parameter is not HybridStrategyConfig strategy) return;
+            if (string.IsNullOrEmpty(strategy.V2Id))
+            {
+                Log($"Strategy '{strategy.Name}' has not been synced to V2 yet.", "WARN");
+                return;
+            }
+            if (_v2?.IsInitialized != true)
+            {
+                Log("V2 Bridge is not initialized.", "WARN");
+                return;
+            }
+            _v2.Orchestrator.StopStrategy(strategy.V2Id);
+            Log($"■ Stop requested for V2 strategy: {strategy.Name} ({strategy.V2Id})");
+        }
+
+        /// <summary>
+        /// Start (or re-start) a strategy in the V2 Orchestrator.
+        /// If the strategy has no V2Id yet, it is synced first (idempotent).
+        /// </summary>
+        [RelayCommand]
+        private async Task StartV2Strategy(object parameter)
+        {
+            if (parameter is not HybridStrategyConfig strategy) return;
+            if (_v2?.IsInitialized != true)
+            {
+                Log("V2 Bridge is not initialized.", "WARN");
+                return;
+            }
+            if (strategy.V2Status == "Active")
+            {
+                Log($"Strategy '{strategy.Name}' is already running in V2.", "WARN");
+                return;
+            }
+
+            // ── Ensure synced to V2 DB (idempotent) ─────────────────────────
+            if (string.IsNullOrEmpty(strategy.V2Id))
+            {
+                var adapter = new V2StrategyAdapter(_v2);
+                string? v2Id = null;
+                try { v2Id = await Task.Run(() => adapter.SyncToV2Async(strategy)); }
+                catch (Exception ex) { Log($"V2 sync failed: {ex.Message}", "ERROR"); return; }
+                if (v2Id == null) { Log($"V2 sync returned null for '{strategy.Name}'", "ERROR"); return; }
+                strategy.V2Id = v2Id;
+                try { await _engine.StrategyRepository.SaveHybridStrategyAsync(strategy); }
+                catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
+                Log($"V2 Strategy synced on-demand: {v2Id}");
+            }
+
+            // ── Start in Orchestrator ────────────────────────────────────────
+            var v2Strategy = new Cognexalgo.Core.Domain.Strategies.HybridV2Strategy(strategy);
+            await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
+            Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id})");
         }
 
         [RelayCommand]
@@ -569,49 +683,68 @@ namespace Cognexalgo.UI.ViewModels
 
         public ObservableCollection<Holding> Holdings { get; } = new ObservableCollection<Holding>();
         
-        /* 
         [RelayCommand]
         public async Task FetchOptionChain(string index = "NIFTY")
         {
-            if (_engine == null || _engine.DataService == null || _isFetchingOptionChain)
-            {
-                return;
-            }
+            if (_engine == null || _engine.DataService == null || _isFetchingOptionChain) return;
 
             try
             {
                 _isFetchingOptionChain = true;
-                var chain = await _engine.DataService.BuildOptionChainAsync(index, "WEEKLY");
-                if (chain == null) return;
+                var idx = string.IsNullOrEmpty(index) ? SelectedOptionIndex : index;
 
-                double spot = await _engine.DataService.GetSpotPriceAsync(index);
-                
+                var chain = await _engine.DataService.BuildOptionChainAsync(idx, "WEEKLY");
+                if (chain == null || chain.Count == 0) return;
+
+                // Use already-streaming live LTP for spot (zero API cost); fall back to REST call
+                double spot = idx switch
+                {
+                    "BANKNIFTY"  => LtpBankNifty,
+                    "FINNIFTY"   => LtpFinnifty,
+                    "MIDCPNIFTY" => LtpMidcpNifty,
+                    _            => LtpNifty
+                };
+                if (spot <= 0)
+                    spot = await _engine.DataService.GetSpotPriceAsync(idx);
+
+                var greeksSvc = new GreeksService();
+                const double r = 0.067; // RBI repo rate ~6.7%
+
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     OptionChain.Clear();
                     foreach (var item in chain.OrderBy(i => i.Strike).ThenBy(i => i.OptionType))
                     {
-                        // Calculate Greeks (Simplified assumptions)
-                        // Time to expiry T (assume 4 days = 4/365)
-                        double T = 4.0 / 365.0;
-                        double r = 0.07;
-                        double sigma = 0.18; // Default vol
+                        // min 0.5 day so Black-Scholes denominator never reaches zero
+                        double dte    = Math.Max(0.5, item.DaysToExpiry);
+                        bool   isCall = item.IsCall;
 
-                        item.Delta = GreeksCalculator.CalculateDelta(spot, item.Strike, T, r, sigma, item.IsCall);
-                        item.Theta = GreeksCalculator.CalculateTheta(spot, item.Strike, T, r, sigma, item.IsCall);
-                        item.Vega = GreeksCalculator.CalculateVega(spot, item.Strike, T, r, sigma);
+                        // Solve for market-implied IV from the live LTP, then compute all Greeks
+                        double iv = greeksSvc.CalculateIV(item.LTP, spot, item.Strike, dte, r, isCall);
+                        if (iv < 0.01) iv = 0.15; // floor at 15% if bisection can't converge
+
+                        var g      = greeksSvc.CalculateGreeks(spot, item.Strike, dte, r, iv, isCall);
+                        item.IV    = Math.Round(iv * 100, 2); // store as percentage for display
+                        item.Delta = g.Delta;
+                        item.Theta = g.Theta;
+                        item.Vega  = g.Vega;
+                        item.Gamma = g.Gamma;
 
                         OptionChain.Add(item);
                     }
                 });
-                Log($"✓ Fetched {OptionChain.Count} options for {index}. Greeks calculated.", "SUCCESS");
+
+                Log($"✓ Option chain: {OptionChain.Count} strikes with market IV & Greeks for {idx}.", "SUCCESS");
+            }
+            catch (Exception ex)
+            {
+                Log($"Option chain error: {ex.Message}", "ERROR");
             }
             finally
             {
                 _isFetchingOptionChain = false;
             }
         }
-        */
         
         [RelayCommand]
         public async Task FetchHoldings()
@@ -658,26 +791,33 @@ namespace Cognexalgo.UI.ViewModels
                     if (orders.Any())
                     {
                         var mockPositions = new System.Collections.Generic.List<Position>();
-                        // Group by Symbol (including strike/expiry string)
                         foreach (var g in orders.GroupBy(o => o.Symbol))
                         {
-                            double netQty = g.Sum(o => (o.TransactionType == "BUY" ? 1 : -1) * o.Qty);
-                            if (netQty != 0)
+                            double buyQtyTotal  = g.Where(o => o.TransactionType == "BUY").Sum(o => o.Qty);
+                            double sellQtyTotal = g.Where(o => o.TransactionType == "SELL").Sum(o => o.Qty);
+                            double buyTotal     = g.Where(o => o.TransactionType == "BUY").Sum(o => o.Qty * o.Price);
+                            double sellTotal    = g.Where(o => o.TransactionType == "SELL").Sum(o => o.Qty * o.Price);
+                            double buyAvg       = buyQtyTotal  > 0 ? buyTotal  / buyQtyTotal  : 0;
+                            double sellAvg      = sellQtyTotal > 0 ? sellTotal / sellQtyTotal : 0;
+                            double closedQty    = Math.Min(buyQtyTotal, sellQtyTotal);
+                            double realizedPnl  = closedQty > 0 ? (sellAvg - buyAvg) * closedQty : 0;
+                            double netQty       = buyQtyTotal - sellQtyTotal;
+
+                            mockPositions.Add(new Position
                             {
-                                mockPositions.Add(new Position 
-                                {
-                                    TradingSymbol = g.Key,
-                                    NetQty = netQty.ToString(),
-                                    BuyAvgPrice = g.Where(o => o.TransactionType == "BUY").Select(o => o.Price).DefaultIfEmpty(0).Average(),
-                                    SellAvgPrice = g.Where(o => o.TransactionType == "SELL").Select(o => o.Price).DefaultIfEmpty(0).Average(),
-                                    Status = "OPEN"
-                                });
-                            }
+                                TradingSymbol = g.Key,
+                                NetQty        = netQty.ToString(),
+                                BuyAvgPrice   = buyAvg,
+                                SellAvgPrice  = sellAvg,
+                                AvgNetPrice   = buyQtyTotal > 0 ? buyAvg : sellAvg,
+                                Pnl           = realizedPnl,
+                                Status        = netQty != 0 ? "OPEN" : "CLOSED"
+                            });
                         }
-                        
-                        System.Windows.Application.Current.Dispatcher.Invoke(() => 
+
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
-                            foreach(var p in mockPositions) Positions.Add(p);
+                            foreach (var p in mockPositions) Positions.Add(p);
                         });
                         Log($"Fetched {mockPositions.Count} Paper Positions.");
                     }
@@ -691,11 +831,10 @@ namespace Cognexalgo.UI.ViewModels
                         return;
                     }
                     
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
-                        foreach(var p in positions)
+                        foreach (var p in positions)
                         {
-                            // Calculate Status based on NetQty
                             double parsedQty = 0;
                             double.TryParse(p.NetQty, out parsedQty);
                             p.Status = (parsedQty == 0) ? "CLOSED" : "OPEN";
@@ -703,6 +842,38 @@ namespace Cognexalgo.UI.ViewModels
                         }
                     });
                     Log($"Fetched {positions.Count} Live Positions.");
+
+                    // ── Enrich positions with trade book fill prices ──────────
+                    // Best-effort: overwrite BuyAvgPrice / SellAvgPrice from actual fills
+                    // which are more granular than the Angel One position API's avgnetprice.
+                    try
+                    {
+                        var trades = await _engine.Api.GetTradeBookAsync();
+                        if (trades?.Count > 0)
+                        {
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                foreach (var pos in Positions)
+                                {
+                                    var fills = trades
+                                        .Where(t => t.Symbol == pos.TradingSymbol &&
+                                                    string.Equals(t.Status, "complete",
+                                                        StringComparison.OrdinalIgnoreCase))
+                                        .ToList();
+                                    if (fills.Count == 0) continue;
+
+                                    double buyFillQty  = fills.Where(f => f.TransactionType == "BUY").Sum(f => f.Qty);
+                                    double sellFillQty = fills.Where(f => f.TransactionType == "SELL").Sum(f => f.Qty);
+                                    if (buyFillQty  > 0)
+                                        pos.BuyAvgPrice  = fills.Where(f => f.TransactionType == "BUY").Sum(f => f.Qty * f.Price)  / buyFillQty;
+                                    if (sellFillQty > 0)
+                                        pos.SellAvgPrice = fills.Where(f => f.TransactionType == "SELL").Sum(f => f.Qty * f.Price) / sellFillQty;
+                                }
+                            });
+                            Log($"Trade book enrichment applied ({trades.Count} fills).");
+                        }
+                    }
+                    catch { /* trade book enrichment is best-effort; never fail FetchPositions */ }
                 }
             }
             catch(Exception ex)

@@ -253,3 +253,38 @@ public class UserProfile
     public string Broker { get; set; } = string.Empty;
     public List<string> Exchanges { get; set; } = new();
 }
+
+/// <summary>
+/// Equity / ETF holding in the demat account.
+/// Returned by IBroker.GetHoldingsAsync() for portfolio P&amp;L calculations.
+/// </summary>
+public class HoldingRecord
+{
+    public string TradingSymbol { get; set; } = string.Empty;
+    public string ISIN          { get; set; } = string.Empty;
+    public string Exchange      { get; set; } = string.Empty;
+    public int    Qty           { get; set; }
+    public int    AuthorisedQty { get; set; }
+    public decimal AvgPrice     { get; set; }
+    public decimal LTP          { get; set; }
+    public decimal PnL          { get; set; }
+    public decimal PnLPercent   { get; set; }
+}
+
+/// <summary>
+/// A completed/filled trade entry from the broker's trade book.
+/// Returned by IBroker.GetTradeBookAsync() — distinct from OrderBook which
+/// includes pending orders.
+/// </summary>
+public class TradeRecord
+{
+    public string OrderId          { get; set; } = string.Empty;
+    public string TradeId          { get; set; } = string.Empty;
+    public string TradingSymbol    { get; set; } = string.Empty;
+    public string Exchange         { get; set; } = string.Empty;
+    public string TransactionType  { get; set; } = string.Empty; // BUY / SELL
+    public int    Qty              { get; set; }
+    public decimal FillPrice       { get; set; }
+    public DateTime FillTime       { get; set; }
+    public string ProductType      { get; set; } = string.Empty;
+}

@@ -36,6 +36,8 @@ namespace Cognexalgo.Core.Services
             ("FIFTEEN_MINUTE",200, "15m"),
             ("THIRTY_MINUTE", 200, "30m"),
             ("ONE_HOUR",      400, "1h"),
+            // Daily: Angel One supports ONE_DAY up to ~2 years
+            ("ONE_DAY",       730, "1D"),
         };
 
         public AngelOneDataService(
@@ -180,6 +182,30 @@ namespace Cognexalgo.Core.Services
                     {
                         _logger?.Log("DataService", $"  ✗ {index} {display}: {ex.Message}");
                     }
+                }
+            }
+
+            // ── Derive Weekly + Monthly from Daily (Angel One has no W/M API) ───
+            OnDownloadProgress?.Invoke("📊 Aggregating Weekly & Monthly candles...", 98);
+            foreach (var index in indices)
+            {
+                string dailyKey = $"{index.ToUpper()}|ONE_DAY";
+                if (_indexHistory.TryGetValue(dailyKey, out var dailyCandles) && dailyCandles.Any())
+                {
+                    var weekly  = AggregatePeriod(dailyCandles, q => GetWeekStart(q.Date));
+                    var monthly = AggregatePeriod(dailyCandles, q => new DateTime(q.Date.Year, q.Date.Month, 1));
+
+                    if (weekly.Any())
+                    {
+                        _indexHistory[$"{index.ToUpper()}|ONE_WEEK"]  = weekly;
+                        await _cacheService.SaveHistoryAsync(index, "ONE_WEEK",  weekly);
+                    }
+                    if (monthly.Any())
+                    {
+                        _indexHistory[$"{index.ToUpper()}|ONE_MONTH"] = monthly;
+                        await _cacheService.SaveHistoryAsync(index, "ONE_MONTH", monthly);
+                    }
+                    _logger?.Log("DataService", $"  ✓ {index}: {weekly.Count} weekly, {monthly.Count} monthly candles derived");
                 }
             }
 
@@ -391,12 +417,13 @@ namespace Cognexalgo.Core.Services
                         {
                             optionChain.Add(new OptionChainItem
                             {
-                                Strike = inst.Strike,
+                                Strike     = inst.Strike,
                                 OptionType = inst.OptionType,
-                                LTP = ltp,
-                                Symbol = inst.Symbol,
-                                Token = inst.Token,
-                                LotSize = inst.LotSize
+                                LTP        = ltp,
+                                Symbol     = inst.Symbol,
+                                Token      = inst.Token,
+                                LotSize    = inst.LotSize,
+                                ExpiryDate = expiryDate   // ← enables DaysToExpiry for Greeks calc
                             });
                         }
                         else
@@ -429,6 +456,36 @@ namespace Cognexalgo.Core.Services
         {
             // Always return true for Mock/Paper Trading
             return true;
+        }
+
+        /// <summary>
+        /// Aggregate daily quotes into weekly or monthly bars.
+        /// <paramref name="periodStart"/> maps each quote to its period-start date.
+        /// </summary>
+        private static List<Skender.Stock.Indicators.Quote> AggregatePeriod(
+            List<Skender.Stock.Indicators.Quote> daily,
+            Func<Skender.Stock.Indicators.Quote, DateTime> periodStart)
+        {
+            return daily
+                .GroupBy(periodStart)
+                .OrderBy(g => g.Key)
+                .Select(g => new Skender.Stock.Indicators.Quote
+                {
+                    Date   = g.Key,
+                    Open   = g.First().Open,
+                    High   = g.Max(q => q.High),
+                    Low    = g.Min(q => q.Low),
+                    Close  = g.Last().Close,
+                    Volume = g.Sum(q => q.Volume)
+                })
+                .ToList();
+        }
+
+        /// <summary>Returns the Monday of the ISO week containing <paramref name="dt"/>.</summary>
+        private static DateTime GetWeekStart(DateTime dt)
+        {
+            int diff = (7 + (int)dt.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+            return dt.Date.AddDays(-diff);
         }
 
         #endregion

@@ -10,6 +10,8 @@ public record StrategyConfig
     public string Name { get; set; } = string.Empty;
     public string PortfolioId { get; set; } = string.Empty;
     public string AccountGroup { get; set; } = string.Empty;
+    /// <summary>Broker-assigned client ID — replaces the old hardcoded "CognexProAdmin".</summary>
+    public string ClientId { get; set; } = string.Empty;
     public BrokerType BrokerType { get; set; }
     public bool IsActive { get; set; }
     public bool IsPositional { get; set; }

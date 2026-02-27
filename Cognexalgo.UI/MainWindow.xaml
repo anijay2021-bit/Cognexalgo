@@ -164,13 +164,17 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Border Background="{Binding Status, Converter={StaticResource StatusBgConverter}}" CornerRadius="12" Padding="10,4" HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding Status}" 
-                                                       Foreground="{Binding Status, Converter={StaticResource StatusFgConverter}}" 
+                                            <TextBlock Text="{Binding Status}"
+                                                       Foreground="{Binding Status, Converter={StaticResource StatusFgConverter}}"
                                                        FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"/>
                                         </Border>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+
+                             <!-- 4b. V2 Orchestrator Status (hidden until strategy is synced to V2) -->
+                            <DataGridTextColumn Header="V2" Binding="{Binding V2Status}" Width="75"
+                                                Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
 
                              <!-- 5. PNL (Real-time) -->
                             <DataGridTextColumn Header="PNL" Binding="{Binding Pnl, StringFormat=N2}" Width="120" CellStyle="{StaticResource FlashCellStyle}">
@@ -208,19 +212,52 @@
                             <DataGridTextColumn Header="Exit" Binding="{Binding ExitTime, StringFormat=HH:mm:ss}" Width="100" Foreground="{StaticResource TextMutedBrush}"/>
 
                             <!-- 9. Actions -->
-                            <DataGridTemplateColumn Header="Actions" Width="80">
+                            <DataGridTemplateColumn Header="Actions" Width="150">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <!-- EDIT -->
-                                            <Button Command="{Binding DataContext.EditStrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            <Button Command="{Binding DataContext.EditStrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Content="✎" ToolTip="Edit Strategy"
                                                     Style="{StaticResource SecondaryButtonStyle}"
-                                                    Padding="5,2" Margin="0,0,5,0" FontSize="12"/>
+                                                    Padding="5,2" Margin="0,0,4,0" FontSize="12"/>
+
+                                            <!-- START V2: visible when not yet Active -->
+                                            <Button Command="{Binding DataContext.StartV2StrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="▶" ToolTip="Start V2 Strategy"
+                                                    Padding="5,2" Margin="0,0,4,0" FontSize="12">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding V2Status}" Value="Active">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+
+                                            <!-- STOP V2: visible only while Active -->
+                                            <Button Command="{Binding DataContext.StopV2StrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="■" ToolTip="Stop V2 Strategy"
+                                                    Padding="5,2" Margin="0,0,4,0" FontSize="12">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding V2Status}" Value="Active">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
 
                                             <!-- DELETE -->
-                                            <Button Command="{Binding DataContext.DeleteStrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                            <Button Command="{Binding DataContext.DeleteStrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
                                                     Content="🗑" ToolTip="Delete Strategy"
                                                     Style="{StaticResource DangerButtonStyle}"
@@ -705,12 +742,13 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Header="LTP" Binding="{Binding LTP, StringFormat=N2}" Width="100" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                                
-                                <DataGridTextColumn Header="Delta" Binding="{Binding Delta, StringFormat=N3}" Width="80"/>
-                                <DataGridTextColumn Header="Theta" Binding="{Binding Theta, StringFormat=N2}" Width="80"/>
-                                <DataGridTextColumn Header="Vega" Binding="{Binding Vega, StringFormat=N2}" Width="80"/>
-                                
+                                <DataGridTextColumn Header="LTP" Binding="{Binding LTP, StringFormat=N2}" Width="90" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                <DataGridTextColumn Header="IV %" Binding="{Binding IV, StringFormat=N1}" Width="65"/>
+                                <DataGridTextColumn Header="Delta" Binding="{Binding Delta, StringFormat=N3}" Width="70"/>
+                                <DataGridTextColumn Header="Gamma" Binding="{Binding Gamma, StringFormat=N4}" Width="75"/>
+                                <DataGridTextColumn Header="Theta" Binding="{Binding Theta, StringFormat=N2}" Width="70"/>
+                                <DataGridTextColumn Header="Vega"  Binding="{Binding Vega,  StringFormat=N2}" Width="70"/>
+                                <DataGridTextColumn Header="DTE"   Binding="{Binding DaysToExpiry}" Width="50" Foreground="{StaticResource TextMutedBrush}"/>
                                 <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}" Width="*" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
                             </DataGrid.Columns>
                         </DataGrid>

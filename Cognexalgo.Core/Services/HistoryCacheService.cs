@@ -2,105 +2,102 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Cognexalgo.Core.Data;
 using Cognexalgo.Core.Data.Entities;
 using Skender.Stock.Indicators;
 
 namespace Cognexalgo.Core.Services
 {
-    public class HistoryCacheService
+    /// <summary>
+    /// Persists and retrieves historical OHLCV candles using LiteDB.
+    /// Replaces the previous SQLite/EF Core implementation.
+    /// Thread-safe for concurrent reads; writes are serialised by LiteDB internally.
+    /// </summary>
+    public class HistoryCacheService : IDisposable
     {
-        private readonly HistoryCacheContext _context;
+        private readonly HistoryCacheContext _ctx;
 
-        public HistoryCacheService()
+        public HistoryCacheService(string dbPath = null)
         {
-            _context = new HistoryCacheContext();
-            _context.Database.EnsureCreated();
+            _ctx = new HistoryCacheContext(dbPath);
         }
 
-        public async Task<List<Quote>> GetHistoryAsync(string symbol, string interval, int days)
+        // ── Read ────────────────────────────────────────────────────────────────
+
+        /// <summary>Return all cached candles for a symbol+interval within the last <paramref name="days"/> days.</summary>
+        public Task<List<Quote>> GetHistoryAsync(string symbol, string interval, int days)
         {
-            DateTime cutoff = DateTime.Now.AddDays(-days);
-            
-            var candles = await _context.CachedCandles
-                .Where(c => c.Symbol == symbol && c.Interval == interval && c.Timestamp >= cutoff)
+            var cutoff = DateTime.Now.AddDays(-days);
+
+            var quotes = _ctx.Candles
+                .Find(c => c.Symbol == symbol && c.Interval == interval && c.Timestamp >= cutoff)
                 .OrderBy(c => c.Timestamp)
-                .AsNoTracking()
-                .ToListAsync();
+                .Select(ToQuote)
+                .ToList();
 
-            return candles.Select(c => new Quote
-            {
-                Date = c.Timestamp,
-                Open = c.Open,
-                High = c.High,
-                Low = c.Low,
-                Close = c.Close,
-                Volume = c.Volume
-            }).ToList();
+            return Task.FromResult(quotes);
         }
 
-        public async Task SaveHistoryAsync(string symbol, string interval, List<Quote> quotes)
-        {
-            if (quotes == null || !quotes.Any()) return;
-
-            // Use a transaction for performance
-            using (var transaction = await _context.Database.BeginTransactionAsync())
-            {
-                try
-                {
-                    foreach (var q in quotes)
-                    {
-                        // Upsert logic (manually for SQLite compatibility in EF)
-                        var existing = await _context.CachedCandles
-                            .FirstOrDefaultAsync(c => c.Symbol == symbol && c.Interval == interval && c.Timestamp == q.Date);
-
-                        if (existing != null)
-                        {
-                            existing.Open = q.Open;
-                            existing.High = q.High;
-                            existing.Low = q.Low;
-                            existing.Close = q.Close;
-                            existing.Volume = q.Volume;
-                            existing.LastUpdated = DateTime.Now;
-                        }
-                        else
-                        {
-                            _context.CachedCandles.Add(new CachedCandle
-                            {
-                                Symbol = symbol,
-                                Interval = interval,
-                                Timestamp = q.Date,
-                                Open = q.Open,
-                                High = q.High,
-                                Low = q.Low,
-                                Close = q.Close,
-                                Volume = q.Volume,
-                                LastUpdated = DateTime.Now
-                            });
-                        }
-                    }
-
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            }
-        }
+        // ── Bulk Write (used by daily download protocol) ─────────────────────
 
         /// <summary>
-        /// Purges old data beyond 30 days to keep the DB size manageable.
+        /// Upsert a batch of quotes into the cache.
+        /// Uses the composite string Id for O(1) insert-or-update.
         /// </summary>
-        public async Task PurgeOldDataAsync(int retentionDays = 30)
+        public Task SaveHistoryAsync(string symbol, string interval, List<Quote> quotes)
         {
-            DateTime cutoff = DateTime.Now.AddDays(-retentionDays);
-            var old = _context.CachedCandles.Where(c => c.Timestamp < cutoff);
-            _context.CachedCandles.RemoveRange(old);
-            await _context.SaveChangesAsync();
+            if (quotes == null || quotes.Count == 0) return Task.CompletedTask;
+
+            var candles = quotes.Select(q => ToEntity(symbol, interval, q)).ToList();
+            _ctx.Candles.Upsert(candles);
+
+            return Task.CompletedTask;
         }
+
+        // ── Single candle upsert (used by live CandleAggregator) ─────────────
+
+        /// <summary>Upsert a single completed live candle.</summary>
+        public void UpsertCandle(string symbol, string interval, Quote q)
+        {
+            _ctx.Candles.Upsert(ToEntity(symbol, interval, q));
+        }
+
+        // ── Maintenance ──────────────────────────────────────────────────────
+
+        /// <summary>Delete candles older than <paramref name="retentionDays"/> days.</summary>
+        public Task PurgeOldDataAsync(int retentionDays = 60)
+        {
+            var cutoff = DateTime.Now.AddDays(-retentionDays);
+            _ctx.Candles.DeleteMany(c => c.Timestamp < cutoff);
+            return Task.CompletedTask;
+        }
+
+        public void Dispose() => _ctx.Dispose();
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        private static CachedCandle ToEntity(string symbol, string interval, Quote q) => new CachedCandle
+        {
+            Id          = CachedCandle.MakeId(symbol, interval, q.Date),
+            Symbol      = symbol,
+            Interval    = interval,
+            Timestamp   = q.Date,
+            Open        = q.Open,
+            High        = q.High,
+            Low         = q.Low,
+            Close       = q.Close,
+            Volume      = q.Volume,
+            LastUpdated = DateTime.Now
+        };
+
+        private static Quote ToQuote(CachedCandle c) => new Quote
+        {
+            Date   = c.Timestamp,
+            Open   = c.Open,
+            High   = c.High,
+            Low    = c.Low,
+            Close  = c.Close,
+            Volume = c.Volume
+        };
     }
 }

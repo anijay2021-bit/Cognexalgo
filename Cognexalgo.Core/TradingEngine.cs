@@ -7,6 +7,7 @@ using Cognexalgo.Core.CloudServices;
 using Newtonsoft.Json;
 using Cognexalgo.Core.Rules;
 using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Application.Services;
 using Microsoft.Extensions.Configuration; // [NEW]
 using Microsoft.EntityFrameworkCore;    // [NEW]
 using Cognexalgo.Core.Data;             // [NEW]
@@ -44,9 +45,30 @@ namespace Cognexalgo.Core
         private DatabaseService _dbService; // [FIX] Added missing field
         private IFirebaseService _firebaseService; // [FIX] Added missing field
         private string _clientId; // [FIX] Added missing field
+
+        /// <summary>Broker-assigned client code — set after successful ConnectAsync login.</summary>
+        public string ClientCode { get; private set; } = string.Empty;
         
         // [NEW] Track active strategies for PnL aggregation
         private List<Cognexalgo.Core.Strategies.StrategyBase> _activeStrategies = new List<Cognexalgo.Core.Strategies.StrategyBase>();
+
+        // ── Telegram alert bot ────────────────────────────────────────────────
+        private TelegramNotifier _telegram;
+
+        // ── Live candle aggregators: key = "SYMBOL|INTERVAL" ─────────────────
+        private readonly Dictionary<string, Services.CandleAggregator> _aggregators
+            = new Dictionary<string, Services.CandleAggregator>();
+        private Services.HistoryCacheService _candleCache;
+
+        /// <summary>Access engine-level aggregators from strategies / Greeks layer.</summary>
+        public IReadOnlyDictionary<string, Services.CandleAggregator> Aggregators => _aggregators;
+
+        /// <summary>Get the full series (history + live candle) for a symbol+interval key.</summary>
+        public List<Skender.Stock.Indicators.Quote> GetLiveSeries(string symbol, string interval)
+        {
+            var key = $"{symbol.ToUpper()}|{interval}";
+            return _aggregators.TryGetValue(key, out var agg) ? agg.GetFullSeries() : new List<Skender.Stock.Indicators.Quote>();
+        }
 
         public TradingEngine() : this(null, null) { }
 
@@ -99,8 +121,31 @@ namespace Cognexalgo.Core
             Api = new SmartApiClient(); 
             DataService = preLoadedDataService ?? new AngelOneDataService(Api, TokenService, Logger);
             SmartStream = new SmartStreamService();
-            // Relay SmartStream statuses/ticks if needed, or strategies can listen directly
+
+            // Relay binary ticks → JSON ticker (existing behaviour)
             SmartStream.OnTickReceived += (data) => Ticker.EmitTick(data);
+
+            // Also route ticks → per-symbol per-interval candle aggregators
+            SmartStream.OnTickReceived += RouteTick;
+
+            // Shared LiteDB cache for all aggregators
+            _candleCache = new Services.HistoryCacheService();
+
+            // ── Telegram: initialise from appsettings.json ────────────────────
+            // Set Enabled=true + BotToken/ChatId in appsettings.json to activate
+            var tgSection = config.GetSection("Telegram");
+            _telegram = new TelegramNotifier(
+                botToken: tgSection["BotToken"] ?? string.Empty,
+                chatId:   tgSection["ChatId"]   ?? string.Empty,
+                enabled:  "true".Equals(tgSection["Enabled"], StringComparison.OrdinalIgnoreCase));
+
+            // Forward every strategy signal to Telegram (fire-and-forget)
+            OnSignalReceived += signal =>
+                _ = Task.Run(() => _telegram.SendSignalAlert(
+                    signal.StrategyName ?? "Strategy",
+                    signal.SignalType   ?? "Signal",
+                    signal.Symbol       ?? string.Empty,
+                    (decimal)(signal.Price)));
 
             _clientId = Environment.MachineName;
 
@@ -110,6 +155,74 @@ namespace Cognexalgo.Core
                 Logger.Log("Engine", "Trading Engine Constructed (fresh — no pre-loaded data).");
         }
 
+
+        // ── Candle Aggregator Wiring ──────────────────────────────────────────
+
+        /// <summary>
+        /// Call once after PreFetchDeepHistoryAsync completes to seed each aggregator
+        /// with its downloaded history and subscribe to live ticks.
+        /// </summary>
+        public async Task InitAggregatorsAsync()
+        {
+            // Intraday timeframes supported by Angel One's binary stream
+            var intervals = new[]
+            {
+                ("ONE_MINUTE",     1),
+                ("THREE_MINUTE",   3),
+                ("FIVE_MINUTE",    5),
+                ("TEN_MINUTE",    10),
+                ("FIFTEEN_MINUTE",15),
+                ("THIRTY_MINUTE", 30),
+                ("ONE_HOUR",      60),
+            };
+
+            var symbols = new[] { "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY" };
+
+            foreach (var sym in symbols)
+            {
+                foreach (var (ivName, ivMins) in intervals)
+                {
+                    var key = $"{sym}|{ivName}";
+                    var agg = new Services.CandleAggregator(sym, ivName, ivMins, _candleCache);
+
+                    // Seed with stored history so indicators are warm immediately
+                    var history = await _candleCache.GetHistoryAsync(sym, ivName, days: 400);
+                    if (history.Count == 0 && DataService != null)
+                        history = DataService.GetCachedHistory(sym, ivName) ?? history;
+
+                    agg.Seed(history);
+                    _aggregators[key] = agg;
+
+                    Logger?.Log("Engine", $"Aggregator seeded: {sym} {ivName} — {history.Count} candles");
+                }
+            }
+
+            Logger?.Log("Engine", $"✓ {_aggregators.Count} candle aggregators initialised and live.");
+        }
+
+        /// <summary>Routes a SmartStream tick to all relevant aggregators.</summary>
+        private void RouteTick(Models.TickerData data)
+        {
+            var now = DateTime.Now;
+
+            // Map from TickerData properties to symbol names
+            RouteSymbol("NIFTY",      data.Nifty?.Ltp,      now);
+            RouteSymbol("BANKNIFTY",  data.BankNifty?.Ltp,  now);
+            RouteSymbol("FINNIFTY",   data.FinNifty?.Ltp,   now);
+            RouteSymbol("MIDCPNIFTY", data.MidcpNifty?.Ltp, now);
+        }
+
+        private void RouteSymbol(string symbol, double? ltp, DateTime now)
+        {
+            if (ltp == null || ltp <= 0) return;
+            var price = (decimal)ltp.Value;
+
+            foreach (var kvp in _aggregators)
+            {
+                if (kvp.Key.StartsWith(symbol + "|"))
+                    kvp.Value.AddTick(now, price);
+            }
+        }
 
         public async Task InitializeDatabaseAsync()
         {
@@ -425,6 +538,12 @@ namespace Cognexalgo.Core
 
                 Logger?.Log("Engine", $"✓ Connected successfully. Feed Token: {Api.FeedToken}");
 
+                // Store the authenticated broker client code so downstream services
+                // (V2Bridge strategy registration, account configs, RMS) all use the
+                // real login identity instead of Environment.MachineName.
+                _clientId  = clientCode;
+                ClientCode = clientCode;
+
                 // CRITICAL FIX: Properly await LoadMasterAsync to prevent race condition
                 // Previously used fire-and-forget (_ = ...) which caused searches to run before loading completed
                 Logger?.Log("Engine", "Loading Scrip Master...");
@@ -442,12 +561,14 @@ namespace Cognexalgo.Core
                 // Nifty (99926000), BankNifty (99926009), FinNifty (99926037), Midcap (99926030), Sensex (99919017)
                 await SmartStream.SubscribeAsync(new List<string> { "99926000", "99926009", "99926037", "99926030" }, "NSE");
                 await SmartStream.SubscribeAsync(new List<string> { "99919017" }, "BSE");
-                // [NEW] Global History Fetch for Indices
+                // [NEW] Global History Fetch for Indices, then seed aggregators
                 _ = Task.Run(async () => {
                     try {
                         await DataService.PreFetchGlobalHistoryAsync();
+                        // After history is in LiteDB + in-memory, seed the live aggregators
+                        await InitAggregatorsAsync();
                     } catch (Exception ex) {
-                        Logger?.Log("Engine", $"Global Pre-fetch Failed: {ex.Message}");
+                        Logger?.Log("Engine", $"Global Pre-fetch / Aggregator Init Failed: {ex.Message}");
                     }
                 });
 
@@ -579,16 +700,18 @@ namespace Cognexalgo.Core
                         Ticker.EmitTick(data);
 
                         // [NEW] Check RMS Limits
-                        double currentMtm = GetTotalPnL(); 
+                        double currentMtm = GetTotalPnL();
                         if (currentMtm <= MaxLoss)
                         {
                             Logger.Log("RMS", $"[CRITICAL] Max Loss Reached ({currentMtm}). Triggering Global Square-Off.");
+                            _ = Task.Run(() => _telegram.SendRmsBreachAlert("ALL", "MaxLoss", (decimal)currentMtm, (decimal)MaxLoss));
                             await SquareOffAll();
                             Stop();
                         }
                         else if (currentMtm >= MaxProfit)
                         {
                             Logger.Log("RMS", $"[SUCCESS] Max Profit Reached ({currentMtm}). Triggering Global Square-Off.");
+                            _ = Task.Run(() => _telegram.SendRmsBreachAlert("ALL", "MaxProfit", (decimal)currentMtm, (decimal)MaxProfit));
                             await SquareOffAll();
                             Stop();
                         }

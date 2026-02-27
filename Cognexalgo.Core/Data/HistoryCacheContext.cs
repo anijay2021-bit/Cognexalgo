@@ -1,40 +1,44 @@
 using System;
-using Microsoft.EntityFrameworkCore;
-using Cognexalgo.Core.Data.Entities;
 using System.IO;
+using LiteDB;
+using Cognexalgo.Core.Data.Entities;
 
 namespace Cognexalgo.Core.Data
 {
-    public class HistoryCacheContext : DbContext
+    /// <summary>
+    /// LiteDB context for the local historical candle cache.
+    /// Replaces the previous SQLite/EF Core implementation.
+    /// Default location: &lt;AppBase&gt;/Data/HistoryCache.db
+    /// </summary>
+    public class HistoryCacheContext : IDisposable
     {
-        public DbSet<CachedCandle> CachedCandles { get; set; }
+        private readonly LiteDatabase _db;
 
-        private string _dbPath;
-
-        public HistoryCacheContext()
+        public HistoryCacheContext(string dbPath = null)
         {
-            var folder = AppContext.BaseDirectory;
-            _dbPath = Path.Combine(folder, "LocalHistoryCache.db");
+            var path = dbPath
+                ?? Path.Combine(AppContext.BaseDirectory, "Data", "HistoryCache.db");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            // Connection=shared allows multiple LiteDatabase instances (e.g. AngelOneDataService
+            // + TradingEngine) to open the same file within the same process without file-lock
+            // conflicts. LiteDB uses an internal mutex to serialise writes.
+            _db = new LiteDatabase($"Filename={path};Connection=shared");
+            EnsureIndexes();
         }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        /// <summary>The candles collection — Id is the composite string key.</summary>
+        public ILiteCollection<CachedCandle> Candles
+            => _db.GetCollection<CachedCandle>("candles");
+
+        private void EnsureIndexes()
         {
-            optionsBuilder.UseSqlite($"Data Source={_dbPath}");
+            var col = Candles;
+            col.EnsureIndex(x => x.Symbol);
+            col.EnsureIndex(x => x.Interval);
+            col.EnsureIndex(x => x.Timestamp);
         }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<CachedCandle>(entity =>
-            {
-                entity.ToTable("cached_candles");
-                entity.HasKey(e => e.Id);
-                
-                // Index for fast lookups by segment
-                entity.HasIndex(e => new { e.Symbol, e.Interval, e.Timestamp }).IsUnique();
-                
-                // Efficient querying for range delete
-                entity.HasIndex(e => e.Timestamp);
-            });
-        }
+        public void Dispose() => _db?.Dispose();
     }
 }

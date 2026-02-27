@@ -148,3 +148,31 @@ public class AngelPositionItem
     [JsonProperty("pnl")] public string Pnl { get; set; } = "0";
     [JsonProperty("realised")] public string Realised { get; set; } = "0";
 }
+
+// ─── Holdings & Trade Book DTOs (added for IBroker.GetHoldingsAsync / GetTradeBookAsync) ───
+
+public class AngelHoldingDto
+{
+    [JsonProperty("tradingsymbol")]      public string  TradingSymbol      { get; set; } = string.Empty;
+    [JsonProperty("isin")]               public string  Isin               { get; set; } = string.Empty;
+    [JsonProperty("exchange")]           public string  Exchange           { get; set; } = string.Empty;
+    [JsonProperty("quantity")]           public int     Quantity           { get; set; }
+    [JsonProperty("authorisedquantity")] public int     AuthorisedQuantity { get; set; }
+    [JsonProperty("averageprice")]       public decimal AveragePrice       { get; set; }
+    [JsonProperty("ltp")]                public decimal Ltp                { get; set; }
+    [JsonProperty("profitandloss")]      public decimal ProfitAndLoss      { get; set; }
+    [JsonProperty("pnlpercentage")]      public decimal Pnlpercentage      { get; set; }
+}
+
+public class AngelTradeDto
+{
+    [JsonProperty("orderid")]        public string  OrderId         { get; set; } = string.Empty;
+    [JsonProperty("tradeid")]        public string  TradeId         { get; set; } = string.Empty;
+    [JsonProperty("tradingsymbol")]  public string  TradingSymbol   { get; set; } = string.Empty;
+    [JsonProperty("exchange")]       public string  Exchange        { get; set; } = string.Empty;
+    [JsonProperty("transactiontype")]public string  TransactionType { get; set; } = string.Empty;
+    [JsonProperty("quantity")]       public int     Quantity        { get; set; }
+    [JsonProperty("tradeprice")]     public decimal TradePrice      { get; set; }
+    [JsonProperty("filltime")]       public DateTime FillTime       { get; set; }
+    [JsonProperty("producttype")]    public string  ProductType     { get; set; } = string.Empty;
+}

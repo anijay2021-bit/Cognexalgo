@@ -1,4 +1,5 @@
 using System;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Newtonsoft.Json;
 
 namespace Cognexalgo.Core.Models
@@ -39,7 +40,12 @@ namespace Cognexalgo.Core.Models
         public double PnlPercentage { get; set; }
     }
 
-    public class Position
+    /// <summary>
+    /// Live broker position. Extends ObservableObject so that Ltp and Pnl updates
+    /// (driven by SmartStream ticks in MainViewModel.OnTick) propagate to WPF DataGrid
+    /// bindings without needing a full collection refresh.
+    /// </summary>
+    public partial class Position : ObservableObject
     {
         [JsonProperty("tradingsymbol")]
         public string TradingSymbol { get; set; }
@@ -98,15 +104,21 @@ namespace Cognexalgo.Core.Models
         [JsonProperty("netprice")]
         public double NetPrice { get; set; }
 
+        // ── Observable for live tick updates ──────────────────────────────────
+        // SetProperty fires INotifyPropertyChanged so WPF DataGrid cells refresh
+        // without rebuilding the entire collection.
+
+        private double _pnl;
         [JsonProperty("pnl")]
-        public double Pnl { get; set; }
-        
+        public double Pnl { get => _pnl; set => SetProperty(ref _pnl, value); }
+
+        private double _ltp;
         [JsonProperty("ltp")]
-        public double Ltp { get; set; }
+        public double Ltp { get => _ltp; set => SetProperty(ref _ltp, value); }
 
         [JsonProperty("closedpositions")]
         public string ClosedPositions { get; set; }
-        
+
         // Additional tracking properties (not from API)
         public string Status { get; set; } = "Running";
         public double EntryPrice { get; set; }

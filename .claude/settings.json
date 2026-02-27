@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet restore Cognexalgo.Core/Cognexalgo.Core.csproj)",
+      "Bash(dotnet build Cognexalgo.Core/Cognexalgo.Core.csproj --no-restore)"
+    ]
+  }
+}

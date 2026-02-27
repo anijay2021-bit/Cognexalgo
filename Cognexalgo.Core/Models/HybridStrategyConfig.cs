@@ -44,6 +44,15 @@ namespace Cognexalgo.Core.Models
         public int MaxLossPercent { get; set; } = 0; // 0 = disabled
 
         // JSON Storage for Strategy-Specific Parameters (e.g., Calendar Times)
-        public string Parameters { get; set; } = "{}"; 
+        public string Parameters { get; set; } = "{}";
+
+        // ── V2 Orchestrator tracking ─────────────────────────────────────────
+        /// <summary>V2 strategy ID returned by V2StrategyAdapter.SyncToV2Async() e.g. "STR-20260227-STR-001".</summary>
+        [ObservableProperty]
+        private string _v2Id = string.Empty;
+
+        /// <summary>Live status fed by StrategyOrchestrator.OnStatusChanged — "Active", "Paused", "Error".</summary>
+        [ObservableProperty]
+        private string _v2Status = string.Empty;
     }
 }

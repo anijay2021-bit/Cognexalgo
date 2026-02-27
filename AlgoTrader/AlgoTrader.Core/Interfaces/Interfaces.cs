@@ -18,6 +18,18 @@ public interface IBroker
     Task<List<Position>> GetPositionBookAsync(string token);
     Task<List<Candle>> GetHistoricalDataAsync(string token, string symbolToken, Exchange exchange, TimeFrame interval, DateTime from, DateTime to);
     Task<decimal> GetLTPAsync(string symbolToken, Exchange exchange, string authToken);
+
+    /// <summary>
+    /// Returns all demat holdings (equity / ETF) for portfolio-level P&amp;L.
+    /// Needed for overnight / positional strategies.
+    /// </summary>
+    Task<List<HoldingRecord>> GetHoldingsAsync(string token);
+
+    /// <summary>
+    /// Returns the intraday trade book — completed fills only, no pending orders.
+    /// Used to seed PositionTracker and RiskManager at engine startup.
+    /// </summary>
+    Task<List<TradeRecord>> GetTradeBookAsync(string token);
 }
 
 /// <summary>Factory to create broker instances by type.</summary>
@@ -97,6 +109,13 @@ public interface IRiskManager
     Task StartAsync();
     Task StopAsync();
     IObservable<RiskEvent> RiskAlerts { get; }
+
+    /// <summary>
+    /// Subscribe to a live MTM stream so the RiskManager can enforce
+    /// MaxLoss / MaxProfit rules per strategy.
+    /// Call once from StrategyEngine.StartAsync() after the PositionTracker is ready.
+    /// </summary>
+    void MonitorMTM(IObservable<PositionSummary> mtmStream);
 }
 
 /// <summary>Encryption and TOTP utilities.</summary>

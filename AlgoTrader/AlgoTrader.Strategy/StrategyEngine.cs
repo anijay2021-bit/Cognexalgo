@@ -77,6 +77,24 @@ public class StrategyEngine : IStrategyEngine
     public Task StartAsync()
     {
         _autoSquareOff.Start();
+
+        // ── Wire PositionTracker → RiskManager ───────────────────────────────
+        // PositionTracker publishes live per-strategy MTM; RiskManager subscribes
+        // and emits RiskAlerts when MaxLoss / MaxProfit thresholds are breached.
+        if (_positionTracker != null)
+        {
+            _riskManager.MonitorMTM(_positionTracker.MTMUpdates);
+
+            // Force-exit the affected strategy the moment a risk limit fires
+            _riskManager.RiskAlerts
+                .Subscribe(async evt =>
+                {
+                    _logger.LogWarning("RiskAlert [{Type}] on strategy {Id} — forcing exit", evt.Type, evt.StrategyId);
+                    if (_activeStrategies.TryGetValue(evt.StrategyId, out var instance))
+                        await instance.ForceExitAsync(ExitReason.Manual);
+                });
+        }
+
         _logger.LogInformation("StrategyEngine started with {Count} strategies", _activeStrategies.Count);
         return Task.CompletedTask;
     }
@@ -388,7 +406,7 @@ public class StrategyInstance : IDisposable
                     var filteredLegs = ExecutionRuleFilter.ApplyRule(_config.Legs, _config.ExecutionRule);
                     var entryConfig = _config with { Legs = filteredLegs };
 
-                    var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = "CognexProAdmin" };
+                    var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = _config.ClientId };
                     _ = _executionEngine.ExecuteStrategyAsync(entryConfig, account);
 
                     // Track open positions for breakeven/MTM
@@ -505,8 +523,8 @@ public class StrategyInstance : IDisposable
     private async void ExecuteLegReEntry(LegConfig leg)
     {
         var newLeg = _reEntryManager.ProcessLegReEntry(leg, _config);
-        
-        var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = "CognexProAdmin" };
+
+        var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = _config.ClientId };
         var tempConfig = _config with { Legs = new List<LegConfig> { newLeg } };
         await _executionEngine.ExecuteStrategyAsync(tempConfig, account);
         
@@ -532,8 +550,8 @@ public class StrategyInstance : IDisposable
             _eventBus.Publish(new StrategyEvent(_config.Id.ToString(), 
                 StrategyEventType.ExitPlaced, DateTime.UtcNow, $"Forced Exit: {reason}"));
             
-            var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = "CognexProAdmin" };
-            var openPositions = new List<Position>(); 
+            var account = new AccountCredential { BrokerType = _config.BrokerType, ClientID = _config.ClientId };
+            var openPositions = new List<Position>();
             await _executionEngine.LiquidateStrategyAsync(_config, account, openPositions);
             _openLegPositions.Clear();
         }
@@ -598,13 +616,13 @@ public class EntryEvaluator
         {
             try
             {
-                // Build a default account credential for indicator data fetching
-                var account = new AccountCredential { BrokerType = config.BrokerType, ClientID = "CognexProAdmin" };
-                
+                // Account credential for indicator data fetching — uses the strategy's own clientId
+                var account = new AccountCredential { BrokerType = config.BrokerType, ClientID = config.ClientId };
+
                 // Determine the symbol/token to evaluate indicators on
                 var firstLeg = config.Legs.FirstOrDefault();
                 string evalSymbol = firstLeg?.UnderlyingSymbol ?? firstLeg?.Symbol ?? tick.Symbol;
-                string evalToken = firstLeg?.Token ?? tick.Token;
+                string evalToken  = firstLeg?.Token ?? tick.Token;
                 Exchange evalExchange = firstLeg?.Exchange ?? Exchange.NSE;
 
                 bool indicatorResult = await _indicatorEvaluator.EvaluateSetAsync(
@@ -675,10 +693,10 @@ public class ExitEvaluator
         {
             try
             {
-                var account = new AccountCredential { BrokerType = config.BrokerType, ClientID = "CognexProAdmin" };
+                var account = new AccountCredential { BrokerType = config.BrokerType, ClientID = config.ClientId };
                 var firstLeg = config.Legs.FirstOrDefault();
-                string evalSymbol = firstLeg?.UnderlyingSymbol ?? firstLeg?.Symbol ?? tick.Symbol;
-                string evalToken = firstLeg?.Token ?? tick.Token;
+                string evalSymbol    = firstLeg?.UnderlyingSymbol ?? firstLeg?.Symbol ?? tick.Symbol;
+                string evalToken     = firstLeg?.Token ?? tick.Token;
                 Exchange evalExchange = firstLeg?.Exchange ?? Exchange.NSE;
 
                 bool indicatorExit = await _indicatorEvaluator.EvaluateSetAsync(

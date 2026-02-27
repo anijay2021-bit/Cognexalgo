@@ -1,3 +1,5 @@
+using System;
+
 namespace Cognexalgo.Core.Models
 {
     /// <summary>
@@ -45,10 +47,17 @@ namespace Cognexalgo.Core.Models
         /// </summary>
         public bool IsPut => OptionType == "PE";
 
-        // [Phase 7] Greeks
+        // Expiry tracking — populated by BuildOptionChainAsync
+        public DateTime ExpiryDate { get; set; }
+
+        /// <summary>Calendar days to expiry (min 1 to avoid div-by-zero in Black-Scholes).</summary>
+        public int DaysToExpiry => Math.Max(1, (ExpiryDate.Date - DateTime.Today).Days);
+
+        // [Phase 7] Greeks — computed from market-implied IV via GreeksService
+        public double IV    { get; set; }
         public double Delta { get; set; }
         public double Theta { get; set; }
-        public double Vega { get; set; }
+        public double Vega  { get; set; }
         public double Gamma { get; set; }
 
         public override string ToString()

@@ -2,6 +2,7 @@ using System.Net;
 using RestSharp;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
+using AlgoTrader.Core.Models;
 
 namespace AlgoTrader.Brokers.AngelOne;
 
@@ -83,6 +84,49 @@ public class AngelOneRestClient
             throw new AngelOneApiException((int)response.StatusCode, "HTTP_ERROR", response.Content ?? "Unknown error");
 
         return JsonConvert.DeserializeObject<T>(response.Content ?? "{}");
+    }
+
+    // ── Portfolio endpoints ──────────────────────────────────────────────────
+
+    /// <summary>Fetch demat holdings from Angel One REST API.</summary>
+    public async Task<List<HoldingRecord>> GetHoldingsAsync(string token)
+    {
+        // Angel One holdings endpoint returns {"status":true,"data":[...]}
+        var wrapper = await GetAsync<AngelApiResponse<List<AngelHoldingDto>>>(
+            "/rest/secure/angelbroking/portfolio/v1/getHolding", token);
+
+        return wrapper?.Data?.Select(h => new HoldingRecord
+        {
+            TradingSymbol = h.TradingSymbol,
+            ISIN          = h.Isin,
+            Exchange      = h.Exchange,
+            Qty           = h.Quantity,
+            AuthorisedQty = h.AuthorisedQuantity,
+            AvgPrice      = h.AveragePrice,
+            LTP           = h.Ltp,
+            PnL           = h.ProfitAndLoss,
+            PnLPercent    = h.Pnlpercentage
+        }).ToList() ?? new List<HoldingRecord>();
+    }
+
+    /// <summary>Fetch intraday trade book (filled orders only) from Angel One REST API.</summary>
+    public async Task<List<TradeRecord>> GetTradeBookAsync(string token)
+    {
+        var wrapper = await GetAsync<AngelApiResponse<List<AngelTradeDto>>>(
+            "/rest/secure/angelbroking/order/v1/getTradeBook", token);
+
+        return wrapper?.Data?.Select(t => new TradeRecord
+        {
+            OrderId         = t.OrderId,
+            TradeId         = t.TradeId,
+            TradingSymbol   = t.TradingSymbol,
+            Exchange        = t.Exchange,
+            TransactionType = t.TransactionType,
+            Qty             = t.Quantity,
+            FillPrice       = t.TradePrice,
+            FillTime        = t.FillTime,
+            ProductType     = t.ProductType
+        }).ToList() ?? new List<TradeRecord>();
     }
 
     private static string GetLocalIP()

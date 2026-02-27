@@ -425,3 +425,25 @@
    at Cognexalgo.UI.MainWindow.InitializeComponent() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\MainWindow.xaml:line 1
    at Cognexalgo.UI.MainWindow..ctor() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\MainWindow.xaml.cs:line 9
    at Cognexalgo.UI.App.OnLoginSuccess() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\App.xaml.cs:line 57
+27-02-2026 14:12:28: Login Transition Failed: System.IO.IOException: The process cannot access the file 'C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\bin\Debug\net8.0-windows\Data\HistoryCache.db' because it is being used by another process.
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options)
+   at LiteDB.Engine.FileStreamFactory.GetStream(Boolean canWrite, Boolean sequencial)
+   at LiteDB.Engine.StreamPool.<>c__DisplayClass3_0.<.ctor>b__0()
+   at System.Lazy`1.ViaFactory(LazyThreadSafetyMode mode)
+   at System.Lazy`1.ExecutionAndPublication(LazyHelper executionAndPublication, Boolean useDefaultConstructor)
+   at System.Lazy`1.CreateValue()
+   at LiteDB.Engine.DiskService..ctor(EngineSettings settings, EngineState state, Int32[] memorySegmentSizes)
+   at LiteDB.Engine.LiteEngine.Open()
+   at LiteDB.Engine.LiteEngine..ctor(EngineSettings settings)
+   at LiteDB.ConnectionString.CreateEngine(Action`1 engineSettingsAction)
+   at LiteDB.LiteDatabase..ctor(ConnectionString connectionString, BsonMapper mapper)
+   at LiteDB.LiteDatabase..ctor(String connectionString, BsonMapper mapper)
+   at Cognexalgo.Core.Data.HistoryCacheContext..ctor(String dbPath) in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Core\Data\HistoryCacheContext.cs:line 23
+   at Cognexalgo.Core.Services.HistoryCacheService..ctor(String dbPath) in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Core\Services\HistoryCacheService.cs:line 22
+   at Cognexalgo.Core.TradingEngine..ctor(TokenService preLoadedTokenService, AngelOneDataService preLoadedDataService) in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.Core\TradingEngine.cs:line 129
+   at Cognexalgo.UI.App.OnLoginSuccess() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\App.xaml.cs:line 77

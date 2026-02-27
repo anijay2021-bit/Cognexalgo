@@ -178,4 +178,30 @@ public class PaperTradingBroker : IBroker
 
         _balance -= (request.BuySell == BuySell.BUY ? 1 : -1) * request.Qty * request.LimitPrice;
     }
+
+    // ── Portfolio stubs (paper broker has no real demat / trade book) ────────
+
+    public Task<List<HoldingRecord>> GetHoldingsAsync(string token)
+        => Task.FromResult(new List<HoldingRecord>());
+
+    public Task<List<TradeRecord>> GetTradeBookAsync(string token)
+    {
+        // Map paper-trade filled orders to TradeRecord so callers get consistent data
+        var fills = _orders.Values
+            .Where(o => o.Status == OrderStatus.COMPLETE)
+            .Select(o => new TradeRecord
+            {
+                OrderId         = o.OrderID,
+                TradeId         = o.OrderID,
+                TradingSymbol   = o.Symbol,
+                Exchange        = o.Exchange.ToString(),
+                TransactionType = o.BuySell.ToString(),
+                Qty             = o.FilledQty,
+                FillPrice       = o.AvgPrice,
+                FillTime        = o.PlaceTime,
+                ProductType     = o.ProductType.ToString()
+            })
+            .ToList();
+        return Task.FromResult(fills);
+    }
 }

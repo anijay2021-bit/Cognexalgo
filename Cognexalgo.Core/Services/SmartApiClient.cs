@@ -236,6 +236,31 @@ namespace Cognexalgo.Core.Services
             }
         }
 
+        /// <summary>
+        /// Fetches the intraday trade book (filled orders only) from Angel One.
+        /// Angel One trade book endpoint: /rest/secure/angelbroking/order/v1/getTradeBook
+        /// </summary>
+        public async Task<System.Collections.Generic.List<Order>> GetTradeBookAsync()
+        {
+            try
+            {
+                var response = await _client.GetAsync("/rest/secure/angelbroking/order/v1/getTradeBook");
+                CheckAuth(response);
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                var data = JObject.Parse(responseString);
+                if (data["status"]?.Value<bool>() == true && data["data"] != null)
+                    return data["data"].ToObject<System.Collections.Generic.List<Order>>();
+
+                return new System.Collections.Generic.List<Order>();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetTradeBook Error: {ex.Message}");
+                return new System.Collections.Generic.List<Order>();
+            }
+        }
+
         public async Task<RMSLimit> GetRMSLimitAsync()
         {
             try
