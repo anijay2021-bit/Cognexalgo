@@ -10,7 +10,7 @@
         Title="Cognexalgo Live Operations" 
         Height="{Binding WindowHeight, Mode=TwoWay}" 
         Width="{Binding WindowWidth, Mode=TwoWay}"
-        Background="#F9FAFB" WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}" WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI Variable, Inter, Segoe UI, sans-serif"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
@@ -80,7 +80,7 @@
         </Menu>
 
         <!-- 1. Enhanced Header (Mockup Match) -->
-        <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="20,10">
+        <Border Grid.Row="1" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="20,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Logo -->
@@ -91,30 +91,30 @@
                 <!-- Logo Section -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Image Source="Assets/logo.png" Height="45" Margin="0,0,10,0"/>
-                    <TextBlock Text="cognexalgo" FontSize="18" FontWeight="Bold" Foreground="#444" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock Text="cognexalgo" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center" Visibility="Collapsed"/>
                 </StackPanel>
 
                 <!-- Labeled Stats -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
-                        <TextBlock Text="ACTIVE STRATEGIES" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="ACTIVE STRATEGIES" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock Text="{Binding RunningStrategiesCount}" Foreground="#2ECC71" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
-                        <TextBlock Text="PENDING" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="PENDING" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock Text="{Binding PendingOrdersCount}" Foreground="#F39C12" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="EXITED" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="EXITED" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <TextBlock Text="{Binding ExitedStrategiesCount}" Foreground="#3498DB" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Total MTM (Right Aligned) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Total MTM" Foreground="#888" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <TextBlock Text="Total MTM" Foreground="{StaticResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"/>
                     <TextBlock Text="{Binding TotalMtm, StringFormat=₹ {0:N2}}" FontSize="28" FontWeight="Bold">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -597,32 +597,32 @@
                         <!-- Summary Cards -->
                         <UniformGrid Grid.Row="0" Columns="3" Margin="0,0,0,20">
                             <!-- Profit Efficiency -->
-                            <Border Background="#EBF5FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,10,0">
+                            <Border Background="#3498DB22" BorderBrush="#3498DB44" BorderThickness="1" CornerRadius="8" Padding="15" Margin="0,0,10,0">
                                 <StackPanel>
-                                    <TextBlock Text="PROFIT EFFICIENCY" Foreground="#2563EB" FontSize="10" FontWeight="Black"/>
+                                    <TextBlock Text="PROFIT EFFICIENCY" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Black"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,5">
-                                        <TextBlock Text="{Binding ProfitEfficiency, StringFormat={}{0:N0}}" Foreground="#1E3A8A" FontSize="28" FontWeight="Black"/>
-                                        <TextBlock Text="%" Foreground="#1E3A8A" FontSize="18" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,4"/>
+                                        <TextBlock Text="{Binding ProfitEfficiency, StringFormat={}{0:N0}}" Foreground="{StaticResource TextMainBrush}" FontSize="28" FontWeight="Black"/>
+                                        <TextBlock Text="%" Foreground="{StaticResource TextMainBrush}" FontSize="18" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,4"/>
                                     </StackPanel>
-                                    <TextBlock Text="Actual vs Protected Profit" Foreground="#60A5FA" FontSize="10"/>
+                                    <TextBlock Text="Actual vs Protected Profit" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
 
                             <!-- Rescued Capital -->
-                            <Border Background="#F0FDF4" BorderBrush="#BBF7D0" BorderThickness="1" CornerRadius="8" Padding="15" Margin="5,0,5,0">
+                            <Border Background="#1ABC9C22" BorderBrush="#1ABC9C44" BorderThickness="1" CornerRadius="8" Padding="15" Margin="5,0,5,0">
                                 <StackPanel>
-                                    <TextBlock Text="RESCUED CAPITAL" Foreground="#166534" FontSize="10" FontWeight="Black"/>
-                                    <TextBlock Text="{Binding RescuedCapital, StringFormat=₹ {0:N0}}" Foreground="#14532D" FontSize="28" FontWeight="Black" Margin="0,5"/>
-                                    <TextBlock Text="Locked via Protection/TSL" Foreground="#4ADE80" FontSize="10"/>
+                                    <TextBlock Text="RESCUED CAPITAL" Foreground="{StaticResource PrimaryBrush}" FontSize="10" FontWeight="Black"/>
+                                    <TextBlock Text="{Binding RescuedCapital, StringFormat=₹ {0:N0}}" Foreground="{StaticResource TextMainBrush}" FontSize="28" FontWeight="Black" Margin="0,5"/>
+                                    <TextBlock Text="Locked via Protection/TSL" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
 
                             <!-- Avg Slippage -->
-                            <Border Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1" CornerRadius="8" Padding="15" Margin="10,0,0,0">
+                            <Border Background="#EF535022" BorderBrush="#EF535044" BorderThickness="1" CornerRadius="8" Padding="15" Margin="10,0,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="AVG SLIPPAGE" Foreground="#991B1B" FontSize="10" FontWeight="Black"/>
-                                    <TextBlock Text="{Binding AvgSlippage, StringFormat=₹ {0:N0}}" Foreground="#7F1D1D" FontSize="28" FontWeight="Black" Margin="0,5"/>
-                                    <TextBlock Text="Execution vs Trigger Variance" Foreground="#F87171" FontSize="10"/>
+                                    <TextBlock Text="AVG SLIPPAGE" Foreground="{StaticResource DangerBrush}" FontSize="10" FontWeight="Black"/>
+                                    <TextBlock Text="{Binding AvgSlippage, StringFormat=₹ {0:N0}}" Foreground="{StaticResource TextMainBrush}" FontSize="28" FontWeight="Black" Margin="0,5"/>
+                                    <TextBlock Text="Execution vs Trigger Variance" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
@@ -792,7 +792,7 @@
 
         <!-- 3. Bottom Section (Tabs) -->
         <!-- 3. Splitter & Bottom Section -->
-        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#E5E7EB" ResizeBehavior="PreviousAndNext"/>
+        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{StaticResource BorderBrush}" ResizeBehavior="PreviousAndNext"/>
 
         <!-- 4. Global Settings & Logs (Resizable) -->
         <Grid Grid.Row="4" Margin="20,0,20,20">
@@ -803,7 +803,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Splitter -->
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="#E5E7EB" ResizeBehavior="PreviousAndNext"/>
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="{StaticResource BorderBrush}" ResizeBehavior="PreviousAndNext"/>
 
             <!-- LEFT: Global Settings -->
             <Grid Grid.Column="0">
@@ -812,9 +812,9 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 
-                <TextBlock Text="Global Settings" Foreground="#888" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
+                <TextBlock Text="Global Settings" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
 
-                <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="8" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/> <!-- Buttons -->
@@ -856,18 +856,18 @@
                         </StackPanel>
 
                         <!-- Bottom: RMS Settings -->
-                        <Border Grid.Row="2" Background="#F8FAFC" CornerRadius="4" Padding="15,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <Border Grid.Row="2" Background="{StaticResource CardHoverBrush}" CornerRadius="4" Padding="15,10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Risk Management" Foreground="#444" FontWeight="Bold" Margin="0,0,20,0" VerticalAlignment="Center" FontSize="12"/>
-                                
-                                <TextBlock Text="Max Loss (-)" Foreground="#666" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
+                                <TextBlock Text="Risk Management" Foreground="{StaticResource TextMainBrush}" FontWeight="Bold" Margin="0,0,20,0" VerticalAlignment="Center" FontSize="12"/>
+
+                                <TextBlock Text="Max Loss (-)" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
                                 <TextBox Text="{Binding MaxLoss}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,20,0" Height="28"/>
 
-                                <TextBlock Text="Max Profit (+)" Foreground="#666" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
+                                <TextBlock Text="Max Profit (+)" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="11"/>
                                 <TextBox Text="{Binding MaxProfit}" Width="80" Style="{StaticResource DarkTextBoxStyle}" Margin="0,0,20,0" Height="28"/>
-                                
-                                <Button Command="{Binding SaveRmsCommand}" Content="SAVE" 
-                                        Background="#E2E8F0" Foreground="#475569" BorderThickness="0"
+
+                                <Button Command="{Binding SaveRmsCommand}" Content="SAVE"
+                                        Background="{StaticResource BorderBrush}" Foreground="{StaticResource TextMutedBrush}" BorderThickness="0"
                                         FontWeight="Bold" Padding="15,4" Height="28">
                                     <Button.Resources>
                                         <Style TargetType="Border">
@@ -888,15 +888,15 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Logs &amp; Events" Foreground="#888" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
+                <TextBlock Text="Logs &amp; Events" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="5,0,0,10" FontSize="11"/>
 
-                <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-                    <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent" 
+                <Border Grid.Row="1" Background="{StaticResource CardBrush}" CornerRadius="8" Padding="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                    <ListBox ItemsSource="{Binding Logs}" BorderThickness="0" Background="Transparent"
                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding}" 
-                                            Foreground="#444" 
+                                <TextBlock Text="{Binding}"
+                                            Foreground="{StaticResource TextMainBrush}"
                                             FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,2"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -906,11 +906,11 @@
         </Grid>
 
         <!-- 5. Status Bar Indices (Mockup Matched Tickers) -->
-        <Border Grid.Row="5" Background="#F8FAFC" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+        <Border Grid.Row="5" Background="{StaticResource CardBrush}" Padding="15,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid>
                 <!-- Connection Status (Left) -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <TextBlock Text="Daily Protocol Check" Foreground="#666" FontWeight="SemiBold" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Daily Protocol Check" Foreground="{StaticResource TextMutedBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
                     <Border CornerRadius="8" Padding="8,3" VerticalAlignment="Center" Background="#B22222">
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -921,20 +921,20 @@
 
                 <!-- Index Tickers (Right-Center) -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <TextBlock Text="NIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
-                    <TextBlock Text="{Binding LtpNifty}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
+                    <TextBlock Text="NIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="BANKNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
-                    <TextBlock Text="{Binding LtpBankNifty}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
+                    <TextBlock Text="BANKNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpBankNifty}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="FINNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
-                    <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
+                    <TextBlock Text="FINNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpFinnifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
 
-                    <TextBlock Text="MIDCPNIFTY:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
-                    <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
-                    
-                    <TextBlock Text="SENSEX:" Foreground="#444" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
-                    <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="#16A34A" FontWeight="Bold" FontSize="12"/>
+                    <TextBlock Text="MIDCPNIFTY:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpMidcpNifty, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" Margin="0,0,30,0" FontSize="12"/>
+
+                    <TextBlock Text="SENSEX:" Foreground="{StaticResource TextMutedBrush}" FontWeight="Bold" Margin="0,0,5,0" FontSize="12"/>
+                    <TextBlock Text="{Binding LtpSensex, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" FontSize="12"/>
                 </StackPanel>
             </Grid>
         </Border>

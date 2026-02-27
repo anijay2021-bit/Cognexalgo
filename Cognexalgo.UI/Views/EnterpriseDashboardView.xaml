@@ -16,23 +16,24 @@
     
     <Grid Background="Transparent">
         <!-- UNIFIED LEGS GRID -->
-        <Border Margin="15" Style="{StaticResource CardBorderStyle}" Background="White">
+        <Border Margin="15" Style="{StaticResource CardBorderStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                
-                <Border Background="White" Padding="15,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
-                    <TextBlock Text="ACTIVE TRADE POSITIONS" FontWeight="Bold" FontSize="14" Foreground="#1E3A8A"/>
+
+                <Border Background="{StaticResource CardBrush}" Padding="15,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
+                    <TextBlock Text="ACTIVE TRADE POSITIONS" FontWeight="Bold" FontSize="14" Foreground="{StaticResource PrimaryBrush}"
+                               FontFamily="Segoe UI Variable, Inter, Segoe UI, sans-serif"/>
                 </Border>
-                
-                <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveLegs}" 
-                          Style="{StaticResource DarkDataGridStyle}" 
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding ActiveLegs}"
+                          Style="{StaticResource DarkDataGridStyle}"
                           AutoGenerateColumns="False" IsReadOnly="True"
                           GridLinesVisibility="Horizontal"
                           RowStyle="{StaticResource DarkDataGridRowStyle}"
-                          Background="White" BorderThickness="0">
+                          Background="{StaticResource CardBrush}" BorderThickness="0">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="*"/>
                         <DataGridTextColumn Header="TYPE" Binding="{Binding Type}" Width="100"/>

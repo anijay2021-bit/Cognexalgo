@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build AlgoTrader.sln)",
+      "Bash(dotnet build Cognexalgo.sln --configuration Debug)"
+    ]
+  }
+}
