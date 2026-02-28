@@ -46,6 +46,13 @@ namespace Cognexalgo.Core.Models
         // JSON Storage for Strategy-Specific Parameters (e.g., Calendar Times)
         public string Parameters { get; set; } = "{}";
 
+        // ── Trading Mode ───────────────────────────────────────────────────────
+        /// <summary>Per-strategy live/paper toggle. Default: Paper (safe).</summary>
+        [ObservableProperty]
+        private bool _isLiveMode = false;
+
+        public string TradingModeDisplay => IsLiveMode ? "LIVE" : "PAPER";
+
         // ── V2 Orchestrator tracking ─────────────────────────────────────────
         /// <summary>V2 strategy ID returned by V2StrategyAdapter.SyncToV2Async() e.g. "STR-20260227-STR-001".</summary>
         [ObservableProperty]

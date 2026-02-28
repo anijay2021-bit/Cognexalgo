@@ -31,6 +31,7 @@ namespace Cognexalgo.Core.Application.Services
         private readonly IOrderRepository _orderRepo;
         private readonly OrderFactory _orderFactory;
         private readonly PaperTradeSimulator _paperSim;
+        private readonly IAngelOneAdapter _broker;
 
         // Exactly-once tracking: StrategyId → last SignalType that was consumed
         private readonly ConcurrentDictionary<string, SignalType> _lastConsumedSignal = new();
@@ -44,12 +45,14 @@ namespace Cognexalgo.Core.Application.Services
             ISignalRepository signalRepo,
             IOrderRepository orderRepo,
             OrderFactory orderFactory,
-            PaperTradeSimulator paperSim)
+            PaperTradeSimulator paperSim,
+            IAngelOneAdapter broker)
         {
             _signalRepo = signalRepo;
             _orderRepo = orderRepo;
             _orderFactory = orderFactory;
             _paperSim = paperSim;
+            _broker = broker;
         }
 
         /// <summary>
@@ -98,6 +101,52 @@ namespace Cognexalgo.Core.Application.Services
             OnSignalProcessed?.Invoke(signal);
 
             Log("INFO", $"[{strategy.Name}] ✓ Signal consumed: {signal.SignalType} | {signal.TriggerCondition}");
+
+            // ─── Create and route order ───────────────────────
+            if (signal.SignalType == SignalType.Entry || signal.SignalType == SignalType.ReEntry ||
+                signal.SignalType == SignalType.Exit || signal.SignalType == SignalType.ForceExit)
+            {
+                var order = new Order
+                {
+                    OrderId = $"ORD-{signal.StrategyId}-{DateTime.UtcNow:HHmmss}-{signal.SignalType}",
+                    StrategyId = signal.StrategyId,
+                    LegId = signal.LegId,
+                    SignalId = signal.SignalId,
+                    TradingSymbol = signal.Symbol ?? "",
+                    Direction = (signal.SignalType == SignalType.Exit || signal.SignalType == SignalType.ForceExit)
+                        ? Direction.BUY : Direction.SELL,
+                    OrderType = OrderType.MARKET,
+                    ProductType = ProductType.MIS,
+                    Quantity = 1,
+                    TradingMode = strategy.TradingMode,
+                    IsSimulated = strategy.TradingMode == TradingMode.PaperTrade,
+                    Status = OrderStatus.PENDING,
+                    Price = (decimal)signal.Price
+                };
+
+                if (strategy.TradingMode == TradingMode.PaperTrade)
+                {
+                    await _paperSim.ExecuteAsync(order, (decimal)signal.Price);
+                }
+                else if (_broker.IsAuthenticated)
+                {
+                    var result = await _broker.PlaceOrderAsync(new AngelOrderRequest
+                    {
+                        TradingSymbol = order.TradingSymbol,
+                        TransactionType = order.Direction == Direction.BUY ? "BUY" : "SELL",
+                        Quantity = order.Quantity,
+                        Price = (decimal)order.Price,
+                        Exchange = order.Exchange
+                    });
+                    order.BrokerOrderId = result.BrokerOrderId;
+                    order.Status = result.Success ? OrderStatus.PLACED : OrderStatus.REJECTED;
+                    if (!result.Success) order.RejectionReason = result.ErrorMessage;
+                    order.PlacedAt = DateTime.UtcNow;
+                }
+
+                try { await _orderRepo.AddAsync(order); } catch { }
+                OnOrderGenerated?.Invoke(order);
+            }
         }
 
         /// <summary>

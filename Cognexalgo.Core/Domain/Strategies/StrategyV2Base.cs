@@ -87,13 +87,25 @@ namespace Cognexalgo.Core.Domain.Strategies
         }
 
         /// <summary>Invoke from derived classes to fire signal events.</summary>
-        protected void FireSignal(Signal signal) => FireSignal(signal);
+        protected void FireSignal(Signal signal) => OnSignalFired?.Invoke(signal);
 
         /// <summary>Invoke from derived classes to fire order placed events.</summary>
         protected void FireOrderPlaced(Order order) => OnOrderPlaced?.Invoke(order);
 
         /// <summary>Invoke from derived classes to fire error events.</summary>
         protected void FireError(Exception ex) => OnError?.Invoke(ex);
+
+        /// <summary>Capture a serializable snapshot of the strategy's current state for crash recovery.</summary>
+        public virtual StrategyStateSnapshot CaptureSnapshot()
+        {
+            return new StrategyStateSnapshot
+            {
+                StrategyId = StrategyId,
+                CurrentState = CurrentState.ToString(),
+                ConsecutiveErrors = ConsecutiveErrors,
+                SnapshotTime = DateTime.UtcNow
+            };
+        }
     }
 
     // ─── Signal State Machine (Module 3) ─────────────────────────
@@ -121,6 +133,10 @@ namespace Cognexalgo.Core.Domain.Strategies
         public decimal NiftyLtp { get; set; }
         public decimal BankNiftyLtp { get; set; }
         public decimal FinniftyLtp { get; set; }
+
+        // Option chain for strike resolution (populated by V2Bridge if available)
+        public System.Collections.Generic.List<Models.OptionChainItem>? NiftyOptionChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? BankNiftyOptionChain { get; set; }
     }
 
     public class CandleContext
@@ -133,5 +149,29 @@ namespace Cognexalgo.Core.Domain.Strategies
         public decimal Low { get; set; }
         public decimal Close { get; set; }
         public long Volume { get; set; }
+    }
+
+    // ─── Crash Recovery Snapshots ───────────────────────────────
+    public class StrategyStateSnapshot
+    {
+        public string StrategyId { get; set; } = "";
+        public string CurrentState { get; set; } = "WAITING";
+        public int ConsecutiveErrors { get; set; }
+        public DateTime SnapshotTime { get; set; }
+        public System.Collections.Generic.List<LegSnapshot> Legs { get; set; } = new();
+    }
+
+    public class LegSnapshot
+    {
+        public string Status { get; set; } = "PENDING";
+        public string ExitReason { get; set; } = "";
+        public int CurrentReEntry { get; set; }
+        public double EntryPrice { get; set; }
+        public double ExitPrice { get; set; }
+        public double Ltp { get; set; }
+        public int CalculatedStrike { get; set; }
+        public string? SymbolToken { get; set; }
+        public DateTime? EntryTime { get; set; }
+        public DateTime? ExitTime { get; set; }
     }
 }

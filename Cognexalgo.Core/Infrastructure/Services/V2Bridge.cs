@@ -38,6 +38,10 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public bool IsInitialized { get; private set; } = false;
         public event Action<TickContext>? OnTickProcessed;
 
+        // Option chain cache for strategy strike resolution
+        public System.Collections.Generic.List<Models.OptionChainItem>? CachedNiftyChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? CachedBankNiftyChain { get; set; }
+
         /// <summary>
         /// Initialize the V2 DI container and all services.
         /// Call this from App.xaml.cs OnLoginSuccess or TradingEngine constructor.
@@ -126,6 +130,16 @@ namespace Cognexalgo.Core.Infrastructure.Services
                 bridge.Logger.Warn("Database", $"DB init warning: {ex.Message}");
             }
 
+            // ─── Crash Recovery ───────────────────────────────────
+            try
+            {
+                await bridge.Orchestrator.RecoverFromCrashAsync();
+            }
+            catch (Exception ex)
+            {
+                bridge.Logger.Warn("V2Bridge", $"Crash recovery warning: {ex.Message}");
+            }
+
             // ─── Wire Orchestrator → Logging + Notifications ─────
             bridge.Orchestrator.OnLog += (level, msg) =>
             {
@@ -152,6 +166,44 @@ namespace Cognexalgo.Core.Infrastructure.Services
                     _ = bridge.Telegram.SendKillSwitchAlert();
             };
 
+            // ─── Wire Signals → Telegram + Toast ──────────────────
+            bridge.SignalEngine.OnSignalProcessed += (signal) =>
+            {
+                _ = bridge.Telegram.SendSignalAlert(
+                    signal.StrategyId,
+                    signal.SignalType.ToString(),
+                    signal.Symbol ?? "",
+                    (decimal)signal.Price);
+                bridge.Toast.NotifySignal(
+                    signal.StrategyId,
+                    signal.SignalType.ToString(),
+                    signal.Symbol ?? "",
+                    (decimal)signal.Price);
+            };
+
+            // ─── Wire Order Fills → Telegram + Toast ──────────────
+            bridge.SignalEngine.OnOrderGenerated += (order) =>
+            {
+                _ = bridge.Telegram.SendOrderFillAlert(
+                    order.OrderId,
+                    order.TradingSymbol,
+                    order.Direction.ToString(),
+                    order.Quantity,
+                    order.FilledPrice);
+                bridge.Toast.NotifyOrderFill(
+                    order.OrderId,
+                    order.TradingSymbol,
+                    order.Direction.ToString(),
+                    order.FilledPrice);
+            };
+
+            // ─── Wire Strategy Status → Telegram ──────────────────
+            bridge.Orchestrator.OnStatusChanged += (strategyId, status) =>
+            {
+                if (status == Domain.Enums.StrategyStatus.Error)
+                    _ = bridge.Telegram.SendSignalAlert(strategyId, "STOPPED", "", 0);
+            };
+
             bridge.IsInitialized = true;
             bridge.Logger.Info("V2Bridge", "V2 Bridge initialized successfully");
             return bridge;
@@ -171,7 +223,9 @@ namespace Cognexalgo.Core.Infrastructure.Services
                 NiftyLtp = (decimal)niftyLtp,
                 BankNiftyLtp = (decimal)bankNiftyLtp,
                 FinniftyLtp = (decimal)finniftyLtp,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
+                NiftyOptionChain = CachedNiftyChain,
+                BankNiftyOptionChain = CachedBankNiftyChain
             };
 
             await Orchestrator.DispatchTickAsync(tick);

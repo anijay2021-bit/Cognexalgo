@@ -10,6 +10,8 @@ using Cognexalgo.Core.Domain.Enums;
 using Cognexalgo.Core.Domain.Strategies;
 using Cognexalgo.Core.Domain.ValueObjects;
 using Cognexalgo.Core.Infrastructure.Services;
+using Cognexalgo.Core.Models;
+using Newtonsoft.Json;
 
 namespace Cognexalgo.Core.Application.Services
 {
@@ -25,6 +27,7 @@ namespace Cognexalgo.Core.Application.Services
         private readonly ConcurrentDictionary<string, StrategyExecutionContext> _contexts = new();
         private readonly IStrategyRepository _strategyRepo;
         private readonly SignalEngine _signalEngine;
+        private readonly StrategyRmsService _rmsService;
 
         public event Action<string, string>? OnLog;
         public event Action<string, StrategyStatus>? OnStatusChanged;
@@ -34,10 +37,12 @@ namespace Cognexalgo.Core.Application.Services
 
         public StrategyOrchestrator(
             IStrategyRepository strategyRepo,
-            SignalEngine signalEngine)
+            SignalEngine signalEngine,
+            StrategyRmsService rmsService)
         {
             _strategyRepo = strategyRepo;
             _signalEngine = signalEngine;
+            _rmsService = rmsService;
         }
 
         /// <summary>Start a strategy in its own isolated Task.</summary>
@@ -81,12 +86,75 @@ namespace Cognexalgo.Core.Application.Services
             await Task.WhenAll(tasks);
         }
 
-        /// <summary>Execute a single strategy tick with full error isolation.</summary>
+        /// <summary>Execute a single strategy tick with full error isolation + RMS enforcement.</summary>
         private async Task SafeExecuteAsync(StrategyExecutionContext ctx, TickContext tick)
         {
             try
             {
                 await ctx.Strategy.OnTickAsync(tick, ctx.CancellationToken);
+
+                // ── Update DailyPnl from strategy legs ──────────────────
+                if (ctx.Strategy is HybridV2Strategy hybrid)
+                {
+                    ctx.DailyPnl = (decimal)hybrid.GetConfig().Legs
+                        .Where(l => l.Status == "OPEN")
+                        .Sum(l => (l.Action == Models.ActionType.Sell
+                            ? l.EntryPrice - l.Ltp
+                            : l.Ltp - l.EntryPrice) * l.TotalLots);
+
+                    if (ctx.DailyPnl > ctx.HighWatermark)
+                        ctx.HighWatermark = ctx.DailyPnl;
+                }
+
+                // ── RMS enforcement ─────────────────────────────────────
+                var breaches = _rmsService.CheckRules(ctx.Strategy.StrategyId, ctx.DailyPnl, DateTime.Now);
+                if (breaches.Count > 0)
+                {
+                    var signal = new Domain.Entities.Signal
+                    {
+                        StrategyId = ctx.Strategy.StrategyId,
+                        SignalType = SignalType.ForceExit,
+                        TriggerCondition = $"RMS: {string.Join(", ", breaches.Select(b => b.RuleType))}"
+                    };
+                    await _signalEngine.ProcessSignalAsync(signal, ctx.Strategy);
+
+                    // Force-exit all open legs
+                    if (ctx.Strategy is HybridV2Strategy hybridRms)
+                    {
+                        foreach (var leg in hybridRms.GetConfig().Legs.Where(l => l.Status == "OPEN"))
+                        {
+                            leg.Status = "EXITED";
+                            leg.ExitPrice = leg.Ltp;
+                            leg.ExitTime = DateTime.Now;
+                            leg.ExitReason = "RMS";
+                        }
+                    }
+
+                    ctx.IsRunning = false;
+                    ctx.Strategy.CurrentState = SignalState.COMPLETED;
+                    OnStatusChanged?.Invoke(ctx.Strategy.StrategyId, StrategyStatus.Error);
+                    Log("WARN", $"[RMS] ForceExit: {ctx.Strategy.Name} — " +
+                        $"{string.Join(", ", breaches.Select(b => $"{b.RuleType}={b.CurrentValue:F0}"))}");
+                }
+
+                // ── Periodic state snapshot (every 30s) ────────────
+                if ((DateTime.UtcNow - ctx.LastSnapshotTime).TotalSeconds >= 30)
+                {
+                    ctx.LastSnapshotTime = DateTime.UtcNow;
+                    try
+                    {
+                        var snapshot = ctx.Strategy.CaptureSnapshot();
+                        var json = JsonConvert.SerializeObject(snapshot);
+                        var dbStrategy = await _strategyRepo.GetByIdAsync(ctx.Strategy.StrategyId);
+                        if (dbStrategy != null)
+                        {
+                            dbStrategy.StateMachineSnapshot = json;
+                            dbStrategy.Status = StrategyStatus.Active;
+                            await _strategyRepo.UpdateAsync(dbStrategy);
+                        }
+                    }
+                    catch { /* Snapshot failure is non-critical */ }
+                }
             }
             catch (OperationCanceledException)
             {
@@ -105,8 +173,8 @@ namespace Cognexalgo.Core.Application.Services
             }
         }
 
-        /// <summary>Stop a specific strategy.</summary>
-        public void StopStrategy(string strategyId)
+        /// <summary>Stop a specific strategy and persist clean stop to DB.</summary>
+        public async Task StopStrategyAsync(string strategyId)
         {
             if (_contexts.TryGetValue(strategyId, out var ctx))
             {
@@ -115,7 +183,26 @@ namespace Cognexalgo.Core.Application.Services
                 _signalEngine.ResetStrategy(strategyId);
                 Log("INFO", $"■ Strategy stopped: {ctx.Strategy.Name}");
                 OnStatusChanged?.Invoke(strategyId, StrategyStatus.Paused);
+
+                // Persist clean stop to DB
+                try
+                {
+                    var dbStrategy = await _strategyRepo.GetByIdAsync(strategyId);
+                    if (dbStrategy != null)
+                    {
+                        dbStrategy.Status = StrategyStatus.Paused;
+                        dbStrategy.StateMachineSnapshot = null; // Clean stop — no recovery needed
+                        await _strategyRepo.UpdateAsync(dbStrategy);
+                    }
+                }
+                catch { /* Non-critical */ }
             }
+        }
+
+        /// <summary>Stop a specific strategy (sync wrapper).</summary>
+        public void StopStrategy(string strategyId)
+        {
+            _ = StopStrategyAsync(strategyId);
         }
 
         /// <summary>Stop ALL strategies (Kill Switch).</summary>
@@ -144,13 +231,34 @@ namespace Cognexalgo.Core.Application.Services
         public async Task RecoverFromCrashAsync()
         {
             var activeStrategies = await _strategyRepo.GetActiveAsync();
-            Log("INFO", $"🔄 Crash recovery: found {activeStrategies.Count} active strategies in DB");
+            Log("INFO", $"Crash recovery: found {activeStrategies.Count} active strategies in DB");
 
-            // Mark strategies as needing reconciliation
             foreach (var s in activeStrategies)
             {
-                Log("INFO", $"  → {s.StrategyId} ({s.Name}) was in state {s.Status}");
-                // Strategy-specific recovery would be handled by the strategy factory
+                if (string.IsNullOrEmpty(s.StateMachineSnapshot))
+                {
+                    Log("WARN", $"  {s.StrategyId}: no snapshot, marking Paused");
+                    s.Status = StrategyStatus.Paused;
+                    await _strategyRepo.UpdateAsync(s);
+                    continue;
+                }
+
+                try
+                {
+                    var snapshot = JsonConvert.DeserializeObject<StrategyStateSnapshot>(s.StateMachineSnapshot);
+                    Log("INFO", $"  {s.StrategyId}: state={snapshot?.CurrentState}, legs={snapshot?.Legs.Count}");
+
+                    // Mark as paused — user must manually restart after reviewing state
+                    s.Status = StrategyStatus.Paused;
+                    await _strategyRepo.UpdateAsync(s);
+                    Log("INFO", $"  {s.StrategyId}: marked Paused for manual review");
+                }
+                catch (Exception ex)
+                {
+                    Log("ERROR", $"  {s.StrategyId}: snapshot parse error: {ex.Message}");
+                    s.Status = StrategyStatus.Error;
+                    await _strategyRepo.UpdateAsync(s);
+                }
             }
         }
 
@@ -173,9 +281,10 @@ namespace Cognexalgo.Core.Application.Services
         public int ReEntryCount { get; set; } = 0;
         public decimal DailyPnl { get; set; } = 0;
         public decimal HighWatermark { get; set; } = 0;
+        public DateTime LastSnapshotTime { get; set; } = DateTime.MinValue;
 
         // Thread-safe order queue
-        public ConcurrentQueue<Order> OrderQueue { get; } = new();
+        public ConcurrentQueue<Domain.Entities.Order> OrderQueue { get; } = new();
 
         public StrategyExecutionContext(StrategyV2Base strategy)
         {

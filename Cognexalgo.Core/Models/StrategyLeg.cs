@@ -55,6 +55,7 @@ namespace Cognexalgo.Core.Models
 
         // Execution Details
         public string Status { get; set; } = "PENDING"; // PENDING, OPEN, EXITED, SQOFF
+        public string ExitReason { get; set; } = ""; // "SL", "TARGET", "MANUAL", "RMS"
         public string OrderId { get; set; }
         public string StraddlePairId { get; set; } // Group ID for Straddle Legs
         public int MaxReEntry { get; set; } = 0;   // Number of allowed adjustments

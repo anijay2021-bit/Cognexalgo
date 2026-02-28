@@ -119,6 +119,27 @@ namespace Cognexalgo.Core.Models
         [JsonProperty("closedpositions")]
         public string ClosedPositions { get; set; }
 
+        // ── Greeks (computed live per tick via GreeksService) ────────────
+        private double _iv;
+        public double IV { get => _iv; set => SetProperty(ref _iv, value); }
+
+        private double _delta;
+        public double Delta { get => _delta; set => SetProperty(ref _delta, value); }
+
+        private double _gamma;
+        public double Gamma { get => _gamma; set => SetProperty(ref _gamma, value); }
+
+        private double _theta;
+        public double Theta { get => _theta; set => SetProperty(ref _theta, value); }
+
+        private double _vega;
+        public double Vega { get => _vega; set => SetProperty(ref _vega, value); }
+
+        // Parsed once from TradingSymbol at load time (not from API)
+        public int ParsedStrike { get; set; }
+        public bool ParsedIsCall { get; set; }
+        public DateTime ParsedExpiry { get; set; }
+
         // Additional tracking properties (not from API)
         public string Status { get; set; } = "Running";
         public double EntryPrice { get; set; }

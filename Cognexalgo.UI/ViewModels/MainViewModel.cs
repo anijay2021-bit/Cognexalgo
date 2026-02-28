@@ -75,6 +75,7 @@ namespace Cognexalgo.UI.ViewModels
         private double _maxProfit = 50000;
 
         private readonly Cognexalgo.Core.Services.ReportExporter _exporter = new Cognexalgo.Core.Services.ReportExporter();
+        private readonly GreeksService _greeksService = new();
 
         // [Phase 4] Analytics Properties
         [ObservableProperty] private double _profitEfficiency;
@@ -346,6 +347,22 @@ namespace Cognexalgo.UI.ViewModels
                         pos.Pnl = netQty > 0
                             ? (ltp - pos.BuyAvgPrice)  * netQty
                             : (pos.SellAvgPrice - ltp) * Math.Abs(netQty);
+
+                        // ── Greeks computation for option positions ──────
+                        if (pos.ParsedStrike > 0)
+                        {
+                            double dte = Math.Max(0.01, (pos.ParsedExpiry - DateTime.Now).TotalDays);
+                            double iv = _greeksService.CalculateIV(
+                                pos.BuyAvgPrice, ltp, pos.ParsedStrike, dte, 0.07, pos.ParsedIsCall);
+                            if (iv < 0.01) iv = 0.15; // floor at 15% if bisection can't converge
+                            var g = _greeksService.CalculateGreeks(
+                                ltp, pos.ParsedStrike, dte, 0.07, iv, pos.ParsedIsCall);
+                            pos.IV    = Math.Round(iv * 100, 2);
+                            pos.Delta = Math.Round(g.Delta, 4);
+                            pos.Gamma = Math.Round(g.Gamma, 6);
+                            pos.Theta = Math.Round(g.Theta, 2);
+                            pos.Vega  = Math.Round(g.Vega, 2);
+                        }
                     }
                 }
 
@@ -527,6 +544,35 @@ namespace Cognexalgo.UI.ViewModels
             Log($"■ Stop requested for V2 strategy: {strategy.Name} ({strategy.V2Id})");
         }
 
+        /// <summary>Toggle a strategy between Paper and Live mode (only when not running).</summary>
+        [RelayCommand]
+        private void ToggleStrategyMode(object parameter)
+        {
+            if (parameter is not HybridStrategyConfig strategy) return;
+            if (strategy.V2Status == "Active")
+            {
+                Log($"Cannot change mode while '{strategy.Name}' is running. Stop it first.", "WARN");
+                return;
+            }
+
+            if (!strategy.IsLiveMode)
+            {
+                // Switching TO live — confirm
+                var result = System.Windows.MessageBox.Show(
+                    $"Switch '{strategy.Name}' to LIVE MODE?\n\n" +
+                    "Real orders will be placed on Angel One.\n" +
+                    "Ensure your broker session is authenticated.",
+                    "Confirm LIVE Trading",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning);
+
+                if (result != System.Windows.MessageBoxResult.Yes) return;
+            }
+
+            strategy.IsLiveMode = !strategy.IsLiveMode;
+            Log($"Strategy '{strategy.Name}' mode: {strategy.TradingModeDisplay}");
+        }
+
         /// <summary>
         /// Start (or re-start) a strategy in the V2 Orchestrator.
         /// If the strategy has no V2Id yet, it is synced first (idempotent).
@@ -546,6 +592,26 @@ namespace Cognexalgo.UI.ViewModels
                 return;
             }
 
+            // ── Live mode confirmation before start ──────────────────────────
+            if (strategy.IsLiveMode)
+            {
+                if (_v2.BrokerAdapter == null || !_v2.BrokerAdapter.IsAuthenticated)
+                {
+                    Log($"Cannot start '{strategy.Name}' in LIVE mode — broker not authenticated.", "ERROR");
+                    return;
+                }
+
+                var result = System.Windows.MessageBox.Show(
+                    $"Start '{strategy.Name}' in LIVE MODE?\n\n" +
+                    "Real orders will be placed on Angel One.\n" +
+                    "This action cannot be undone once orders execute.",
+                    "Confirm LIVE Start",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning);
+
+                if (result != System.Windows.MessageBoxResult.Yes) return;
+            }
+
             // ── Ensure synced to V2 DB (idempotent) ─────────────────────────
             if (string.IsNullOrEmpty(strategy.V2Id))
             {
@@ -560,10 +626,20 @@ namespace Cognexalgo.UI.ViewModels
                 Log($"V2 Strategy synced on-demand: {v2Id}");
             }
 
-            // ── Start in Orchestrator ────────────────────────────────────────
+            // ── Register RMS rules from strategy config ──────────────────────
             var v2Strategy = new Cognexalgo.Core.Domain.Strategies.HybridV2Strategy(strategy);
+            var rmsConfig = new Cognexalgo.Core.Domain.ValueObjects.RmsConfig();
+            if (strategy.MaxLossPercent > 0)
+                rmsConfig.MaxLoss = strategy.MaxLossPercent * 100; // simple absolute ₹
+            if (strategy.MaxProfitPercent > 0)
+                rmsConfig.MaxProfit = strategy.MaxProfitPercent * 100;
+            if (strategy.Legs.Count > 0)
+                rmsConfig.MaxReEntries = strategy.Legs.Max(l => l.MaxReEntry);
+            _v2.StrategyRms.RegisterStrategy(v2Strategy.StrategyId, rmsConfig);
+
+            // ── Start in Orchestrator ────────────────────────────────────────
             await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
-            Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id})");
+            Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id}) [{strategy.TradingModeDisplay}]");
         }
 
         [RelayCommand]
@@ -735,6 +811,16 @@ namespace Cognexalgo.UI.ViewModels
                 });
 
                 Log($"✓ Option chain: {OptionChain.Count} strikes with market IV & Greeks for {idx}.", "SUCCESS");
+
+                // Cache option chain for V2 strategy strike resolution
+                if (_v2 != null)
+                {
+                    var chainList = OptionChain.ToList();
+                    if (idx == "BANKNIFTY")
+                        _v2.CachedBankNiftyChain = chainList;
+                    else
+                        _v2.CachedNiftyChain = chainList;
+                }
             }
             catch (Exception ex)
             {
@@ -815,6 +901,17 @@ namespace Cognexalgo.UI.ViewModels
                             });
                         }
 
+                        // Parse option symbol for greeks computation
+                        foreach (var p in mockPositions)
+                        {
+                            if (SymbolParser.TryParse(p.TradingSymbol, out _, out var exp, out var stk, out var call))
+                            {
+                                p.ParsedStrike = stk;
+                                p.ParsedExpiry = exp;
+                                p.ParsedIsCall = call;
+                            }
+                        }
+
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
                             foreach (var p in mockPositions) Positions.Add(p);
@@ -835,9 +932,14 @@ namespace Cognexalgo.UI.ViewModels
                     {
                         foreach (var p in positions)
                         {
-                            double parsedQty = 0;
-                            double.TryParse(p.NetQty, out parsedQty);
+                            double.TryParse(p.NetQty, out double parsedQty);
                             p.Status = (parsedQty == 0) ? "CLOSED" : "OPEN";
+                            if (SymbolParser.TryParse(p.TradingSymbol, out _, out var exp, out var stk, out var call))
+                            {
+                                p.ParsedStrike = stk;
+                                p.ParsedExpiry = exp;
+                                p.ParsedIsCall = call;
+                            }
                             Positions.Add(p);
                         }
                     });

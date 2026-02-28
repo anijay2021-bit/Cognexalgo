@@ -176,6 +176,30 @@
                             <DataGridTextColumn Header="V2" Binding="{Binding V2Status}" Width="75"
                                                 Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
 
+                            <!-- 4c. Trading Mode (PAPER / LIVE) -->
+                            <DataGridTemplateColumn Header="Mode" Width="80">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.ToggleStrategyModeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                Content="{Binding TradingModeDisplay}"
+                                                ToolTip="Toggle Paper/Live Mode"
+                                                Padding="6,2" FontSize="10" FontWeight="Bold">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLiveMode}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
                              <!-- 5. PNL (Real-time) -->
                             <DataGridTextColumn Header="PNL" Binding="{Binding Pnl, StringFormat=N2}" Width="120" CellStyle="{StaticResource FlashCellStyle}">
                                  <DataGridTextColumn.ElementStyle>
@@ -497,7 +521,18 @@
                             <!-- 12. Avg SELL Price -->
                             <DataGridTextColumn Header="Avg SELL Price" Binding="{Binding SellAvgPrice, StringFormat=N2}" Width="100" Foreground="{StaticResource TextMutedBrush}"/>
 
-                            <!-- 13. Action (Exit Button) -->
+                            <!-- 13. IV% -->
+                            <DataGridTextColumn Header="IV%" Binding="{Binding IV, StringFormat=F1}" Width="55" Foreground="{StaticResource TextMainBrush}"/>
+                            <!-- 14. Delta -->
+                            <DataGridTextColumn Header="Δ" Binding="{Binding Delta, StringFormat=F3}" Width="60" Foreground="{StaticResource TextMainBrush}"/>
+                            <!-- 15. Gamma -->
+                            <DataGridTextColumn Header="Γ" Binding="{Binding Gamma, StringFormat=F4}" Width="60" Foreground="{StaticResource TextMutedBrush}"/>
+                            <!-- 16. Theta -->
+                            <DataGridTextColumn Header="Θ" Binding="{Binding Theta, StringFormat=F2}" Width="60" Foreground="{StaticResource DangerBrush}"/>
+                            <!-- 17. Vega -->
+                            <DataGridTextColumn Header="V" Binding="{Binding Vega, StringFormat=F2}" Width="60" Foreground="{StaticResource TextMutedBrush}"/>
+
+                            <!-- 18. Action (Exit Button) -->
                             <DataGridTemplateColumn Header="Action" Width="80">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
