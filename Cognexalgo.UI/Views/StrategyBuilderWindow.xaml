@@ -148,7 +148,7 @@
                          </StackPanel>
                          
                         <StackPanel Grid.Row="2" Grid.Column="2" Margin="5,15,0,0" Orientation="Horizontal">
-                             <CheckBox IsChecked="{Binding UseCandleClose}" Content="Candle Close" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                             <CheckBox IsChecked="{Binding UseCandleClose}" Content="Candle Close" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -171,8 +171,8 @@
                             <TextBlock Text="Entry Conditions" Style="{StaticResource SectionHeaderStyle}"/>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,5">
-                                 <TextBlock Text="Logic:" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,10,0"/>
-                                 <CheckBox IsChecked="{Binding IsMatchAllConditions}" Content="Match ALL Conditions (AND)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                 <TextBlock Text="Logic:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,10,0"/>
+                                 <CheckBox IsChecked="{Binding IsMatchAllConditions}" Content="Match ALL Conditions (AND)" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <!-- Rule Builder Inputs -->
@@ -228,7 +228,7 @@
                                     </WrapPanel>
                                     
                                     <WrapPanel Orientation="Horizontal">
-                                        <TextBlock Text="Then" VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,5,0"/>
+                                        <TextBlock Text="Then" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,5,0"/>
                                         <ComboBox SelectedItem="{Binding Action}" Width="80" Margin="0,0,10,0" Style="{StaticResource DarkComboBoxStyle}">
                                             <System:String xmlns:System="clr-namespace:System;assembly=mscorlib">BUY_CE</System:String>
                                             <System:String xmlns:System="clr-namespace:System;assembly=mscorlib">BUY_PE</System:String>
@@ -266,13 +266,13 @@
                 <!-- Strike Selection Mode Radio Buttons -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
                     <RadioButton Content="ATM Point" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ATMPoint}" 
-                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                     <RadioButton Content="ATM Percent" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ATMPercent}" 
-                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                     <RadioButton Content="Straddle Width" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=StraddleWidth}" 
-                                 Margin="0,0,20,0" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                     <RadioButton Content="Closest Premium (CP)" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ClosestPremium}" 
-                                 Foreground="{StaticResource TextBrush}" FontSize="12"/>
+                                 Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                 </StackPanel>
 
                 <!-- Conditional Fields Based on Mode -->
@@ -319,7 +319,7 @@
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
                             <CheckBox Content="Wait for Match" IsChecked="{Binding WaitForMatch}" 
-                                      Foreground="{StaticResource TextBrush}" Margin="0,5,0,0"/>
+                                      Foreground="{StaticResource TextMainBrush}" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -448,11 +448,11 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Type" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Type" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <ComboBox ItemsSource="{Binding TargetTypes}" SelectedItem="{Binding SelectedTargetType}" Style="{StaticResource DarkComboBoxStyle}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="Value" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Value" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <TextBox Text="{Binding TargetValue}" Style="{StaticResource DarkTextBoxStyle}"/>
                     </StackPanel>
                 </Grid>
@@ -466,11 +466,11 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Type" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Type" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <ComboBox ItemsSource="{Binding StopLossTypes}" SelectedItem="{Binding SelectedStopLossType}" Style="{StaticResource DarkComboBoxStyle}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="Value" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Value" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <TextBox Text="{Binding StopLossValue}" Style="{StaticResource DarkTextBoxStyle}"/>
                     </StackPanel>
                 </Grid>
@@ -484,11 +484,11 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Period" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Period" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <TextBox Text="{Binding AtrPeriod}" Style="{StaticResource DarkTextBoxStyle}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="Multiplier" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                        <TextBlock Text="Multiplier" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                         <TextBox Text="{Binding AtrMultiplier}" Style="{StaticResource DarkTextBoxStyle}"/>
                     </StackPanel>
                 </Grid>
@@ -507,11 +507,11 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Trail Distance" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Trail Distance" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding TrailingStopDistance}" Style="{StaticResource DarkTextBoxStyle}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Use Percentage" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Use Percentage" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <CheckBox IsChecked="{Binding TrailingStopIsPercent}" Content="% (uncheck for points)" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Grid>
@@ -520,9 +520,9 @@
                         <CheckBox Content="Enable Time-Based Exit" IsChecked="{Binding EnableTimeBasedExit}" Margin="0,0,0,10" FontWeight="SemiBold"/>
                         <Grid Margin="20,0,0,15" IsEnabled="{Binding EnableTimeBasedExit}">
                             <StackPanel>
-                                <TextBlock Text="Exit Time (HH:mm)" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Exit Time (HH:mm)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding ExitTime}" Style="{StaticResource DarkTextBoxStyle}" Width="200" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Position will auto-exit at this time" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
+                                <TextBlock Text="Position will auto-exit at this time" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Grid>
 
@@ -530,9 +530,9 @@
                         <CheckBox Content="Enable Breakeven Stop" IsChecked="{Binding EnableBreakevenStop}" Margin="0,0,0,10" FontWeight="SemiBold"/>
                         <Grid Margin="20,0,0,15" IsEnabled="{Binding EnableBreakevenStop}">
                             <StackPanel>
-                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding BreakevenTriggerPercent}" Style="{StaticResource DarkTextBoxStyle}" Width="200" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Stop loss will move to entry price when profit reaches this %" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
+                                <TextBlock Text="Stop loss will move to entry price when profit reaches this %" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,5,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Grid>
 
@@ -564,14 +564,14 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Protection %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Protection %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding ProfitProtectionPercent}" Style="{StaticResource DarkTextBoxStyle}"/>
-                                <TextBlock Text="% of unrealized gain to lock" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                                <TextBlock Text="% of unrealized gain to lock" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding ProfitProtectionTrigger}" Style="{StaticResource DarkTextBoxStyle}"/>
-                                <TextBlock Text="Wait for this profit to activate" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                                <TextBlock Text="Wait for this profit to activate" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
