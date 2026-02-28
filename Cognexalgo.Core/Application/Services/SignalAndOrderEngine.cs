@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Cognexalgo.Core.Application.Interfaces;
@@ -363,6 +364,145 @@ namespace Cognexalgo.Core.Application.Services
             }
 
             return order;
+        }
+    }
+
+    /// <summary>
+    /// Order Status Polling Service:
+    /// - Tracks live (non-paper) orders in PLACED/OPEN status
+    /// - Polls broker GetOrderBookAsync every 3 seconds
+    /// - Updates order status on fill/reject and fires events
+    /// - Auto-starts when live orders exist, auto-stops when none remain
+    /// </summary>
+    public class OrderPollingService : IDisposable
+    {
+        private readonly IAngelOneAdapter _broker;
+        private readonly IOrderRepository _orderRepo;
+        private readonly ConcurrentDictionary<string, Order> _pendingOrders = new();
+        private Timer? _pollTimer;
+        private bool _isPolling = false;
+
+        public event Action<Order>? OnOrderFilled;
+        public event Action<Order>? OnOrderRejected;
+        public event Action<string, string>? OnLog;
+
+        public int PendingCount => _pendingOrders.Count;
+
+        public OrderPollingService(IAngelOneAdapter broker, IOrderRepository orderRepo)
+        {
+            _broker = broker;
+            _orderRepo = orderRepo;
+        }
+
+        /// <summary>Track a live order for status polling.</summary>
+        public void TrackOrder(Order order)
+        {
+            if (order.IsSimulated || order.TradingMode == TradingMode.PaperTrade) return;
+            if (order.Status == OrderStatus.COMPLETE || order.Status == OrderStatus.REJECTED) return;
+            if (string.IsNullOrEmpty(order.BrokerOrderId)) return;
+
+            _pendingOrders[order.BrokerOrderId] = order;
+            Log("INFO", $"[OrderPoll] Tracking: {order.BrokerOrderId} ({order.TradingSymbol})");
+
+            // Auto-start polling when first live order arrives
+            if (!_isPolling) StartPolling();
+        }
+
+        /// <summary>Start the 3-second polling timer.</summary>
+        public void StartPolling()
+        {
+            if (_isPolling) return;
+            _isPolling = true;
+            _pollTimer = new Timer(async _ => await PollOrdersAsync(), null,
+                                   TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3));
+            Log("INFO", "[OrderPoll] Polling started (3s interval)");
+        }
+
+        /// <summary>Stop the polling timer.</summary>
+        public void StopPolling()
+        {
+            _isPolling = false;
+            _pollTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            Log("INFO", "[OrderPoll] Polling stopped");
+        }
+
+        private async Task PollOrdersAsync()
+        {
+            if (_pendingOrders.IsEmpty)
+            {
+                StopPolling();
+                return;
+            }
+
+            if (!_broker.IsAuthenticated) return;
+
+            try
+            {
+                var orderBook = await _broker.GetOrderBookAsync();
+                if (orderBook == null || orderBook.Count == 0) return;
+
+                foreach (var (brokerOrderId, order) in _pendingOrders)
+                {
+                    var brokerOrder = orderBook.FirstOrDefault(
+                        o => o.OrderId == brokerOrderId);
+                    if (brokerOrder == null) continue;
+
+                    var newStatus = brokerOrder.Status?.ToUpperInvariant() switch
+                    {
+                        "COMPLETE" or "TRADED" => OrderStatus.COMPLETE,
+                        "REJECTED" => OrderStatus.REJECTED,
+                        "CANCELLED" => OrderStatus.CANCELLED,
+                        "OPEN" or "PENDING" or "TRIGGER PENDING" => (OrderStatus?)null,
+                        _ => null
+                    };
+
+                    if (newStatus == null) continue; // Still pending, skip
+
+                    // ── Update order with broker data ────────────
+                    order.Status = newStatus.Value;
+
+                    if (newStatus == OrderStatus.COMPLETE)
+                    {
+                        order.FilledPrice = brokerOrder.AveragePrice > 0
+                            ? brokerOrder.AveragePrice : order.Price;
+                        order.FilledQuantity = brokerOrder.FilledShares > 0
+                            ? brokerOrder.FilledShares : order.Quantity;
+                        order.PendingQuantity = 0;
+                        order.FilledAt = DateTime.UtcNow;
+
+                        Log("INFO", $"[OrderPoll] FILLED: {brokerOrderId} " +
+                            $"({order.TradingSymbol} @ {order.FilledPrice:N2})");
+                        OnOrderFilled?.Invoke(order);
+                    }
+                    else if (newStatus == OrderStatus.REJECTED)
+                    {
+                        order.RejectionReason = brokerOrder.Text ?? "Rejected by broker";
+
+                        Log("WARN", $"[OrderPoll] REJECTED: {brokerOrderId} " +
+                            $"({order.TradingSymbol}) — {order.RejectionReason}");
+                        OnOrderRejected?.Invoke(order);
+                    }
+                    else
+                    {
+                        Log("WARN", $"[OrderPoll] CANCELLED: {brokerOrderId} ({order.TradingSymbol})");
+                    }
+
+                    // Persist + remove from tracking
+                    try { await _orderRepo.UpdateAsync(order); } catch { }
+                    _pendingOrders.TryRemove(brokerOrderId, out _);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR", $"[OrderPoll] Error: {ex.Message}");
+            }
+        }
+
+        private void Log(string level, string msg) => OnLog?.Invoke(level, msg);
+
+        public void Dispose()
+        {
+            _pollTimer?.Dispose();
         }
     }
 }

@@ -34,6 +34,7 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public V2LoggingService Logger { get; private set; }
         public TelegramNotifier Telegram { get; private set; }
         public WindowsToastNotifier Toast { get; private set; }
+        public OrderPollingService OrderPoller { get; private set; }
 
         public bool IsInitialized { get; private set; } = false;
         public event Action<TickContext>? OnTickProcessed;
@@ -204,6 +205,50 @@ namespace Cognexalgo.Core.Infrastructure.Services
                     _ = bridge.Telegram.SendSignalAlert(strategyId, "STOPPED", "", 0);
             };
 
+            // ─── Order Status Polling (live orders only) ─────────
+            bridge.OrderPoller = new OrderPollingService(bridge.BrokerAdapter,
+                bridge.Services.GetRequiredService<IOrderRepository>());
+
+            bridge.OrderPoller.OnLog += (level, msg) =>
+            {
+                switch (level)
+                {
+                    case "ERROR": bridge.Logger.Error("OrderPoll", msg); break;
+                    case "WARN": bridge.Logger.Warn("OrderPoll", msg); break;
+                    default: bridge.Logger.Info("OrderPoll", msg); break;
+                }
+            };
+
+            bridge.OrderPoller.OnOrderFilled += (order) =>
+            {
+                _ = bridge.Telegram.SendOrderFillAlert(
+                    order.OrderId,
+                    order.TradingSymbol,
+                    order.Direction.ToString(),
+                    order.Quantity,
+                    order.FilledPrice);
+                bridge.Toast.NotifyOrderFill(
+                    order.OrderId,
+                    order.TradingSymbol,
+                    order.Direction.ToString(),
+                    order.FilledPrice);
+            };
+
+            bridge.OrderPoller.OnOrderRejected += (order) =>
+            {
+                _ = bridge.Telegram.SendRmsBreachAlert(
+                    order.StrategyId,
+                    "ORDER_REJECTED",
+                    order.Price,
+                    0);
+            };
+
+            // Auto-track live orders from SignalEngine
+            bridge.SignalEngine.OnOrderGenerated += (order) =>
+            {
+                bridge.OrderPoller.TrackOrder(order);
+            };
+
             bridge.IsInitialized = true;
             bridge.Logger.Info("V2Bridge", "V2 Bridge initialized successfully");
             return bridge;
@@ -248,6 +293,7 @@ namespace Cognexalgo.Core.Infrastructure.Services
 
         public void Dispose()
         {
+            OrderPoller?.Dispose();
             if (Services is IDisposable disposable)
                 disposable.Dispose();
         }
