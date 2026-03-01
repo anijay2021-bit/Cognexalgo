@@ -127,18 +127,41 @@ namespace Cognexalgo.Core.Application.Services
 
                 if (strategy.TradingMode == TradingMode.PaperTrade)
                 {
+                    // F4: Use per-strategy slippage if configured
+                    if (strategy is Cognexalgo.Core.Domain.Strategies.HybridV2Strategy hybrid4 &&
+                        hybrid4.GetConfig().SlippagePct > 0)
+                        _paperSim.SlippagePercent = (double)hybrid4.GetConfig().SlippagePct;
+
                     await _paperSim.ExecuteAsync(order, (decimal)signal.Price);
                 }
                 else if (_broker.IsAuthenticated)
                 {
-                    var result = await _broker.PlaceOrderAsync(new AngelOrderRequest
+                    // F6: Use SL-M order type for exits if leg is configured for it
+                    bool useSLM = false;
+                    if (strategy is Cognexalgo.Core.Domain.Strategies.HybridV2Strategy hybrid6 &&
+                        (signal.SignalType == SignalType.Exit || signal.SignalType == SignalType.ForceExit))
                     {
-                        TradingSymbol = order.TradingSymbol,
+                        var leg = hybrid6.GetConfig().Legs
+                            .FirstOrDefault(l => $"LEG-{hybrid6.StrategyId}-{hybrid6.GetConfig().Legs.IndexOf(l):D2}" == signal.LegId);
+                        useSLM = leg?.UseSLMOnExit == true;
+                    }
+
+                    var angelReq = new AngelOrderRequest
+                    {
+                        TradingSymbol   = order.TradingSymbol,
                         TransactionType = order.Direction == Direction.BUY ? "BUY" : "SELL",
-                        Quantity = order.Quantity,
-                        Price = (decimal)order.Price,
-                        Exchange = order.Exchange
-                    });
+                        Quantity        = order.Quantity,
+                        Price           = (decimal)order.Price,
+                        Exchange        = order.Exchange
+                    };
+                    if (useSLM)
+                    {
+                        angelReq.OrderType    = "SL-M";
+                        angelReq.TriggerPrice = (decimal)signal.Price;
+                        angelReq.Variety      = "STOPLOSS";
+                    }
+
+                    var result = await _broker.PlaceOrderAsync(angelReq);
                     order.BrokerOrderId = result.BrokerOrderId;
                     order.Status = result.Success ? OrderStatus.PLACED : OrderStatus.REJECTED;
                     if (!result.Success) order.RejectionReason = result.ErrorMessage;

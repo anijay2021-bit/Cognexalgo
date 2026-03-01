@@ -138,8 +138,13 @@
                     <local:EnterpriseDashboardView DataContext="{Binding EnterpriseDashboard}"/>
                 </TabItem>
                 <TabItem Header="Strategies">
-                            <DataGrid ItemsSource="{Binding Strategies}" 
-                                      AutoGenerateColumns="False" 
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                            <DataGrid Grid.Row="0" ItemsSource="{Binding Strategies}"
+                                      AutoGenerateColumns="False"
                               Style="{StaticResource DarkDataGridStyle}"
                               CanUserAddRows="False" RowHeight="45">
                         <DataGrid.Columns>
@@ -293,6 +298,46 @@
 
                         </DataGrid.Columns>
                     </DataGrid>
+
+                    <!-- F9: Portfolio P&L footer + F3: Reports button -->
+                    <Border Grid.Row="1" Background="{StaticResource CardBrush}" Padding="10,6"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Portfolio P&L -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Portfolio P&amp;L: " Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                                <TextBlock VerticalAlignment="Center" FontWeight="Bold" FontSize="16">
+                                    <TextBlock.Text>
+                                        <Binding Path="TotalV2Pnl" StringFormat="₹{0:N0}"/>
+                                    </TextBlock.Text>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding TotalV2Pnl, Converter={StaticResource IsNegativeConverter}}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <!-- F3: Reports button -->
+                            <Button Grid.Column="2"
+                                    Content="📊 Reports"
+                                    Command="{Binding OpenReportsCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Padding="12,4" Margin="8,0,0,0"/>
+                        </Grid>
+                    </Border>
+                    </Grid>
                 </TabItem>
 
                 <!-- NEW A/C MANAGER TAB -->

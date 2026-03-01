@@ -35,6 +35,9 @@ namespace Cognexalgo.Core.Application.Services
         public int ActiveCount => _contexts.Count(c => c.Value.IsRunning);
         public IReadOnlyDictionary<string, StrategyExecutionContext> Contexts => _contexts;
 
+        // F9: Combined portfolio P&L across all running strategies
+        public decimal TotalDailyPnl => _contexts.Values.Sum(c => c.DailyPnl);
+
         public StrategyOrchestrator(
             IStrategyRepository strategyRepo,
             SignalEngine signalEngine,
@@ -215,6 +218,30 @@ namespace Cognexalgo.Core.Application.Services
                 _signalEngine.ResetStrategy(kvp.Key);
             }
             Log("WARN", "⛔ KILL SWITCH: All strategies stopped");
+        }
+
+        /// <summary>EOD square-off at 15:20: close all open legs at LTP, then stop all strategies.</summary>
+        public void EodSquareOff()
+        {
+            Log("WARN", "⏰ EOD square-off: closing all open legs at LTP");
+            foreach (var kvp in _contexts.Where(c => c.Value.IsRunning))
+            {
+                if (kvp.Value.Strategy is HybridV2Strategy hybrid)
+                {
+                    foreach (var leg in hybrid.GetConfig().Legs.Where(l => l.Status == "OPEN"))
+                    {
+                        leg.Status = "EXITED";
+                        leg.ExitPrice = leg.Ltp;
+                        leg.ExitTime = DateTime.Now;
+                        leg.ExitReason = "EOD";
+                    }
+                }
+                kvp.Value.Strategy.Stop();
+                kvp.Value.IsRunning = false;
+                _signalEngine.ResetStrategy(kvp.Key);
+                OnStatusChanged?.Invoke(kvp.Key, StrategyStatus.Paused);
+            }
+            Log("WARN", "⏰ EOD square-off complete");
         }
 
         /// <summary>Remove a stopped strategy from the orchestrator.</summary>

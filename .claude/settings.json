@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(dotnet restore Cognexalgo.Core/Cognexalgo.Core.csproj)",
-      "Bash(dotnet build Cognexalgo.Core/Cognexalgo.Core.csproj --no-restore)"
+      "Bash(dotnet build Cognexalgo.Core/Cognexalgo.Core.csproj --no-restore)",
+      "WebFetch(domain:algotest.in)",
+      "WebFetch(domain:docs.algotest.in)",
+      "Bash(dotnet build Cognexalgo.sln --no-restore -v quiet)"
     ]
   }
 }

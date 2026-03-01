@@ -20,7 +20,7 @@ namespace Cognexalgo.Core.Infrastructure.Services
     /// </summary>
     public class SmartApiClientAdapter : IAngelOneAdapter
     {
-        private readonly SmartApiClient _client;
+        private SmartApiClient _client;
         private bool _isAuthenticated = false;
 
         public bool IsAuthenticated => _isAuthenticated;
@@ -33,6 +33,16 @@ namespace Cognexalgo.Core.Infrastructure.Services
         }
 
         public SmartApiClientAdapter() : this(new SmartApiClient()) { }
+
+        /// <summary>
+        /// Share an already-authenticated SmartApiClient from V1 TradingEngine.
+        /// Calling this after V1 login means V2 live orders use the same session.
+        /// </summary>
+        public void UseExistingClient(SmartApiClient authenticatedClient)
+        {
+            _client = authenticatedClient;
+            _isAuthenticated = !string.IsNullOrEmpty(authenticatedClient.JwtToken);
+        }
 
         // ─── Auth ──────────────────────────────────────────────────
 

@@ -35,6 +35,8 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public TelegramNotifier Telegram { get; private set; }
         public WindowsToastNotifier Toast { get; private set; }
         public OrderPollingService OrderPoller { get; private set; }
+        // F2: Exposed so MainViewModel can pass to HybridV2Strategy.SetHistoryCacheService
+        public Cognexalgo.Core.Services.HistoryCacheService? HistoryCache { get; private set; }
 
         public bool IsInitialized { get; private set; } = false;
         public event Action<TickContext>? OnTickProcessed;
@@ -71,6 +73,9 @@ namespace Cognexalgo.Core.Infrastructure.Services
             bridge.Simulator = bridge.Services.GetRequiredService<PaperTradeSimulator>();
             bridge.Logger = bridge.Services.GetRequiredService<V2LoggingService>();
             bridge.Toast = bridge.Services.GetRequiredService<WindowsToastNotifier>();
+            // F2: Resolve HistoryCacheService for indicator warm-up
+            try { bridge.HistoryCache = bridge.Services.GetRequiredService<Cognexalgo.Core.Services.HistoryCacheService>(); }
+            catch { /* optional — V2 runs without indicator conditions if not available */ }
 
             // ─── Configure Telegram from appsettings ─────────────
             string telegramToken = config["V2:Notifications:TelegramBotToken"] ?? "";
@@ -249,6 +254,9 @@ namespace Cognexalgo.Core.Infrastructure.Services
                 bridge.OrderPoller.TrackOrder(order);
             };
 
+            // ─── Schedule EOD auto-square-off at 15:20 ───────────
+            bridge.ScheduleEodSquareOff();
+
             bridge.IsInitialized = true;
             bridge.Logger.Info("V2Bridge", "V2 Bridge initialized successfully");
             return bridge;
@@ -277,6 +285,16 @@ namespace Cognexalgo.Core.Infrastructure.Services
             OnTickProcessed?.Invoke(tick);
         }
 
+        /// <summary>
+        /// Share V1 TradingEngine's already-authenticated SmartApiClient with V2.
+        /// Call this immediately after _engine.ConnectAsync() succeeds so live orders work.
+        /// </summary>
+        public void SyncBrokerAuth(Cognexalgo.Core.Services.SmartApiClient v1Client)
+        {
+            if (BrokerAdapter is SmartApiClientAdapter adapter)
+                adapter.UseExistingClient(v1Client);
+        }
+
         /// <summary>Kill Switch — immediately stop everything.</summary>
         public void KillAll()
         {
@@ -291,8 +309,37 @@ namespace Cognexalgo.Core.Infrastructure.Services
             return scope.ServiceProvider.GetRequiredService<T>();
         }
 
+        // ─── EOD timer ────────────────────────────────────────────
+        private System.Threading.Timer? _eodTimer;
+
+        /// <summary>
+        /// Schedule EOD auto-square-off at 15:20 today (no-op if already past).
+        /// </summary>
+        public void ScheduleEodSquareOff()
+        {
+            var now = DateTime.Now;
+            var cutoff = DateTime.Today.AddHours(15).AddMinutes(15);
+            if (now >= cutoff)
+            {
+                Logger.Info("V2Bridge", "EOD square-off: already past 15:15, not scheduling");
+                return;
+            }
+
+            var delay = cutoff - now;
+            _eodTimer = new System.Threading.Timer(_ =>
+            {
+                Logger.Warn("V2Bridge", "⏰ EOD auto-square-off triggered (15:15)");
+                Orchestrator.EodSquareOff();
+                _ = Telegram.SendKillSwitchAlert();
+                _eodTimer?.Dispose();
+            }, null, delay, System.Threading.Timeout.InfiniteTimeSpan);
+
+            Logger.Info("V2Bridge", $"EOD square-off scheduled at {cutoff:HH:mm:ss}");
+        }
+
         public void Dispose()
         {
+            _eodTimer?.Dispose();
             OrderPoller?.Dispose();
             if (Services is IDisposable disposable)
                 disposable.Dispose();

@@ -9,7 +9,8 @@ namespace Cognexalgo.Core.Models
         ATMPoint,
         ATMPercent,
         StraddleWidth,
-        ClosestPremium
+        ClosestPremium,
+        ByDelta          // F7: select strike whose delta is closest to TargetDelta
     }
 
     public enum OptionType
@@ -43,6 +44,10 @@ namespace Cognexalgo.Core.Models
         public string PremiumOperator { get; set; } // "~", ">=", "<="
         public bool WaitForMatch { get; set; } = false;
 
+        // F7: Delta Mode
+        /// <summary>Target delta magnitude (0.0–1.0). Used when Mode == ByDelta.</summary>
+        public double TargetDelta { get; set; } = 0.3;
+
         // Common Properties
         public string Index { get; set; } // "NIFTY", "BANKNIFTY"
         public OptionType OptionType { get; set; }
@@ -72,6 +77,23 @@ namespace Cognexalgo.Core.Models
         public double StopLossPrice { get; set; }
         public double TargetPrice { get; set; }
         public double TrailingSL { get; set; }
+
+        // F6: SL-M exit order
+        /// <summary>Use SL-M (stop-loss market) order type for exits in live mode.</summary>
+        public bool UseSLMOnExit { get; set; } = false;
+
+        // F2: Indicator entry conditions — ALL must be true before entry
+        public List<IndicatorCondition> EntryConditions { get; set; } = new();
+
+        // F8: Adjustment legs
+        /// <summary>True = this leg is inactive at start; activates when its trigger fires.</summary>
+        public bool IsAdjustmentLeg { get; set; } = false;
+        /// <summary>"None" | "ParentLegPnL" | "UnderlyingMove"</summary>
+        public string AdjustmentTrigger { get; set; } = "None";
+        /// <summary>₹ loss threshold (ParentLegPnL) or point move (UnderlyingMove) that activates this leg.</summary>
+        public decimal AdjustmentTriggerValue { get; set; } = 0;
+        /// <summary>Zero-based index of the parent leg in the Legs list. -1 = no parent.</summary>
+        public int ParentLegIndex { get; set; } = -1;
         
         // Calculated at execution (populated by GetTargetStrike)
         public int CalculatedStrike { get; set; }
@@ -116,9 +138,24 @@ namespace Cognexalgo.Core.Models
                     }
                     return closestStrike;
 
+                case StrikeSelectionMode.ByDelta:
+                    return GetDeltaStrike(chain);
+
                 default:
                     return atmStrike;
             }
+        }
+
+        /// <summary>F7: Find strike whose absolute delta is closest to TargetDelta.</summary>
+        private int GetDeltaStrike(List<OptionChainItem> chain)
+        {
+            var targetType = OptionType == OptionType.Call ? "CE" : "PE";
+            var filtered = chain.Where(x => x.OptionType == targetType && x.Delta != 0).ToList();
+            if (!filtered.Any()) return 0;
+
+            return filtered
+                .OrderBy(x => Math.Abs(Math.Abs((double)x.Delta) - Math.Abs(TargetDelta)))
+                .First().Strike;
         }
 
         private int GetATMStrike(double spotPrice, List<OptionChainItem> chain)
@@ -219,6 +256,8 @@ namespace Cognexalgo.Core.Models
                     return $"SW {StraddleMultiplier}x";
                 case StrikeSelectionMode.ClosestPremium:
                     return $"CP {PremiumOperator} {TargetPremium}";
+                case StrikeSelectionMode.ByDelta:
+                    return $"Δ{TargetDelta:F2}";
                 default:
                     return "ATM";
             }

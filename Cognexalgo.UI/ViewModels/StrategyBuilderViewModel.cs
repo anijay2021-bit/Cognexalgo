@@ -150,6 +150,7 @@ namespace Cognexalgo.UI.ViewModels
                 "ATMPercent" => StrikeSelectionMode.ATMPercent,
                 "StraddleWidth" => StrikeSelectionMode.StraddleWidth,
                 "ClosestPremium" => StrikeSelectionMode.ClosestPremium,
+                "ByDelta" => StrikeSelectionMode.ByDelta, // F7
                 _ => StrikeSelectionMode.ATMPoint
             };
 
@@ -162,6 +163,7 @@ namespace Cognexalgo.UI.ViewModels
                 TargetPremium = TargetPremiumValue,
                 PremiumOperator = SelectedPremiumOperator,
                 WaitForMatch = WaitForMatch,
+                TargetDelta = NewLegTargetDelta, // F7
                 Index = SelectedIndex,
                 OptionType = SelectedOptionType == "Call" ? OptionType.Call : OptionType.Put,
                 Action = SelectedAction == "Buy" ? ActionType.Buy : ActionType.Sell,
@@ -348,12 +350,14 @@ namespace Cognexalgo.UI.ViewModels
         [NotifyPropertyChangedFor(nameof(IsATMPercentMode))]
         [NotifyPropertyChangedFor(nameof(IsStraddleWidthMode))]
         [NotifyPropertyChangedFor(nameof(IsClosestPremiumMode))]
+        [NotifyPropertyChangedFor(nameof(IsByDeltaMode))]
         private string _selectedStrikeMode = "ATMPoint";
 
         public bool IsATMPointMode => SelectedStrikeMode == "ATMPoint";
         public bool IsATMPercentMode => SelectedStrikeMode == "ATMPercent";
         public bool IsStraddleWidthMode => SelectedStrikeMode == "StraddleWidth";
         public bool IsClosestPremiumMode => SelectedStrikeMode == "ClosestPremium";
+        public bool IsByDeltaMode => SelectedStrikeMode == "ByDelta"; // F7
 
         // ATM Point Options
         public ObservableCollection<string> ATMPointOptions { get; } = new ObservableCollection<string>
@@ -410,6 +414,27 @@ namespace Cognexalgo.UI.ViewModels
 
         // Legs Collection
         public ObservableCollection<StrategyLeg> HybridLegs { get; } = new ObservableCollection<StrategyLeg>();
+
+        // F7: Delta-based strike — target delta for the leg being added
+        [ObservableProperty]
+        private double _newLegTargetDelta = 0.30;
+
+        // F4: Per-strategy slippage (paper trade)
+        [ObservableProperty]
+        private decimal _slippagePct = 0.05m;
+
+        // F5: Strategy-level MTM trailing SL + lock profit
+        [ObservableProperty]
+        private decimal _strategyMtmTrailingSL = 0m;
+
+        [ObservableProperty]
+        private bool _strategyMtmTrailingIsPercent = false;
+
+        [ObservableProperty]
+        private decimal _strategyLockProfitAt = 0m;
+
+        [ObservableProperty]
+        private decimal _strategyLockProfitTo = 0m;
 
         // ========== END HYBRID PROPERTIES ==========
 
@@ -509,6 +534,13 @@ namespace Cognexalgo.UI.ViewModels
             LotSize = config.Legs.FirstOrDefault()?.TotalLots ?? 1;
             SelectedProductType = config.ProductType;
             SelectedExpiryType = Enum.TryParse<ExpiryType>(config.ExpiryType, out var expiry) ? expiry : ExpiryType.Weekly;
+
+            // F4+F5: load strategy-level risk settings
+            SlippagePct = config.SlippagePct;
+            StrategyMtmTrailingSL = config.StrategyTrailingSL;
+            StrategyMtmTrailingIsPercent = config.StrategyTrailingIsPercent;
+            StrategyLockProfitAt = config.StrategyLockProfitAt;
+            StrategyLockProfitTo = config.StrategyLockProfitTo;
             
             // Load Legs
             HybridLegs.Clear();
@@ -729,7 +761,16 @@ namespace Cognexalgo.UI.ViewModels
                 // Optional settings mapping
                 AutoExecute = true,
                 MaxProfitPercent = (int)TargetValue,
-                MaxLossPercent = (int)StopLossValue
+                MaxLossPercent = (int)StopLossValue,
+
+                // F4: per-strategy slippage
+                SlippagePct = SlippagePct,
+
+                // F5: strategy-level MTM trailing SL + lock profit
+                StrategyTrailingSL = StrategyMtmTrailingSL,
+                StrategyTrailingIsPercent = StrategyMtmTrailingIsPercent,
+                StrategyLockProfitAt = StrategyLockProfitAt,
+                StrategyLockProfitTo = StrategyLockProfitTo
             };
 
             await _engine.StrategyRepository.SaveHybridStrategyAsync(config, "User");

@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
+        xmlns:local="clr-namespace:Cognexalgo.UI.Views"
         mc:Ignorable="d"
         Title="Strategy Builder" Height="800" Width="900" ResizeMode="CanResize"
         Background="{StaticResource BackgroundBrush}"
@@ -271,7 +272,9 @@
                                  Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                     <RadioButton Content="Straddle Width" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=StraddleWidth}" 
                                  Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
-                    <RadioButton Content="Closest Premium (CP)" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ClosestPremium}" 
+                    <RadioButton Content="Closest Premium (CP)" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ClosestPremium}"
+                                 Margin="0,0,20,0" Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
+                    <RadioButton Content="By Delta" IsChecked="{Binding SelectedStrikeMode, Converter={StaticResource RadioButtonConverter}, ConverterParameter=ByDelta}"
                                  Foreground="{StaticResource TextMainBrush}" FontSize="12"/>
                 </StackPanel>
 
@@ -318,10 +321,17 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
-                            <CheckBox Content="Wait for Match" IsChecked="{Binding WaitForMatch}" 
+                            <CheckBox Content="Wait for Match" IsChecked="{Binding WaitForMatch}"
                                       Foreground="{StaticResource TextMainBrush}" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Grid>
+
+                    <!-- F7: By Delta Mode -->
+                    <StackPanel Visibility="{Binding IsByDeltaMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="Target Delta (e.g. 0.30)" Style="{StaticResource LabelTextStyle}"/>
+                        <TextBox Text="{Binding NewLegTargetDelta}" Style="{StaticResource DarkTextBoxStyle}" Width="200" HorizontalAlignment="Left"/>
+                        <TextBlock Text="Selects the strike closest to this delta value" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,3,0,0" FontStyle="Italic"/>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Common Fields -->
@@ -418,10 +428,32 @@
                                 <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="80"/>
                                 <DataGridTextColumn Header="Lots" Binding="{Binding TotalLots}" Width="60"/>
                                 <DataGridTextColumn Header="Product" Binding="{Binding ProductType}" Width="80"/>
+
+                                <!-- F6: SL-M exit checkbox -->
+                                <DataGridCheckBoxColumn Header="SL-M" Binding="{Binding UseSLMOnExit, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
+
+                                <!-- F8: Adjustment leg controls -->
+                                <DataGridCheckBoxColumn Header="Adj" Binding="{Binding IsAdjustmentLeg, UpdateSourceTrigger=PropertyChanged}" Width="45"/>
+                                <DataGridTemplateColumn Header="Trigger" Width="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding AdjustmentTrigger}" FontSize="11" VerticalAlignment="Center" Padding="2,0"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <ComboBox SelectedItem="{Binding AdjustmentTrigger, UpdateSourceTrigger=PropertyChanged}"
+                                                      ItemsSource="{x:Static local:StrategyBuilderWindow.AdjustmentTriggers}"
+                                                      FontSize="11"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Trig Val" Binding="{Binding AdjustmentTriggerValue, UpdateSourceTrigger=PropertyChanged}" Width="70"/>
+
                                 <DataGridTemplateColumn Header="Remove" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Content="✕" Command="{Binding DataContext.RemovePositionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                            <Button Content="✕" Command="{Binding DataContext.RemovePositionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                     CommandParameter="{Binding}" Background="#D32F2F" Foreground="White" Padding="5,2"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -572,6 +604,66 @@
                                 <TextBlock Text="Trigger at Profit %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding ProfitProtectionTrigger}" Style="{StaticResource DarkTextBoxStyle}"/>
                                 <TextBlock Text="Wait for this profit to activate" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- F4: Slippage + F5: Strategy MTM Trailing SL / Lock Profit -->
+                <Border BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="0,15,0,0" Margin="0,10,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Paper Trade &amp; MTM Settings" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
+
+                        <!-- F4: Slippage -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Slippage %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding SlippagePct}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="Applied in paper trade mode" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- F5: Strategy-level MTM Trailing SL -->
+                        <TextBlock Text="MTM Trailing Stop Loss" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Trail Distance (₹ or %)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding StrategyMtmTrailingSL}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="0 = disabled" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
+                                <CheckBox Content="Use % (uncheck = ₹ points)" IsChecked="{Binding StrategyMtmTrailingIsPercent}"
+                                          Foreground="{StaticResource TextMainBrush}" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- F5: Lock Profit -->
+                        <TextBlock Text="Lock Profit" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <Grid Margin="0,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Activate at MTM Profit (₹)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding StrategyLockProfitAt}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="0 = disabled" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Lock to MTM Profit (₹)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding StrategyLockProfitTo}" Style="{StaticResource DarkTextBoxStyle}"/>
+                                <TextBlock Text="Exit if MTM falls below this" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>

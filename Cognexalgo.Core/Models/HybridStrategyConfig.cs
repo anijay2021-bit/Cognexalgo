@@ -46,6 +46,28 @@ namespace Cognexalgo.Core.Models
         // JSON Storage for Strategy-Specific Parameters (e.g., Calendar Times)
         public string Parameters { get; set; } = "{}";
 
+        // ── Slippage (F4) ─────────────────────────────────────────────────────
+        /// <summary>Paper-trade slippage as a fraction (0.05 = 0.05%). Applied by PaperTradeSimulator.</summary>
+        [ObservableProperty]
+        private decimal _slippagePct = 0.05m;
+
+        // ── Strategy-Level MTM RMS (F5) ───────────────────────────────────────
+        /// <summary>Trailing SL on overall strategy MTM. 0 = disabled.</summary>
+        [ObservableProperty]
+        private decimal _strategyTrailingSL = 0;
+
+        /// <summary>True = StrategyTrailingSL is a percentage of peak profit; False = absolute ₹.</summary>
+        [ObservableProperty]
+        private bool _strategyTrailingIsPercent = false;
+
+        /// <summary>Lock minimum profit at StrategyLockProfitTo when MTM reaches this value. 0 = disabled.</summary>
+        [ObservableProperty]
+        private decimal _strategyLockProfitAt = 0;
+
+        /// <summary>Locked minimum P&L once StrategyLockProfitAt is triggered.</summary>
+        [ObservableProperty]
+        private decimal _strategyLockProfitTo = 0;
+
         // ── Trading Mode ───────────────────────────────────────────────────────
         /// <summary>Per-strategy live/paper toggle. Default: Paper (safe).</summary>
         [ObservableProperty]

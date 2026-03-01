@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Cognexalgo.Core.Domain.Entities;
 using Cognexalgo.Core.Domain.Enums;
+using Cognexalgo.Core.Domain.Indicators;
 using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Services;
 
 namespace Cognexalgo.Core.Domain.Strategies
 {
@@ -17,6 +20,16 @@ namespace Cognexalgo.Core.Domain.Strategies
     {
         private readonly HybridStrategyConfig _config;
 
+        // F1: Per-leg trailing SL — tracks best price seen for each leg (keyed by leg index)
+        private readonly Dictionary<int, double> _legTrailBestPrices = new();
+
+        // F2: Indicator engine for entry conditions
+        private readonly IndicatorEngine _indicatorEngine = new();
+        private HistoryCacheService? _historyCache;
+
+        // F8: Underlying price at strategy first-entry (for UnderlyingMove trigger)
+        private double _strategyEntrySpotLtp = 0;
+
         public HybridV2Strategy(HybridStrategyConfig config)
         {
             _config    = config ?? throw new ArgumentNullException(nameof(config));
@@ -28,6 +41,42 @@ namespace Cognexalgo.Core.Domain.Strategies
             Name        = config.Name ?? "HybridStrategy";
             Type        = StrategyType.CSTM;
             TradingMode = config.IsLiveMode ? TradingMode.LiveTrade : TradingMode.PaperTrade;
+        }
+
+        /// <summary>F2: Inject history cache so indicators can warm up on start.</summary>
+        public void SetHistoryCacheService(HistoryCacheService cache) => _historyCache = cache;
+
+        /// <summary>F2: Load index candles into IndicatorEngine for all timeframes used in entry conditions.</summary>
+        public override async Task InitializeAsync(CancellationToken ct)
+        {
+            if (_historyCache == null) return;
+
+            var usedIndices = _config.Legs
+                .Where(l => l.EntryConditions?.Count > 0)
+                .Select(l => l.Index)
+                .Distinct()
+                .ToList();
+
+            var usedTimeFrames = _config.Legs
+                .SelectMany(l => l.EntryConditions ?? new())
+                .Select(c => c.TimeFrame)
+                .Distinct()
+                .ToList();
+
+            foreach (var index in usedIndices)
+            {
+                string symbol = index.ToUpper(); // "NIFTY" or "BANKNIFTY"
+                foreach (var tfStr in usedTimeFrames)
+                {
+                    string interval = TimeFrameToInterval(tfStr);
+                    var quotes = await _historyCache.GetHistoryAsync(symbol, interval, 60);
+                    if (quotes.Count > 0 && Enum.TryParse<TimeFrame>(tfStr, out var tf))
+                        _indicatorEngine.LoadHistory(tf, quotes);
+                }
+            }
+
+            if (_indicatorEngine.IsWarmedUp)
+                Log("INFO", $"[{Name}] IndicatorEngine warmed up");
         }
 
         /// <summary>Expose config for RMS P&L computation in Orchestrator.</summary>
@@ -67,8 +116,10 @@ namespace Cognexalgo.Core.Domain.Strategies
                 DateTime.Now.TimeOfDay < startTime)
                 return Task.CompletedTask;
 
-            foreach (var leg in _config.Legs)
+            for (int legIdx = 0; legIdx < _config.Legs.Count; legIdx++)
             {
+                var leg = _config.Legs[legIdx];
+
                 decimal spotLtp = leg.Index switch
                 {
                     "BANKNIFTY" => tick.BankNiftyLtp,
@@ -85,10 +136,14 @@ namespace Cognexalgo.Core.Domain.Strategies
                 string optType = leg.OptionType == Models.OptionType.Call ? "CE" : "PE";
 
                 // ── ENTRY: resolve strike, fire Entry signal ────────────
-                if (leg.Status == "PENDING" && CurrentState == SignalState.WAITING)
+                if ((leg.Status == "PENDING") && CurrentState == SignalState.WAITING)
                 {
                     if (chain == null || chain.Count == 0)
-                        continue; // no option chain available yet
+                        continue;
+
+                    // F2: Check all indicator entry conditions before entering
+                    if (leg.EntryConditions?.Count > 0 && !AllConditionsMet(leg.EntryConditions))
+                        continue;
 
                     int strike = leg.GetTargetStrike((double)spotLtp, chain);
                     if (strike == 0) continue;
@@ -107,10 +162,17 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.Status           = "OPEN";
                     CurrentState         = SignalState.IN_POSITION;
 
+                    // Record entry spot for UnderlyingMove trigger (F8)
+                    if (_strategyEntrySpotLtp == 0)
+                        _strategyEntrySpotLtp = (double)spotLtp;
+
+                    // F1: initialise trailing stop tracker
+                    _legTrailBestPrices[legIdx] = opt.LTP;
+
                     FireSignal(new Entities.Signal
                     {
                         StrategyId       = StrategyId,
-                        LegId            = $"LEG-{StrategyId}-{_config.Legs.IndexOf(leg):D2}",
+                        LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                         SignalType       = SignalType.Entry,
                         Symbol           = leg.Index,
                         Price            = opt.LTP,
@@ -129,6 +191,38 @@ namespace Cognexalgo.Core.Domain.Strategies
                         var opt = chain.FirstOrDefault(c =>
                             c.Strike == leg.CalculatedStrike && c.OptionType == optType);
                         if (opt != null) leg.Ltp = opt.LTP;
+                    }
+
+                    // F1: Update trailing SL before checking SL breach
+                    if (leg.TrailingSL > 0 && leg.StopLossPrice > 0)
+                    {
+                        if (!_legTrailBestPrices.ContainsKey(legIdx))
+                            _legTrailBestPrices[legIdx] = leg.Ltp;
+
+                        double best = _legTrailBestPrices[legIdx];
+
+                        if (leg.Action == ActionType.Sell)
+                        {
+                            // Sell leg: best = lowest Ltp seen. Trail stop follows down.
+                            if (leg.Ltp < best)
+                            {
+                                best = leg.Ltp;
+                                _legTrailBestPrices[legIdx] = best;
+                                leg.StopLossPrice = best + leg.TrailingSL;
+                                Log("INFO", $"[{Name}] Trail SL updated: {optType} {leg.CalculatedStrike} SL→{leg.StopLossPrice:F2}");
+                            }
+                        }
+                        else
+                        {
+                            // Buy leg: best = highest Ltp seen. Trail stop follows up.
+                            if (leg.Ltp > best)
+                            {
+                                best = leg.Ltp;
+                                _legTrailBestPrices[legIdx] = best;
+                                leg.StopLossPrice = best - leg.TrailingSL;
+                                Log("INFO", $"[{Name}] Trail SL updated: {optType} {leg.CalculatedStrike} SL→{leg.StopLossPrice:F2}");
+                            }
+                        }
                     }
 
                     bool slHit = false, targetHit = false;
@@ -151,11 +245,12 @@ namespace Cognexalgo.Core.Domain.Strategies
                         leg.ExitPrice  = leg.Ltp;
                         leg.ExitTime   = DateTime.Now;
                         leg.ExitReason = reason;
+                        _legTrailBestPrices.Remove(legIdx); // F1: clear trail state
 
                         FireSignal(new Entities.Signal
                         {
                             StrategyId       = StrategyId,
-                            LegId            = $"LEG-{StrategyId}-{_config.Legs.IndexOf(leg):D2}",
+                            LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                             SignalType       = SignalType.Exit,
                             Symbol           = leg.Index,
                             Price            = leg.Ltp,
@@ -169,6 +264,23 @@ namespace Cognexalgo.Core.Domain.Strategies
                             CurrentState = SignalState.WAITING;
                     }
                 }
+
+                // F8: Adjustment leg activation check (INACTIVE legs only)
+                else if (leg.IsAdjustmentLeg && leg.Status == "INACTIVE")
+                {
+                    bool triggered = leg.AdjustmentTrigger switch
+                    {
+                        "ParentLegPnL"    => CheckParentLegPnLTrigger(leg, legIdx),
+                        "UnderlyingMove"  => CheckUnderlyingMoveTrigger(leg, (double)spotLtp),
+                        _                 => false
+                    };
+
+                    if (triggered)
+                    {
+                        leg.Status = "PENDING"; // entry block picks it up next tick
+                        Log("INFO", $"[{Name}] Adjustment leg {legIdx} activated ({leg.AdjustmentTrigger})");
+                    }
+                }
             }
 
             // ── Re-entry check (after exit processing) ──────────────────
@@ -178,24 +290,91 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.CurrentReEntry < leg.MaxReEntry &&
                     CurrentState == SignalState.WAITING)
                 {
+                    int legIdx = _config.Legs.IndexOf(leg);
                     leg.CurrentReEntry++;
                     leg.Status = "PENDING"; // picked up by entry block on next tick
 
                     FireSignal(new Entities.Signal
                     {
                         StrategyId       = StrategyId,
-                        LegId            = $"LEG-{StrategyId}-{_config.Legs.IndexOf(leg):D2}",
+                        LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                         SignalType       = SignalType.ReEntry,
                         TriggerCondition = $"Re-entry #{leg.CurrentReEntry}/{leg.MaxReEntry} after SL"
                     });
 
-                    Log("INFO", $"[{Name}] RE-ENTRY queued: leg {_config.Legs.IndexOf(leg)}, " +
+                    Log("INFO", $"[{Name}] RE-ENTRY queued: leg {legIdx}, " +
                         $"attempt {leg.CurrentReEntry}/{leg.MaxReEntry}");
                 }
             }
 
             RecordSuccess();
             return Task.CompletedTask;
+        }
+
+        // F2: Evaluate all indicator conditions — returns true if ALL pass
+        private bool AllConditionsMet(List<IndicatorCondition> conditions)
+        {
+            if (!_indicatorEngine.IsWarmedUp) return true; // let through if not yet warmed up
+
+            foreach (var c in conditions)
+            {
+                if (!Enum.TryParse<IndicatorType>(c.IndicatorType, out var indType)) continue;
+                if (!Enum.TryParse<TimeFrame>(c.TimeFrame, out var tf)) continue;
+
+                double val = _indicatorEngine.GetValue(indType, c.Period, tf);
+                if (double.IsNaN(val)) continue;
+
+                bool pass = c.Comparator switch
+                {
+                    "<"  => val < c.Value,
+                    ">"  => val > c.Value,
+                    "<=" => val <= c.Value,
+                    ">=" => val >= c.Value,
+                    "==" => Math.Abs(val - c.Value) < 0.01,
+                    _    => true
+                };
+                if (!pass) return false;
+            }
+            return true;
+        }
+
+        // F2: Map TimeFrame string to Angel One interval string for HistoryCacheService
+        private static string TimeFrameToInterval(string tfStr) => tfStr switch
+        {
+            "Min1"  => "ONE_MINUTE",
+            "Min3"  => "THREE_MINUTE",
+            "Min5"  => "FIVE_MINUTE",
+            "Min10" => "TEN_MINUTE",
+            "Min15" => "FIFTEEN_MINUTE",
+            "Min30" => "THIRTY_MINUTE",
+            "Hour1" => "ONE_HOUR",
+            "Day1"  => "ONE_DAY",
+            _       => "FIFTEEN_MINUTE"
+        };
+
+        // F8: Check if parent leg P&L has crossed the trigger threshold
+        private bool CheckParentLegPnLTrigger(Models.StrategyLeg adjLeg, int adjLegIdx)
+        {
+            if (adjLeg.ParentLegIndex < 0 || adjLeg.ParentLegIndex >= _config.Legs.Count)
+                return false;
+
+            var parent = _config.Legs[adjLeg.ParentLegIndex];
+            if (parent.Status != "OPEN") return false;
+
+            double pnl = parent.Action == ActionType.Sell
+                ? (parent.EntryPrice - parent.Ltp) * parent.TotalLots
+                : (parent.Ltp - parent.EntryPrice) * parent.TotalLots;
+
+            // TriggerValue is the P&L loss threshold (negative = loss, e.g. -1000)
+            return (decimal)pnl <= adjLeg.AdjustmentTriggerValue;
+        }
+
+        // F8: Check if underlying has moved by TriggerValue points from entry
+        private bool CheckUnderlyingMoveTrigger(Models.StrategyLeg adjLeg, double currentSpot)
+        {
+            if (_strategyEntrySpotLtp == 0) return false;
+            double move = Math.Abs(currentSpot - _strategyEntrySpotLtp);
+            return (decimal)move >= adjLeg.AdjustmentTriggerValue;
         }
     }
 }

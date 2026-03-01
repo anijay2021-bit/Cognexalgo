@@ -87,6 +87,10 @@ namespace Cognexalgo.UI.ViewModels
         public string TradingModeText => IsLiveMode ? "LIVE MODE" : "PAPER MODE";
         public string TradingModeColor => IsLiveMode ? "#2ECC71" : "#E74C3C";
 
+        // F9: Combined portfolio P&L across all running V2 strategies
+        [ObservableProperty]
+        private decimal _totalV2Pnl;
+
         public ObservableCollection<HybridStrategyConfig> Strategies { get; } = new ObservableCollection<HybridStrategyConfig>();
         public ObservableCollection<Order> Orders { get; } = new ObservableCollection<Order>();
         public ObservableCollection<Position> Positions { get; } = new ObservableCollection<Position>(); // Changed from Order
@@ -370,6 +374,8 @@ namespace Cognexalgo.UI.ViewModels
                 if (_v2?.IsInitialized == true)
                 {
                     _ = _v2.DispatchTickAsync(LtpNifty, LtpBankNifty, LtpFinnifty);
+                    // F9: Update combined portfolio P&L
+                    TotalV2Pnl = _v2.Orchestrator.TotalDailyPnl;
                 }
             });
         }
@@ -418,7 +424,11 @@ namespace Cognexalgo.UI.ViewModels
                 await _engine.Ticker.ConnectAsync();
                 _engine.Start();
                 Status = "Running";
-                
+
+                // ── Share V1 auth session with V2 broker adapter ──
+                _v2?.SyncBrokerAuth(_engine.Api);
+                Log("V2 broker auth synced from V1 session.");
+
                 // Start Auto-Refresh
                 _autoRefreshTimer.Start();
                 Log("Auto-Refresh Started (3s Interval)");
@@ -630,12 +640,29 @@ namespace Cognexalgo.UI.ViewModels
             var v2Strategy = new Cognexalgo.Core.Domain.Strategies.HybridV2Strategy(strategy);
             var rmsConfig = new Cognexalgo.Core.Domain.ValueObjects.RmsConfig();
             if (strategy.MaxLossPercent > 0)
-                rmsConfig.MaxLoss = strategy.MaxLossPercent * 100; // simple absolute ₹
+                rmsConfig.MaxLoss = strategy.MaxLossPercent * 100;
             if (strategy.MaxProfitPercent > 0)
                 rmsConfig.MaxProfit = strategy.MaxProfitPercent * 100;
             if (strategy.Legs.Count > 0)
                 rmsConfig.MaxReEntries = strategy.Legs.Max(l => l.MaxReEntry);
+
+            // F5: MTM trailing SL + lock profit
+            if (strategy.StrategyTrailingSL > 0)
+            {
+                rmsConfig.TrailingSL = strategy.StrategyTrailingSL;
+                rmsConfig.TrailingIsPercent = strategy.StrategyTrailingIsPercent;
+            }
+            if (strategy.StrategyLockProfitAt > 0)
+            {
+                rmsConfig.LockProfitAt = strategy.StrategyLockProfitAt;
+                rmsConfig.LockProfitTo = strategy.StrategyLockProfitTo;
+            }
+
             _v2.StrategyRms.RegisterStrategy(v2Strategy.StrategyId, rmsConfig);
+
+            // F2: Wire history cache for indicator-based entry conditions
+            if (_v2.HistoryCache != null)
+                v2Strategy.SetHistoryCacheService(_v2.HistoryCache);
 
             // ── Start in Orchestrator ────────────────────────────────────────
             await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
@@ -662,6 +689,17 @@ namespace Cognexalgo.UI.ViewModels
                  Owner = Application.Current.MainWindow
              };
              window.ShowDialog();
+        }
+
+        // F3: Open Performance Report window
+        [RelayCommand]
+        public void OpenReports()
+        {
+            if (_v2 == null) return;
+            var vm = new ReportsViewModel(_v2);
+            var win = new Views.ReportsWindow(vm) { Owner = Application.Current.MainWindow };
+            _ = vm.LoadReportCommand.ExecuteAsync(null);
+            win.Show();
         }
 
         [RelayCommand]
