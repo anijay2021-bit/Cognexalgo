@@ -691,6 +691,23 @@ namespace Cognexalgo.UI.ViewModels
              window.ShowDialog();
         }
 
+        // Help: Open User Guide HTML in default browser
+        [RelayCommand]
+        public void OpenUserGuide()
+        {
+            // Search: next to exe, then walk up to solution root (up to 6 levels)
+            string fileName = "COGNEX_UserGuide.html";
+            string? found = null;
+            var dir = new System.IO.DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            for (int i = 0; i < 6 && dir != null; i++, dir = dir.Parent)
+            {
+                var candidate = System.IO.Path.Combine(dir.FullName, fileName);
+                if (System.IO.File.Exists(candidate)) { found = candidate; break; }
+            }
+            if (found == null) { System.Windows.MessageBox.Show("User guide not found.", "Help"); return; }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found) { UseShellExecute = true });
+        }
+
         // F3: Open Performance Report window
         [RelayCommand]
         public void OpenReports()

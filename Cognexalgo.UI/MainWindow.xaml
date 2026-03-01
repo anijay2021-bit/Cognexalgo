@@ -76,7 +76,9 @@
             </MenuItem>
             <MenuItem Header="View" Foreground="{StaticResource TextMainBrush}" />
             <MenuItem Header="Settings" Command="{Binding OpenSettingsCommand}" Foreground="{StaticResource TextMainBrush}" />
-            <MenuItem Header="Help" Foreground="{StaticResource TextMainBrush}"/>
+            <MenuItem Header="Help" Foreground="{StaticResource TextMainBrush}">
+                <MenuItem Header="📖 User Guide" Command="{Binding OpenUserGuideCommand}"/>
+            </MenuItem>
         </Menu>
 
         <!-- 1. Enhanced Header (Mockup Match) -->
