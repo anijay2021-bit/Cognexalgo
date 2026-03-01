@@ -444,7 +444,7 @@
     and performance analytics — everything you need to trade smarter.
   </div>
   <div class="cover-meta">Version 2.0 &nbsp;·&nbsp; Angel One Integration &nbsp;·&nbsp; NSE/BSE Options</div>
-  <div class="cover-badge">📊 Nifty &nbsp;|&nbsp; BankNifty &nbsp;|&nbsp; FinNifty &nbsp;|&nbsp; MidcapNifty</div>
+  <div class="cover-badge">📊 Nifty &nbsp;|&nbsp; BankNifty &nbsp;|&nbsp; FinNifty</div>
 </div>
 
 
@@ -460,14 +460,15 @@
   <div class="toc-section toc-sub"><a href="#ch2-optchain"><span>2.2  Option Chain</span></a></div>
   <div class="toc-section toc-sub"><a href="#ch2-positions"><span>2.3  Positions &amp; Orders</span></a></div>
   <div class="toc-section"><a href="#ch3"><span>3. Strategy Builder — Creating Strategies</span><span class="toc-num">§3</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-legs"><span>3.1  Configuring Legs</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-strike"><span>3.2  Strike Selection Modes</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-risk"><span>3.3  Per-Leg Risk Management (SL / Target / Trailing SL / SL-M)</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-entry"><span>3.4  Indicator-Based Entry Conditions</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-strat-rms"><span>3.5  Strategy-Level MTM Risk (Trailing SL + Lock Profit)</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-slippage"><span>3.6  Slippage Configuration</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-adj"><span>3.7  Adjustment Legs</span></a></div>
-  <div class="toc-section toc-sub"><a href="#ch3-delta"><span>3.8  Delta-Based Strike Selection</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-legs"><span>3.2  Strategies DataGrid Column Reference</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-legs"><span>3.4  Configuring Legs (Leg Grid Columns)</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-strike"><span>3.5  Strike Selection Modes</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-risk"><span>3.6  Per-Leg Risk Management (Trail SL / SL-M)</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-entry"><span>3.7  Indicator-Based Entry Conditions</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-strat-rms"><span>3.8  Strategy-Level MTM Risk (Trail Distance + Lock Profit)</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-slippage"><span>3.9  Slippage Configuration</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-adj"><span>3.10  Adjustment Legs</span></a></div>
+  <div class="toc-section toc-sub"><a href="#ch3-delta"><span>3.11  Delta-Based Strike Selection</span></a></div>
   <div class="toc-section"><a href="#ch4"><span>4. Paper Trading — Simulation Mode</span><span class="toc-num">§4</span></a></div>
   <div class="toc-section"><a href="#ch5"><span>5. Live Trading — Going Live</span><span class="toc-num">§5</span></a></div>
   <div class="toc-section"><a href="#ch6"><span>6. Strategy Examples</span><span class="toc-num">§6</span></a></div>
@@ -552,11 +553,14 @@
 <table>
   <thead><tr><th>Tab</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr><td><span class="ui-label">Account Manager</span></td><td>View balance, holdings, and trade book from Angel One</td></tr>
-    <tr><td><span class="ui-label">Option Chain</span></td><td>Live option chain with Greeks (Delta, Gamma, Theta, Vega, IV%)</td></tr>
-    <tr><td><span class="ui-label">Positions</span></td><td>Real-time open positions with live P&amp;L</td></tr>
+    <tr><td><span class="ui-label">Dashboard</span></td><td>Overview of account health and engine status</td></tr>
+    <tr><td><span class="ui-label">Strategies</span></td><td>COGNEX algorithmic strategy engine — create, run, monitor strategies</td></tr>
+    <tr><td><span class="ui-label">A/c Manager</span></td><td>View balance, holdings, and trade book from Angel One</td></tr>
+    <tr><td><span class="ui-label">Positions</span></td><td>Real-time open positions with live P&amp;L and Greeks</td></tr>
     <tr><td><span class="ui-label">Orders</span></td><td>Order book — all placed orders and their statuses</td></tr>
-    <tr><td><span class="ui-label">Strategy V2</span></td><td>COGNEX algorithmic strategy engine — create, run, monitor strategies</td></tr>
+    <tr><td><span class="ui-label">Performance Analytics</span></td><td>Strategy-level profit/loss efficiency breakdown</td></tr>
+    <tr><td><span class="ui-label">Option Chain</span></td><td>Live option chain with Greeks (Delta, Gamma, Theta, Vega, IV%)</td></tr>
+    <tr><td><span class="ui-label">Signals</span></td><td>Live signal log — every entry/exit signal with price and reason</td></tr>
   </tbody>
 </table>
 
@@ -567,7 +571,7 @@
 <ol>
   <li>Select <strong>Index</strong>: Nifty, BankNifty, FinNifty, or MidcapNifty.</li>
   <li>Select <strong>Expiry</strong> from the dropdown (weekly or monthly).</li>
-  <li>Click <span class="ui-label">Fetch Option Chain</span> to load live data.</li>
+  <li>Click <span class="ui-label">Refresh Chain</span> to load live data.</li>
 </ol>
 
 <h3>Columns Explained</h3>
@@ -609,7 +613,7 @@
   <div class="legend-item"><div class="legend-dot" style="background:#64748B"></div>CANCELLED</div>
 </div>
 
-<h3>Account Manager Tab</h3>
+<h3>A/c Manager Tab</h3>
 <p>Shows your Angel One account summary:</p>
 <ul>
   <li><strong>Available Cash</strong> — funds available for new positions</li>
@@ -623,51 +627,82 @@
 <!-- ═══════════════════════════════════════════ -->
 <h1 id="ch3"><span class="ch-num">Chapter 3</span> Strategy Builder — Creating Strategies</h1>
 
-<p>The <strong>Strategy V2</strong> tab is the core of COGNEX. It lets you build multi-leg options strategies with sophisticated risk management, entry conditions, and auto-execution.</p>
+<p>The <strong>Strategies</strong> tab is the core of COGNEX. It lets you build multi-leg options strategies with sophisticated risk management, entry conditions, and auto-execution.</p>
 
 <h2>3.1 Opening the Strategy Builder</h2>
 <ol>
-  <li>Click the <span class="ui-label">Strategy V2</span> tab in the main window.</li>
-  <li>Click the <span class="ui-label" style="background:#1D4ED8">+ Create Strategy</span> button in the toolbar.</li>
+  <li>Click the <span class="ui-label">Strategies</span> tab in the main window.</li>
+  <li>Click the <span class="ui-label" style="background:#1D4ED8">Create Strategy</span> button in the toolbar.</li>
   <li>The <strong>Strategy Builder</strong> window opens.</li>
 </ol>
 
-<h2>3.2 Strategy Configuration (Header Section)</h2>
+<h2>3.2 Strategies DataGrid — Column Reference</h2>
+<p>The Strategies tab shows all saved strategies in a DataGrid. Each row is one strategy:</p>
+<table>
+  <thead><tr><th>Column</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>LID</td><td>Local ID — sequential identifier assigned when strategy is saved</td></tr>
+    <tr><td>Strategy</td><td>Strategy name</td></tr>
+    <tr><td>Instrument</td><td>Underlying index (NIFTY, BANKNIFTY, etc.) derived from the first leg</td></tr>
+    <tr><td>Status</td><td>Current engine status: RUNNING, STOPPED, ERROR</td></tr>
+    <tr><td>V2</td><td>V2 orchestrator ID (assigned when strategy is started)</td></tr>
+    <tr><td>Mode</td><td>Toggle button: blue = PAPER, red = LIVE. Click to switch (strategy must be stopped first)</td></tr>
+    <tr><td>PNL</td><td>Current session P&amp;L for this strategy (updates live)</td></tr>
+    <tr><td>Reason</td><td>Last exit reason (SL, TARGET, RMS, MANUAL)</td></tr>
+    <tr><td>LTP</td><td>Last traded price of the strategy's primary instrument</td></tr>
+    <tr><td>Entry</td><td>Strategy entry time</td></tr>
+    <tr><td>Exit</td><td>Strategy exit time</td></tr>
+    <tr><td>Actions</td><td>▶ Start / ■ Stop buttons for this strategy row</td></tr>
+  </tbody>
+</table>
+
+<h2>3.3 Strategy Configuration (Header Section)</h2>
 <table class="field-table">
   <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td>Strategy Name</td><td>Text</td><td>A unique name for your strategy (e.g., "Nifty Iron Condor")</td></tr>
+    <tr><td>Strategy Type</td><td>Dropdown</td><td>Type of strategy structure (e.g., Hybrid)</td></tr>
+    <tr><td>Template</td><td>Dropdown</td><td>Pre-built strategy templates to load default leg configurations</td></tr>
+    <tr><td>Symbol</td><td>Dropdown</td><td>Underlying index: NIFTY, BANKNIFTY, FINNIFTY</td></tr>
+    <tr><td>Contract Expiry</td><td>Dropdown</td><td><code>Weekly</code> (current week expiry) or <code>Monthly</code> (monthly expiry)</td></tr>
     <tr><td>Product Type</td><td>Dropdown</td><td><code>MIS</code> (intraday, auto-squared off at 3:20 PM) or <code>NRML</code> (carry overnight)</td></tr>
-    <tr><td>Expiry Type</td><td>Dropdown</td><td><code>Weekly</code> (current week expiry) or <code>Monthly</code> (monthly expiry)</td></tr>
-    <tr><td>Candle Start Time</td><td>Time</td><td>Time from which indicators start calculating (default: 09:15)</td></tr>
+    <tr><td>Start Time</td><td>Time</td><td>Time from which indicators start calculating and entries are allowed (default: 09:15)</td></tr>
   </tbody>
 </table>
 
 <hr class="section-break"/>
 
-<h2 id="ch3-legs">3.3 Configuring Legs</h2>
+<h2 id="ch3-legs">3.4 Configuring Legs</h2>
 <p>A <strong>leg</strong> is a single option contract (one buy or sell of a call or put). Every strategy has one or more legs. Click <span class="ui-label green">+ Add Leg</span> to add each leg.</p>
 
-<h3>Leg Fields Reference</h3>
+<h3>Leg Grid Columns (in the Legs DataGrid)</h3>
+<p>Each row in the legs grid represents one option contract. The columns are:</p>
 <table class="field-table">
-  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <thead><tr><th>Column</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td>Index</td><td>Dropdown</td><td>NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY</td></tr>
-    <tr><td>Option Type</td><td>CE / PE</td><td>Call (CE) or Put (PE)</td></tr>
-    <tr><td>Action</td><td>Buy / Sell</td><td>Buy = long premium, Sell = short premium (credit)</td></tr>
-    <tr><td>Lots</td><td>Number</td><td>Number of lots (1 Nifty lot = 25 units)</td></tr>
-    <tr><td>Expiry Offset</td><td>0 / 1 / 2</td><td>0 = current expiry, 1 = next expiry, 2 = next+1</td></tr>
-    <tr><td>Strike Mode</td><td>Radio</td><td>See §3.4 for all modes</td></tr>
-    <tr><td>Stop Loss</td><td>₹ price</td><td>Exit the leg if LTP hits this price</td></tr>
-    <tr><td>Target</td><td>₹ price</td><td>Exit the leg if LTP hits this price (profit target)</td></tr>
-    <tr><td>Trail SL</td><td>₹</td><td>Trailing stop-loss in ₹ — moves with favorable price movement</td></tr>
-    <tr><td>Use SL-M</td><td>Checkbox</td><td>Place SL-M (stop-loss market) exit order in Live mode</td></tr>
-    <tr><td>Adj. Leg</td><td>Checkbox</td><td>Mark as adjustment leg (activates on trigger, not immediately)</td></tr>
-    <tr><td>Trigger</td><td>Dropdown</td><td>Adjustment trigger: None / ParentLegPnL / UnderlyingMove</td></tr>
-    <tr><td>Trigger Value</td><td>₹ / pts</td><td>Threshold ₹ loss or point move that activates this leg</td></tr>
-    <tr><td>Parent#</td><td>Number</td><td>Zero-based index of the parent leg (for ParentLegPnL trigger)</td></tr>
+    <tr><td>Mode</td><td>Strike selection mode (ATM Point, ATM%, Straddle Width, CP, By Delta)</td></tr>
+    <tr><td>Strike</td><td>Resolved strike value (populated at entry time)</td></tr>
+    <tr><td>Index</td><td>NIFTY, BANKNIFTY, FINNIFTY</td></tr>
+    <tr><td>Type</td><td>CE (Call) or PE (Put)</td></tr>
+    <tr><td>Action</td><td>Buy or Sell</td></tr>
+    <tr><td>Lots</td><td>Number of lots</td></tr>
+    <tr><td>Product</td><td>MIS (intraday) or NRML (positional)</td></tr>
+    <tr><td>Trail SL</td><td>Trailing stop-loss in ₹ — moves with favorable price movement. Set 0 to disable.</td></tr>
+    <tr><td>SL-M</td><td>Checkbox — use SL-M exit order type in Live mode</td></tr>
+    <tr><td>Adj</td><td>Checkbox — mark as adjustment leg (starts inactive)</td></tr>
+    <tr><td>Trigger</td><td>Adjustment trigger type: None / ParentLegPnL / UnderlyingMove</td></tr>
+    <tr><td>Trig Val</td><td>Threshold ₹ loss or index point move that activates this adjustment leg</td></tr>
+    <tr><td>Parent#</td><td>Zero-based index of the parent leg in the grid (for ParentLegPnL trigger)</td></tr>
   </tbody>
 </table>
+
+<div class="callout info">
+  <div class="callout-icon">ℹ️</div>
+  <div class="callout-body">
+    <div class="callout-title">Stop Loss &amp; Target are in the Risk Management section</div>
+    <p>Individual leg SL price, Target price, and other advanced exits (ATR, time-based, partial exits, breakeven) are configured in the <strong>Risk Management</strong> panel below the legs grid — not in the leg row itself.</p>
+  </div>
+</div>
 
 <div class="callout success">
   <div class="callout-icon">✅</div>
@@ -679,7 +714,7 @@
 
 <hr class="section-break"/>
 
-<h2 id="ch3-strike">3.4 Strike Selection Modes</h2>
+<h2 id="ch3-strike">3.5 Strike Selection Modes</h2>
 <p>COGNEX offers 5 dynamic strike selection methods — all resolve to an actual strike at entry time using the live option chain.</p>
 
 <table>
@@ -730,7 +765,7 @@
 
 <hr class="section-break"/>
 
-<h2 id="ch3-risk">3.5 Per-Leg Risk Management</h2>
+<h2 id="ch3-risk">3.6 Per-Leg Risk Management</h2>
 
 <h3>Stop Loss (SL)</h3>
 <p>Enter a <strong>Stop Loss price</strong> (absolute LTP level, not P&amp;L) for the leg. When the live LTP of the option hits this level, COGNEX automatically exits the leg.</p>
@@ -766,7 +801,7 @@
       </tr>
     </tbody>
   </table>
-  <p style="font-size:13px;color:#64748B;margin-top:12px;">Set <code>Trail SL = 0</code> to disable trailing. Leave SL Price as initial SL.</p>
+  <p style="font-size:13px;color:#64748B;margin-top:12px;">Set <code>Trail SL = 0</code> in the leg row to disable trailing. Configure the fixed SL level in the Risk Management section below the leg grid.</p>
 </div>
 
 <h3>SL-M Exit Order Type <span class="feat-tag p2">F6</span></h3>
@@ -782,78 +817,61 @@
 
 <hr class="section-break"/>
 
-<h2 id="ch3-entry">3.6 Indicator-Based Entry Conditions <span class="feat-tag p0">F2</span></h2>
+<h2 id="ch3-entry">3.7 Indicator-Based Entry Conditions <span class="feat-tag p0">F2</span></h2>
 <p>You can add one or more <strong>technical indicator conditions</strong> that ALL must be true before COGNEX enters a leg. This prevents entries in unfavorable market regimes.</p>
 
-<h3>Available Indicators</h3>
+<h3>How to Add Entry Conditions</h3>
+<div class="example-box">
+  <div class="example-title">Steps</div>
+  <ul class="step-list">
+    <li><span class="step-num">1</span><span class="step-text">In the Strategy Builder, scroll to the <strong>Entry Conditions</strong> section.</span></li>
+    <li><span class="step-num">2</span><span class="step-text">Check <strong>Match ALL Conditions (AND)</strong> to require all rules to be true simultaneously (recommended).</span></li>
+    <li><span class="step-num">3</span><span class="step-text">Click <span class="ui-label green">ADD RULE</span> to add a condition row to the rules grid.</span></li>
+    <li><span class="step-num">4</span><span class="step-text">In each rule row, set the <strong>Logic</strong> column (AND/OR) and the <strong>Action</strong> column (select the indicator condition from the dropdown).</span></li>
+    <li><span class="step-num">5</span><span class="step-text">Add as many rules as needed. All AND rules must be satisfied before entry fires.</span></li>
+  </ul>
+</div>
+
+<h3>Available Indicators (in Action dropdown)</h3>
 <table>
-  <thead><tr><th>Indicator</th><th>Typical Use</th><th>Suggested Range</th></tr></thead>
+  <thead><tr><th>Indicator</th><th>Typical Use</th><th>Suggested Period</th></tr></thead>
   <tbody>
-    <tr><td>RSI</td><td>Momentum (overbought/oversold)</td><td>Period 14; threshold 30/70</td></tr>
-    <tr><td>EMA</td><td>Trend direction</td><td>Period 9, 21, 50, 200</td></tr>
-    <tr><td>SMA</td><td>Trend direction (smoother)</td><td>Period 20, 50, 200</td></tr>
-    <tr><td>VWAP</td><td>Intraday price vs. volume-weighted average</td><td>Period 1 (full day VWAP)</td></tr>
-    <tr><td>SuperTrend</td><td>Trend confirmation with ATR-based channel</td><td>Period 10, ATR multiplier 3</td></tr>
+    <tr><td>RSI</td><td>Momentum (overbought/oversold)</td><td>14; threshold 30/70</td></tr>
+    <tr><td>EMA</td><td>Trend direction</td><td>9, 21, 50, 200</td></tr>
+    <tr><td>SMA</td><td>Trend direction (smoother)</td><td>20, 50, 200</td></tr>
+    <tr><td>VWAP</td><td>Intraday price vs. volume-weighted average</td><td>Full-day</td></tr>
+    <tr><td>SuperTrend</td><td>Trend confirmation with ATR-based channel</td><td>Period 10, multiplier 3</td></tr>
   </tbody>
 </table>
-
-<h3>Comparators</h3>
-<div class="legend-row">
-  <div class="legend-item"><code>&lt;</code> Less than</div>
-  <div class="legend-item"><code>&gt;</code> Greater than</div>
-  <div class="legend-item"><code>&lt;=</code> Less than or equal</div>
-  <div class="legend-item"><code>&gt;=</code> Greater than or equal</div>
-  <div class="legend-item"><code>==</code> Equal (within 0.01)</div>
-</div>
-
-<h3>Timeframes</h3>
-<div class="legend-row">
-  <div class="legend-item"><code>MIN1</code></div>
-  <div class="legend-item"><code>MIN5</code></div>
-  <div class="legend-item"><code>MIN15</code></div>
-  <div class="legend-item"><code>MIN60</code></div>
-  <div class="legend-item"><code>DAY</code></div>
-</div>
-
-<div class="example-box">
-  <div class="example-title">Example: Only enter when RSI is oversold on 15-min</div>
-  <table>
-    <thead><tr><th>Indicator</th><th>Period</th><th>Timeframe</th><th>Comparator</th><th>Value</th></tr></thead>
-    <tbody>
-      <tr><td>RSI</td><td>14</td><td>MIN15</td><td>&lt;</td><td>30</td></tr>
-    </tbody>
-  </table>
-  <p style="font-size:13px;color:#334155;margin-top:10px;">With this condition set, the leg will only enter if the 14-period RSI on the 15-min chart is below 30. Perfect for buying put options after a sharp sell-off.</p>
-</div>
 
 <div class="callout info">
   <div class="callout-icon">💡</div>
   <div class="callout-body">
-    <div class="callout-title">Multiple Conditions = AND Logic</div>
-    <p>When you add multiple entry conditions, ALL of them must be satisfied simultaneously before the leg enters. Use this to combine trend + momentum filters.</p>
+    <div class="callout-title">AND Logic = All conditions must be true</div>
+    <p>With "Match ALL Conditions" checked, COGNEX only enters the leg when every rule row is satisfied at the same time. Use this to combine trend + momentum filters for higher-quality entries.</p>
   </div>
 </div>
 
 <hr class="section-break"/>
 
-<h2 id="ch3-strat-rms">3.7 Strategy-Level MTM Risk Management <span class="feat-tag p1">F5</span></h2>
+<h2 id="ch3-strat-rms">3.8 Strategy-Level MTM Risk Management <span class="feat-tag p1">F5</span></h2>
 <p>Beyond per-leg stop losses, COGNEX monitors the <strong>combined P&amp;L (MTM)</strong> of the entire strategy and can exit all legs at once when strategy-level risk limits are hit.</p>
 
 <table class="field-table">
-  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <thead><tr><th>Field (exact UI label)</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td>Strategy Trailing SL</td><td>₹ or %</td><td>Trail the strategy's peak P&amp;L. When P&amp;L falls by this amount from the peak, exit all legs.</td></tr>
-    <tr><td>Trailing is %</td><td>Checkbox</td><td>If checked, Trailing SL is treated as a percentage of peak profit. E.g., 20% = exit when P&amp;L falls 20% from peak.</td></tr>
-    <tr><td>Lock Profit At</td><td>₹</td><td>Once strategy P&amp;L reaches this value, lock in minimum profit.</td></tr>
-    <tr><td>Lock Profit To</td><td>₹</td><td>Minimum P&amp;L guaranteed after lock triggers. Strategy exits if P&amp;L falls below this.</td></tr>
+    <tr><td>Trail Distance (₹ or %)</td><td>₹ number</td><td>Trail the strategy's peak MTM P&amp;L. When P&amp;L falls by this amount from peak, exit all legs.</td></tr>
+    <tr><td>Use % (uncheck = ₹ points)</td><td>Checkbox</td><td>If checked, Trail Distance is treated as a % of peak profit. Uncheck for absolute ₹ points.</td></tr>
+    <tr><td>Activate at MTM Profit (₹)</td><td>₹ number</td><td>Once strategy P&amp;L reaches this value, the Lock Profit guard activates.</td></tr>
+    <tr><td>Lock to MTM Profit (₹)</td><td>₹ number</td><td>Minimum P&amp;L guaranteed after the lock triggers. Strategy exits if P&amp;L falls below this.</td></tr>
   </tbody>
 </table>
 
 <div class="example-box">
   <div class="example-title">Example: Lock ₹10,000 profit once ₹15,000 is reached</div>
   <ul>
-    <li>Set <strong>Lock Profit At</strong> = <code>15000</code></li>
-    <li>Set <strong>Lock Profit To</strong> = <code>10000</code></li>
+    <li>Set <strong>Activate at MTM Profit (₹)</strong> = <code>15000</code></li>
+    <li>Set <strong>Lock to MTM Profit (₹)</strong> = <code>10000</code></li>
   </ul>
   <p style="font-size:13px;color:#334155;margin-top:8px;">When strategy MTM hits ₹15,000, COGNEX activates a guard: if P&amp;L drops below ₹10,000, all legs are exited immediately. Your ₹10,000 profit is safe.</p>
 </div>
@@ -861,14 +879,14 @@
 <div class="example-box">
   <div class="example-title">Example: Strategy-level Trailing SL of ₹5,000</div>
   <ul>
-    <li>Set <strong>Strategy Trailing SL</strong> = <code>5000</code></li>
+    <li>Set <strong>Trail Distance (₹ or %)</strong> = <code>5000</code></li>
   </ul>
   <p style="font-size:13px;color:#334155;margin-top:8px;">If peak MTM = ₹20,000 and P&amp;L then falls to ₹15,000 (down ₹5,000 from peak), all legs exit. If instead peak rises to ₹25,000, the new stop becomes ₹20,000.</p>
 </div>
 
 <hr class="section-break"/>
 
-<h2 id="ch3-slippage">3.8 Slippage Configuration <span class="feat-tag p1">F4</span></h2>
+<h2 id="ch3-slippage">3.9 Slippage Configuration <span class="feat-tag p1">F4</span></h2>
 <p>In Paper trading mode, COGNEX simulates order fills with realistic slippage. The default is <strong>0.05%</strong> of the option LTP per order.</p>
 
 <table class="field-table">
@@ -888,7 +906,7 @@
 
 <hr class="section-break"/>
 
-<h2 id="ch3-adj">3.9 Adjustment Legs <span class="feat-tag p2">F8</span></h2>
+<h2 id="ch3-adj">3.10 Adjustment Legs <span class="feat-tag p2">F8</span></h2>
 <p>An <strong>adjustment leg</strong> is a leg that starts <em>inactive</em> and only enters the market when a specific trigger condition is met — allowing you to automate defensive adjustments without manual intervention.</p>
 
 <h3>Adjustment Trigger Types</h3>
@@ -937,7 +955,7 @@
 
 <hr class="section-break"/>
 
-<h2 id="ch3-delta">3.10 Delta-Based Strike Selection <span class="feat-tag p2">F7</span></h2>
+<h2 id="ch3-delta">3.11 Delta-Based Strike Selection <span class="feat-tag p2">F7</span></h2>
 <p>The <strong>By Delta</strong> strike mode uses the live Delta from the GreeksService to select the option strike whose delta most closely matches your target.</p>
 
 <div class="example-box">
@@ -976,9 +994,9 @@
   <div class="example-title">Steps to Run Your First Paper Trade</div>
   <ul class="step-list">
     <li><span class="step-num">1</span><span class="step-text">Build your strategy in the Strategy Builder (Chapter 3). Click <span class="ui-label green">Save Strategy</span>.</span></li>
-    <li><span class="step-num">2</span><span class="step-text">In the Strategy V2 tab, find your strategy in the <strong>Strategies DataGrid</strong>. The <strong>Mode</strong> column shows <span class="ui-label">PAPER</span> (blue) by default.</span></li>
+    <li><span class="step-num">2</span><span class="step-text">In the <strong>Strategies</strong> tab, find your strategy in the <strong>Strategies DataGrid</strong>. The <strong>Mode</strong> column shows <span class="ui-label">PAPER</span> (blue) by default.</span></li>
     <li><span class="step-num">3</span><span class="step-text">Click the <span class="ui-label">▶ Start</span> button (green) for the strategy row.</span></li>
-    <li><span class="step-num">4</span><span class="step-text">COGNEX begins monitoring live ticks. When the first candle forms (after Candle Start Time = 09:15), it evaluates entry conditions and enters legs.</span></li>
+    <li><span class="step-num">4</span><span class="step-text">COGNEX begins monitoring live ticks. When the first candle forms (after Start Time = 09:15), it evaluates entry conditions and enters legs.</span></li>
     <li><span class="step-num">5</span><span class="step-text">Monitor the <strong>Legs panel</strong> below — each leg shows live LTP, Status (OPEN/PENDING/EXITED), and running P&amp;L.</span></li>
   </ul>
 </div>
@@ -1035,7 +1053,7 @@
   <li>✅ Strategy has run in Paper mode for ≥ 5 days</li>
   <li>✅ Paper P&amp;L is positive or within acceptable drawdown</li>
   <li>✅ Stop Loss values are set for all legs</li>
-  <li>✅ Strategy Trailing SL or Lock Profit configured</li>
+  <li>✅ Trail Distance (MTM Trailing SL) or Lock Profit configured</li>
   <li>✅ Max Profit % and Max Loss % limits set in the Risk section</li>
   <li>✅ Product Type = <code>MIS</code> for intraday (auto square-off at 3:20 PM)</li>
   <li>✅ Sufficient margin available in your Angel One account</li>
@@ -1103,37 +1121,25 @@
   <div class="example-title">Step 2: Configure 4 Legs</div>
   <table>
     <thead>
-      <tr><th>#</th><th>Index</th><th>Type</th><th>Action</th><th>Lots</th><th>Strike Mode</th><th>Value</th><th>SL Price</th><th>Target</th></tr>
+      <tr><th>#</th><th>Index</th><th>Type</th><th>Action</th><th>Lots</th><th>Mode (Strike)</th><th>Value</th><th>Trail SL</th></tr>
     </thead>
     <tbody>
-      <tr>
-        <td>L1</td><td>NIFTY</td><td>CE</td><td>Sell</td><td>1</td>
-        <td>Straddle Width</td><td>1.0x</td><td>Entry × 3</td><td>Entry × 0.3</td>
-      </tr>
-      <tr>
-        <td>L2</td><td>NIFTY</td><td>CE</td><td>Buy</td><td>1</td>
-        <td>Straddle Width</td><td>1.5x</td><td>—</td><td>—</td>
-      </tr>
-      <tr>
-        <td>L3</td><td>NIFTY</td><td>PE</td><td>Sell</td><td>1</td>
-        <td>Straddle Width</td><td>1.0x</td><td>Entry × 3</td><td>Entry × 0.3</td>
-      </tr>
-      <tr>
-        <td>L4</td><td>NIFTY</td><td>PE</td><td>Buy</td><td>1</td>
-        <td>Straddle Width</td><td>1.5x</td><td>—</td><td>—</td>
-      </tr>
+      <tr><td>L1</td><td>NIFTY</td><td>CE</td><td>Sell</td><td>1</td><td>Straddle Width</td><td>1.0x</td><td>₹0</td></tr>
+      <tr><td>L2</td><td>NIFTY</td><td>CE</td><td>Buy</td><td>1</td><td>Straddle Width</td><td>1.5x</td><td>₹0</td></tr>
+      <tr><td>L3</td><td>NIFTY</td><td>PE</td><td>Sell</td><td>1</td><td>Straddle Width</td><td>1.0x</td><td>₹0</td></tr>
+      <tr><td>L4</td><td>NIFTY</td><td>PE</td><td>Buy</td><td>1</td><td>Straddle Width</td><td>1.5x</td><td>₹0</td></tr>
     </tbody>
   </table>
-  <p style="font-size:13px;color:#64748B;margin-top:8px;">1.0x Straddle Width = ATM straddle premium away from ATM. 1.5x = 50% further. This auto-adjusts for IV.</p>
+  <p style="font-size:13px;color:#64748B;margin-top:8px;">1.0x Straddle Width = 1× ATM straddle premium from ATM. 1.5x = 50% further OTM. Auto-adjusts for IV. Set individual SL/Target values in the Risk Management section below the leg grid.</p>
 </div>
 
 <div class="example-box">
   <div class="example-title">Step 3: Strategy-Level Risk</div>
   <table>
     <tbody>
-      <tr><td width="200"><strong>Strategy Trailing SL</strong></td><td>₹3,000 (exit if MTM falls ₹3,000 from peak)</td></tr>
-      <tr><td><strong>Lock Profit At</strong></td><td>₹5,000</td></tr>
-      <tr><td><strong>Lock Profit To</strong></td><td>₹3,000</td></tr>
+      <tr><td width="200"><strong>Trail Distance (₹ or %)</strong></td><td>₹3,000 (exit if MTM falls ₹3,000 from peak)</td></tr>
+      <tr><td><strong>Activate at MTM Profit (₹)</strong></td><td>₹5,000</td></tr>
+      <tr><td><strong>Lock to MTM Profit (₹)</strong></td><td>₹3,000</td></tr>
     </tbody>
   </table>
 </div>
@@ -1142,7 +1148,7 @@
   <div class="example-title">Step 4: Save &amp; Run in Paper Mode</div>
   <ul class="step-list">
     <li><span class="step-num">1</span><span class="step-text">Click <span class="ui-label green">Save Strategy</span>.</span></li>
-    <li><span class="step-num">2</span><span class="step-text">In Strategy V2 tab, ensure Mode = <span class="ui-label">PAPER</span>.</span></li>
+    <li><span class="step-num">2</span><span class="step-text">In the Strategies tab, ensure Mode = <span class="ui-label">PAPER</span>.</span></li>
     <li><span class="step-num">3</span><span class="step-text">At 09:15 AM (or your configured start time), click <span class="ui-label green">▶ Start</span>.</span></li>
     <li><span class="step-num">4</span><span class="step-text">COGNEX enters all 4 legs simultaneously at that tick's LTP.</span></li>
     <li><span class="step-num">5</span><span class="step-text">Monitor the P&amp;L updating in real time. Theta decay works in your favor over the day.</span></li>
@@ -1212,7 +1218,7 @@
 
 <hr class="section-break"/>
 
-<h2 id="ex3">Example 3: ATM Short Straddle with Strategy Trailing SL</h2>
+<h2 id="ex3">Example 3: ATM Short Straddle with MTM Trailing SL</h2>
 <p><strong>Thesis:</strong> Very low expected move (pre-result squeeze). Sell ATM call and put for maximum theta. Exit when either leg moves against you.</p>
 
 <div class="example-box">
@@ -1233,9 +1239,9 @@
   <div class="example-title">Strategy-Level Risk</div>
   <table>
     <tbody>
-      <tr><td width="220"><strong>Strategy Trailing SL</strong></td><td>₹8,000 (₹ absolute)</td></tr>
-      <tr><td><strong>Lock Profit At</strong></td><td>₹12,000</td></tr>
-      <tr><td><strong>Lock Profit To</strong></td><td>₹7,000</td></tr>
+      <tr><td width="220"><strong>Trail Distance (₹ or %)</strong></td><td>₹8,000 (uncheck "Use %")</td></tr>
+      <tr><td><strong>Activate at MTM Profit (₹)</strong></td><td>₹12,000</td></tr>
+      <tr><td><strong>Lock to MTM Profit (₹)</strong></td><td>₹7,000</td></tr>
     </tbody>
   </table>
   <p style="font-size:13px;color:#334155;margin-top:8px;">
@@ -1291,7 +1297,8 @@
 
 <h2>7.1 Opening the Reports Window</h2>
 <ol>
-  <li>In the <strong>MainWindow toolbar</strong>, click the <span class="ui-label">📊 Reports</span> button.</li>
+  <li>Click the <span class="ui-label">Strategies</span> tab.</li>
+  <li>At the bottom of the tab, click the <span class="ui-label">📊 Reports</span> button in the footer area.</li>
   <li>The Reports window opens (modeless — you can keep it open while trading).</li>
 </ol>
 
@@ -1390,7 +1397,7 @@
     <tr>
       <td><strong>Strategy MTM</strong></td>
       <td>All legs in one strategy</td>
-      <td>Strategy Trailing SL, Lock Profit At/To</td>
+      <td>Trail Distance, Activate at MTM Profit (₹), Lock to MTM Profit (₹)</td>
       <td>Exit all legs of that strategy</td>
     </tr>
     <tr>
@@ -1434,7 +1441,7 @@
   <li>Check the <strong>Status</strong> column — it may show PENDING (waiting for entry conditions).</li>
   <li>If you have Indicator Entry Conditions, verify the indicator value on your charting app for the configured timeframe. The condition may not yet be met.</li>
   <li>Ensure the WebSocket is connected (green status bar at bottom).</li>
-  <li>Verify Candle Start Time has passed (default 09:15).</li>
+  <li>Verify Start Time has passed (default 09:15).</li>
 </ul>
 
 <h3>Q: I see REJECTED orders in the Orders tab. How do I fix this?</h3>
@@ -1465,7 +1472,7 @@
 <ul>
   <li>Delta is calculated via Black-Scholes using live LTP, ATM IV, risk-free rate, and time-to-expiry.</li>
   <li>Ensure the LTP feed is live (check WebSocket status). If disconnected, last-tick prices are stale.</li>
-  <li>Click <span class="ui-label">Fetch Option Chain</span> to force a refresh.</li>
+  <li>Click <span class="ui-label">Refresh Chain</span> to force a refresh.</li>
 </ul>
 
 <h3>Q: How do I receive Telegram trade alerts?</h3>
@@ -1479,14 +1486,14 @@
 <h3>Q: How is paper trade P&amp;L calculated?</h3>
 <p>Paper P&amp;L = (Entry Price − Current LTP) × Lots × Lot Size, with configurable slippage applied at entry. No brokerage deducted in paper mode.</p>
 
-<h3>Q: What is the difference between SL Price and Trail SL?</h3>
+<h3>Q: What is the difference between SL (in Risk Management) and Trail SL (in the leg grid)?</h3>
 <table>
-  <thead><tr><th></th><th>SL Price</th><th>Trail SL</th></tr></thead>
+  <thead><tr><th></th><th>SL (Risk Management section)</th><th>Trail SL (leg grid column)</th></tr></thead>
   <tbody>
-    <tr><td><strong>Fixed / Dynamic</strong></td><td>Fixed absolute ₹ price level</td><td>Dynamic — moves with the market</td></tr>
+    <tr><td><strong>Fixed / Dynamic</strong></td><td>Fixed absolute ₹ price level — configured in the Risk Management panel</td><td>Dynamic ₹ distance — set in the Trail SL column of the leg row</td></tr>
     <tr><td><strong>Direction</strong></td><td>Set once, never changes</td><td>Only moves in your favor, never against</td></tr>
-    <tr><td><strong>Use when</strong></td><td>You have a specific max pain level</td><td>You want to lock partial profit as trade moves well</td></tr>
-    <tr><td><strong>Together</strong></td><td colspan="2">You can set both — Trail SL overrides SL Price once it becomes tighter</td></tr>
+    <tr><td><strong>Use when</strong></td><td>You have a specific max pain level</td><td>You want to lock partial profit as the trade moves well</td></tr>
+    <tr><td><strong>Together</strong></td><td colspan="2">Both are active simultaneously. The trailing SL tightens the fixed SL as the trade becomes profitable.</td></tr>
   </tbody>
 </table>
 
@@ -1502,14 +1509,14 @@
   </thead>
   <tbody>
     <tr><td>Trailing SL per leg (F1)</td><td>Strategy Builder → Leg row → Trail SL column</td><td><code>TrailingSL</code> (₹)</td></tr>
-    <tr><td>Indicator entry conditions (F2)</td><td>Strategy Builder → Leg → Entry Rules section</td><td>Indicator, Period, Timeframe, Comparator, Value</td></tr>
-    <tr><td>Performance Reports (F3)</td><td>Main window toolbar → 📊 Reports button</td><td>Date range selector</td></tr>
+    <tr><td>Indicator entry conditions (F2)</td><td>Strategy Builder → Entry Conditions section → ADD RULE</td><td>Logic (AND/OR), Action (indicator condition)</td></tr>
+    <tr><td>Performance Reports (F3)</td><td>Strategies tab → footer → 📊 Reports button</td><td>Date range selector</td></tr>
     <tr><td>Slippage per strategy (F4)</td><td>Strategy Builder → Risk section → Slippage %</td><td><code>SlippagePct</code> (default 0.05%)</td></tr>
     <tr><td>MTM Trailing SL + Lock Profit (F5)</td><td>Strategy Builder → Strategy Risk section</td><td><code>StrategyTrailingSL</code>, <code>LockProfitAt/To</code></td></tr>
     <tr><td>SL-M exit orders (F6)</td><td>Strategy Builder → Leg row → Use SL-M checkbox</td><td><code>UseSLMOnExit</code> (Live only)</td></tr>
     <tr><td>Delta-based strikes (F7)</td><td>Strategy Builder → Leg → Strike Mode → By Delta</td><td><code>TargetDelta</code> (0.0–1.0)</td></tr>
     <tr><td>Adjustment legs (F8)</td><td>Strategy Builder → Leg row → Adj. Leg checkbox</td><td>Trigger, Trigger Value, Parent#</td></tr>
-    <tr><td>Portfolio P&amp;L footer (F9)</td><td>Strategy V2 tab → below Strategies DataGrid</td><td>Auto-updates, no config needed</td></tr>
+    <tr><td>Portfolio P&amp;L footer (F9)</td><td>Strategies tab → below Strategies DataGrid</td><td>Auto-updates, no config needed</td></tr>
   </tbody>
 </table>
 
