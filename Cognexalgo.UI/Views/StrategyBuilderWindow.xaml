@@ -429,6 +429,9 @@
                                 <DataGridTextColumn Header="Lots" Binding="{Binding TotalLots}" Width="60"/>
                                 <DataGridTextColumn Header="Product" Binding="{Binding ProductType}" Width="80"/>
 
+                                <!-- F1: Per-leg trailing SL (0 = disabled) -->
+                                <DataGridTextColumn Header="Trail SL" Binding="{Binding TrailingSL, UpdateSourceTrigger=PropertyChanged}" Width="65"/>
+
                                 <!-- F6: SL-M exit checkbox -->
                                 <DataGridCheckBoxColumn Header="SL-M" Binding="{Binding UseSLMOnExit, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
 
@@ -449,6 +452,7 @@
                                     </DataGridTemplateColumn.CellEditingTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Trig Val" Binding="{Binding AdjustmentTriggerValue, UpdateSourceTrigger=PropertyChanged}" Width="70"/>
+                                <DataGridTextColumn Header="Parent#" Binding="{Binding ParentLegIndex, UpdateSourceTrigger=PropertyChanged}" Width="65"/>
 
                                 <DataGridTemplateColumn Header="Remove" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
