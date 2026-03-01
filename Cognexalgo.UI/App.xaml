@@ -6,7 +6,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Styles/DarkTheme.xaml"/>
+                <ResourceDictionary Source="Styles/SilverTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>

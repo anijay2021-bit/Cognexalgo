@@ -575,7 +575,7 @@
                         <!-- Partial Exits -->
                         <CheckBox Content="Enable Partial Exits" IsChecked="{Binding EnablePartialExits}" Margin="0,0,0,10" FontWeight="SemiBold"/>
                         <StackPanel Margin="20,0,0,15" IsEnabled="{Binding EnablePartialExits}">
-                            <DataGrid ItemsSource="{Binding PartialExitLevels}" AutoGenerateColumns="False" CanUserAddRows="False" Style="{StaticResource DarkDataGridStyle}" Background="#2A2A2A" Foreground="White" BorderThickness="1" BorderBrush="#444">
+                            <DataGrid ItemsSource="{Binding PartialExitLevels}" AutoGenerateColumns="False" CanUserAddRows="False" Style="{StaticResource DarkDataGridStyle}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Exit %" Binding="{Binding Percentage}" Width="*"/>
                                     <DataGridTextColumn Header="Target %" Binding="{Binding TargetPercent}" Width="*"/>

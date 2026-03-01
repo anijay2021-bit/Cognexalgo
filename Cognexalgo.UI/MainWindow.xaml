@@ -118,7 +118,7 @@
                     <TextBlock Text="{Binding TotalMtm, StringFormat=₹ {0:N2}}" FontSize="28" FontWeight="Bold">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#1ABC9C"/>
+                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding TotalMtm, Converter={StaticResource IsNegativeConverter}}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
@@ -682,10 +682,10 @@
                                                                 <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Status}" Value="open">
-                                                                <Setter Property="Foreground" Value="#60A5FA"/> <!-- Blue -->
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/> <!-- Blue -->
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Status}" Value="pending">
-                                                                <Setter Property="Foreground" Value="#60A5FA"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -760,7 +760,7 @@
                                         <DataTemplate>
                                             <StackPanel VerticalAlignment="Center" Margin="5,0">
                                                 <Grid>
-                                                    <ProgressBar Value="{Binding ActualProfit}" Maximum="{Binding ProtectedProfit}" Height="4" Foreground="#10B981" Background="#444"/>
+                                                    <ProgressBar Value="{Binding ActualProfit}" Maximum="{Binding ProtectedProfit}" Height="4" Foreground="#10B981" Background="#E2E8F0"/>
                                                 </Grid>
                                             </StackPanel>
                                         </DataTemplate>
@@ -952,8 +952,8 @@
                                 </Button.Resources>
                             </Button>
                             
-                            <Button Command="{Binding CreateStrategyCommand}" Content="Create Strategy" 
-                                    Background="Transparent" Foreground="#1ABC9C" BorderBrush="#1ABC9C" BorderThickness="1.5"
+                            <Button Command="{Binding CreateStrategyCommand}" Content="Create Strategy"
+                                    Background="Transparent" Foreground="{StaticResource PrimaryBrush}" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="1.5"
                                     Width="120" Height="32" Margin="0,0,15,0" FontWeight="Bold">
                                 <Button.Resources>
                                     <Style TargetType="Border">
