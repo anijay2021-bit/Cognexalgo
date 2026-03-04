@@ -53,6 +53,7 @@ namespace Cognexalgo.Core.Models
         public OptionType OptionType { get; set; }
         public ActionType Action { get; set; }
         public int TotalLots { get; set; }
+        public int LotSize { get; set; } = 1; // Resolved from instrument master at entry time
         public string ProductType { get; set; } // "MIS", "NRML"
         public string ExpiryType { get; set; } // "Weekly", "Monthly"
         public int ExpiryOffset { get; set; } = 0; // 0 = Current, 1 = Next, 2 = Next+1
