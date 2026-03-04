@@ -91,9 +91,7 @@ namespace Cognexalgo.UI
             // 1. Cancel immediate close
             e.Cancel = true;
 
-            // 2. Show Sync Overlay
-            // Assuming we'll add a Grid named "SyncOverlay" in XAML
-            if (SyncOverlay != null) SyncOverlay.Visibility = Visibility.Visible;
+            // 2. Sync overlay removed (Design2 uses no named overlay element)
 
             // 3. Run Safe Exit Logic
             if (DataContext is ViewModels.MainViewModel vm)
@@ -116,7 +114,6 @@ namespace Cognexalgo.UI
 
                         if (result == MessageBoxResult.Yes)
                         {
-                            if (SyncOverlay != null) SyncOverlay.Visibility = Visibility.Collapsed;
                             return; // User cancelled exit to retry
                         }
                     }

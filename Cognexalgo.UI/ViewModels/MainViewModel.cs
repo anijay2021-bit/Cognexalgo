@@ -91,6 +91,14 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty]
         private decimal _totalV2Pnl;
 
+        // Design2: spot price shown in Option Chain header
+        [ObservableProperty]
+        private double _spotPrice;
+
+        // Design2: intraday P&L sparkline
+        public ObservableCollection<PnlPoint> PnlHistory { get; } = new();
+        private DateTime _lastPnlSample = DateTime.MinValue;
+
         public ObservableCollection<HybridStrategyConfig> Strategies { get; } = new ObservableCollection<HybridStrategyConfig>();
         public ObservableCollection<Order> Orders { get; } = new ObservableCollection<Order>();
         public ObservableCollection<Position> Positions { get; } = new ObservableCollection<Position>(); // Changed from Order
@@ -380,6 +388,14 @@ namespace Cognexalgo.UI.ViewModels
                             pos.Vega  = Math.Round(g.Vega, 2);
                         }
                     }
+                }
+
+                // ─── Intraday P&L sparkline sample (every 30 s) ──────────
+                if ((DateTime.Now - _lastPnlSample).TotalSeconds >= 30)
+                {
+                    _lastPnlSample = DateTime.Now;
+                    PnlHistory.Add(new PnlPoint { Time = DateTime.Now, Value = TotalMtm });
+                    if (PnlHistory.Count > 200) PnlHistory.RemoveAt(0);
                 }
 
                 // ─── V2: Forward tick to V2 Orchestrator ─────
@@ -892,6 +908,7 @@ namespace Cognexalgo.UI.ViewModels
                     }
                 });
 
+                SpotPrice = spot;
                 Log($"✓ Option chain: {OptionChain.Count} strikes with market IV & Greeks for {idx}.", "SUCCESS");
 
                 // Cache option chain for V2 strategy strike resolution
@@ -1136,6 +1153,12 @@ namespace Cognexalgo.UI.ViewModels
             }
         }
 
+        // Design2 command aliases
+        [RelayCommand] public void KillSwitch() => _ = ExitAll();
+        [RelayCommand] public void ClearLog() => Logs.Clear();
+        [RelayCommand] public void AddStrategy() => CreateStrategy();
+        [RelayCommand] public async Task RefreshStrategies() => await LoadStrategies();
+
         [RelayCommand]
         public async Task<bool> ExitPosition(Position position)
         {
@@ -1201,5 +1224,11 @@ namespace Cognexalgo.UI.ViewModels
                 return false;
             }
         }
+    }
+
+    public class PnlPoint
+    {
+        public DateTime Time  { get; set; }
+        public double   Value { get; set; }
     }
 }

@@ -12,7 +12,15 @@
       "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/net8.0/\")",
       "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/4.6.2/\")",
       "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/\")",
-      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/precompiledassemblies/\")"
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/precompiledassemblies/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/precompiledassemblies/net8.0/\")",
+      "Bash(dotnet build Design1Preview.csproj)",
+      "Bash(dotnet build Design2Preview.csproj)",
+      "Bash(dotnet build -c Release)",
+      "Bash(dotnet build Cognexalgo.UI/Cognexalgo.UI.csproj)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\anijay\\.gemini\\antigravity\\scratch\\COGNEX\\SYNCUI\\Design1\\Preview"
     ]
   }
 }

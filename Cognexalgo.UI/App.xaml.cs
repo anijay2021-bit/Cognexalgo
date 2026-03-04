@@ -16,6 +16,8 @@ namespace Cognexalgo.UI;
 
         protected override async void OnStartup(StartupEventArgs e)
         {
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
+                "Ngo9BigBOggjHTQxAR8/V1JGaF1cXmhNYVBpR2NbeU51flBCalhSVAciSV9jS3hTdUVnWXpbdXFQRWJVVU91XQ==");
             base.OnStartup(e);
 
             // [NEW] Load Configuration
