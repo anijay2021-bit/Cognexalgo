@@ -41,8 +41,14 @@ namespace Cognexalgo.Core.Models
 
         // Closest Premium Mode
         public double TargetPremium { get; set; }
-        public string PremiumOperator { get; set; } // "~", ">=", "<="
+        public string PremiumOperator { get; set; } = "~"; // "~" closest | ">=" at-least | "<=" at-most
         public bool WaitForMatch { get; set; } = false;
+        /// <summary>
+        /// Max acceptable deviation from TargetPremium (in ₹) when WaitForMatch is true.
+        /// Entry is deferred until a strike exists within this band.
+        /// 0 = no tolerance guard (always enter with closest).
+        /// </summary>
+        public double PremiumTolerance { get; set; } = 10.0;
 
         // F7: Delta Mode
         /// <summary>Target delta magnitude (0.0–1.0). Used when Mode == ByDelta.</summary>
@@ -78,6 +84,11 @@ namespace Cognexalgo.Core.Models
         public double StopLossPrice { get; set; }
         public double TargetPrice { get; set; }
         public double TrailingSL { get; set; }
+
+        /// <summary>SL as % of entry premium. 25 = exit when premium moves 25% against position. Overrides StopLossPrice at entry if > 0.</summary>
+        public double StopLossPercent { get; set; } = 0;
+        /// <summary>Target as % of entry premium. 50 = exit when 50% profit is locked. Overrides TargetPrice at entry if > 0.</summary>
+        public double TargetPercent { get; set; } = 0;
 
         // F6: SL-M exit order
         /// <summary>Use SL-M (stop-loss market) order type for exits in live mode.</summary>
@@ -224,25 +235,33 @@ namespace Cognexalgo.Core.Models
 
         private int CalculateClosestPremiumStrike(List<OptionChainItem> chain)
         {
-            // Default: Wait for Match if no premium found?
-            // Handled by returning 0
-            
-            var targetOptionType = OptionType == OptionType.Call ? "CE" : "PE";
-            var relevantOptions = chain.Where(x => x.OptionType == targetOptionType).ToList();
-            
-            if (!relevantOptions.Any()) return 0;
+            var targetType = OptionType == OptionType.Call ? "CE" : "PE";
+            var candidates = chain.Where(x => x.OptionType == targetType && x.LTP > 0).ToList();
+            if (!candidates.Any()) return 0;
 
-            // 1. Find Closest Match
-            var bestMatch = relevantOptions.OrderBy(x => Math.Abs(x.LTP - TargetPremium)).FirstOrDefault();
-            
-            if (bestMatch == null) return 0;
-            
-            // 2. Check Tolerance (Optional)
-            // If we strictly want to match "within 5%", we can add a check here.
-            // For now, returning the *abs* closest is standard behavior for "Closest Premium".
-            
-            SelectedPremium = bestMatch.LTP;
-            return bestMatch.Strike;
+            // ── 1. Apply operator filter ──────────────────────────────────────────
+            IEnumerable<OptionChainItem> filtered = PremiumOperator switch
+            {
+                ">=" => candidates.Where(x => x.LTP >= TargetPremium),  // at-least: entry premium >= target
+                "<=" => candidates.Where(x => x.LTP <= TargetPremium),  // at-most:  entry premium <= target
+                _    => candidates                                        // "~" closest: no pre-filter
+            };
+
+            // If operator filtering left nothing, fall back to full list
+            if (!filtered.Any()) filtered = candidates;
+
+            // ── 2. Pick candidate with LTP closest to TargetPremium ───────────────
+            var best = filtered.OrderBy(x => Math.Abs(x.LTP - TargetPremium)).First();
+
+            // ── 3. WaitForMatch guard: defer entry if best is outside tolerance ───
+            if (WaitForMatch && PremiumTolerance > 0 &&
+                Math.Abs(best.LTP - TargetPremium) > PremiumTolerance)
+            {
+                return 0; // no match within band — skip this tick, try next
+            }
+
+            SelectedPremium = best.LTP;
+            return best.Strike;
         }
 
         public string GetStrikeDisplay()

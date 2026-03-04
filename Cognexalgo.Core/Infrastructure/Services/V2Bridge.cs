@@ -41,9 +41,12 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public bool IsInitialized { get; private set; } = false;
         public event Action<TickContext>? OnTickProcessed;
 
-        // Option chain cache for strategy strike resolution
+        // Option chain cache for strategy strike resolution (all 5 supported indices)
         public System.Collections.Generic.List<Models.OptionChainItem>? CachedNiftyChain { get; set; }
         public System.Collections.Generic.List<Models.OptionChainItem>? CachedBankNiftyChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? CachedFinniftyChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? CachedMidcpniftyChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? CachedSensexChain { get; set; }
 
         /// <summary>
         /// Initialize the V2 DI container and all services.
@@ -266,19 +269,28 @@ namespace Cognexalgo.Core.Infrastructure.Services
         /// Feed a tick from the existing TickerService to all V2 strategies.
         /// Call this from the OnTick handler in MainViewModel.
         /// </summary>
-        public async Task DispatchTickAsync(double niftyLtp, double bankNiftyLtp, 
-                                             double finniftyLtp = 0)
+        public async Task DispatchTickAsync(
+            double niftyLtp,
+            double bankNiftyLtp,
+            double finniftyLtp    = 0,
+            double midcpniftyLtp  = 0,
+            double sensexLtp      = 0)
         {
             if (!IsInitialized || Orchestrator.ActiveCount == 0) return;
 
             var tick = new TickContext
             {
-                NiftyLtp = (decimal)niftyLtp,
-                BankNiftyLtp = (decimal)bankNiftyLtp,
-                FinniftyLtp = (decimal)finniftyLtp,
-                Timestamp = DateTime.Now,
-                NiftyOptionChain = CachedNiftyChain,
-                BankNiftyOptionChain = CachedBankNiftyChain
+                NiftyLtp         = (decimal)niftyLtp,
+                BankNiftyLtp     = (decimal)bankNiftyLtp,
+                FinniftyLtp      = (decimal)finniftyLtp,
+                MidcpniftyLtp    = (decimal)midcpniftyLtp,
+                SensexLtp        = (decimal)sensexLtp,
+                Timestamp        = DateTime.Now,
+                NiftyOptionChain     = CachedNiftyChain,
+                BankNiftyOptionChain = CachedBankNiftyChain,
+                FinniftyOptionChain  = CachedFinniftyChain,
+                MidcpniftyOptionChain = CachedMidcpniftyChain,
+                SensexOptionChain    = CachedSensexChain,
             };
 
             await Orchestrator.DispatchTickAsync(tick);

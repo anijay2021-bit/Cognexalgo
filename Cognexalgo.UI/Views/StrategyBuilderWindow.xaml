@@ -27,43 +27,74 @@
         <!-- Inputs -->
         <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="15" Margin="0,0,0,20">
             <StackPanel>
+                <!-- Row 1: Strategy Name | Underlying | Strategy Type -->
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                          <ColumnDefinition Width="2*"/>
                          <ColumnDefinition Width="*"/>
                          <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <StackPanel Margin="0,0,5,0">
                          <TextBlock Text="Strategy Name" Style="{StaticResource LabelTextStyle}"/>
                          <TextBox Text="{Binding StrategyName}" Style="{StaticResource DarkTextBoxStyle}"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="5,0,5,0">
+                         <TextBlock Text="Underlying" Style="{StaticResource LabelTextStyle}"/>
+                         <ComboBox ItemsSource="{Binding Symbols}" SelectedItem="{Binding Symbol}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="5,0,0,0">
                          <TextBlock Text="Strategy Type" Style="{StaticResource LabelTextStyle}"/>
-                         <ComboBox ItemsSource="{Binding StrategyTypes}" SelectedItem="{Binding SelectedStrategyType}" Style="{StaticResource DarkComboBoxStyle}"/>
+                         <ComboBox ItemsSource="{Binding StrategyCategories}" SelectedItem="{Binding StrategyCategory}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 2: Option Strategy cascading combos (visible only when Option Strategy selected) -->
+                <Grid Margin="0,0,0,10"
+                      Visibility="{Binding IsOptionStrategyCategory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Margin="0,0,5,0">
+                        <TextBlock Text="Market Bias Type" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding MarketBiasTypes}"
+                                  SelectedItem="{Binding MarketBiasType}"
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                        <TextBlock Text="Strategy" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding AvailableOptionStrategies}"
+                                  SelectedItem="{Binding SelectedOptionStrategy}"
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 3: Timeframe | Template (Indicator Strategy only) -->
+                <Grid Visibility="{Binding IsIndicatorStrategyCategory, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Margin="0,0,5,0">
+                        <TextBlock Text="Timeframe" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding Timeframes}" SelectedItem="{Binding Timeframe}" Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="5,0,5,0">
+                        <TextBlock Text="Sub-Type" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{Binding StrategyTypes}" SelectedItem="{Binding SelectedStrategyType}" Style="{StaticResource DarkComboBoxStyle}"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Margin="5,0,0,0">
                          <TextBlock Text="Template" Style="{StaticResource LabelTextStyle}"/>
                          <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" Style="{StaticResource DarkComboBoxStyle}"/>
-                    </StackPanel>
-                </Grid>
-
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-    
-                    <StackPanel Margin="0,0,5,0">
-                        <TextBlock Text="Symbol" Style="{StaticResource LabelTextStyle}"/>
-                        <ComboBox ItemsSource="{Binding Symbols}" SelectedItem="{Binding Symbol}" Style="{StaticResource DarkComboBoxStyle}"/>
-                    </StackPanel>
-    
-                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
-                        <TextBlock Text="Timeframe" Style="{StaticResource LabelTextStyle}"/>
-                        <ComboBox ItemsSource="{Binding Timeframes}" SelectedItem="{Binding Timeframe}" Style="{StaticResource DarkComboBoxStyle}"/>
                     </StackPanel>
                 </Grid>
 

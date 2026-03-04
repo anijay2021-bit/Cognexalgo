@@ -133,10 +133,15 @@ namespace Cognexalgo.Core.Domain.Strategies
         public decimal NiftyLtp { get; set; }
         public decimal BankNiftyLtp { get; set; }
         public decimal FinniftyLtp { get; set; }
+        public decimal MidcpniftyLtp { get; set; }
+        public decimal SensexLtp { get; set; }
 
         // Option chain for strike resolution (populated by V2Bridge if available)
         public System.Collections.Generic.List<Models.OptionChainItem>? NiftyOptionChain { get; set; }
         public System.Collections.Generic.List<Models.OptionChainItem>? BankNiftyOptionChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? FinniftyOptionChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? MidcpniftyOptionChain { get; set; }
+        public System.Collections.Generic.List<Models.OptionChainItem>? SensexOptionChain { get; set; }
     }
 
     public class CandleContext

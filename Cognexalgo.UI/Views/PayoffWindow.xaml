@@ -1,0 +1,167 @@
+<Window x:Class="Cognexalgo.UI.Views.PayoffWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:chart="http://schemas.syncfusion.com/wpf"
+        xmlns:conv="clr-namespace:Cognexalgo.UI.Converters"
+        mc:Ignorable="d"
+        Title="Payoff Diagram"
+        Width="900" Height="600"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Header -->
+            <RowDefinition Height="Auto"/>  <!-- Stats bar -->
+            <RowDefinition Height="*"/>     <!-- Chart -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="{Binding StrategyName, StringFormat='PAYOFF — {0}'}"
+                   Style="{StaticResource HeaderTextStyle}"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,12"/>
+
+        <!-- Stats bar -->
+        <Border Grid.Row="1"
+                Style="{StaticResource CardBorderStyle}"
+                Padding="15,10"
+                Margin="0,0,0,12">
+            <UniformGrid Rows="1" Columns="5">
+
+                <StackPanel Margin="0,0,15,0">
+                    <TextBlock Text="Max Profit" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding MaxProfitText}" Foreground="#4CAF50" FontSize="14" FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,15,0">
+                    <TextBlock Text="Max Loss" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding MaxLossText}" Foreground="#F44336" FontSize="14" FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,15,0">
+                    <TextBlock Text="Net Premium" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding NetPremiumText}" Foreground="{StaticResource TextMainBrush}" FontSize="14" FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,15,0">
+                    <TextBlock Text="Upper BE" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding UpperBeText}" Foreground="#FF9800" FontSize="14" FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Lower BE" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                    <TextBlock Text="{Binding LowerBeText}" Foreground="#FF9800" FontSize="14" FontWeight="Bold"/>
+                </StackPanel>
+
+            </UniformGrid>
+        </Border>
+
+        <!-- Payoff Chart -->
+        <Border Grid.Row="2" Background="White" CornerRadius="6" Padding="10">
+            <chart:SfChart Background="White">
+
+                <chart:SfChart.PrimaryAxis>
+                    <chart:NumericalAxis Header="Underlying Price (₹)"
+                                         LabelFormat="N0"
+                                         EdgeLabelsDrawingMode="Shift"/>
+                </chart:SfChart.PrimaryAxis>
+
+                <chart:SfChart.SecondaryAxis>
+                    <chart:NumericalAxis Header="P&amp;L (₹)"
+                                         LabelFormat="N0"/>
+                </chart:SfChart.SecondaryAxis>
+
+                <!-- Green fill: profit area (Pnl ≥ 0) -->
+                <chart:AreaSeries ItemsSource="{Binding ProfitPoints}"
+                                  XBindingPath="Price"
+                                  YBindingPath="Pnl"
+                                  Interior="#4CAF50"
+                                  Opacity="0.35"
+                                  StrokeThickness="0"
+                                  ShowTooltip="False"
+                                  Label="Profit"/>
+
+                <!-- Red fill: loss area (Pnl ≤ 0) -->
+                <chart:AreaSeries ItemsSource="{Binding LossPoints}"
+                                  XBindingPath="Price"
+                                  YBindingPath="Pnl"
+                                  Interior="#F44336"
+                                  Opacity="0.35"
+                                  StrokeThickness="0"
+                                  ShowTooltip="False"
+                                  Label="Loss"/>
+
+                <!-- Payoff line on top -->
+                <chart:SplineSeries ItemsSource="{Binding PayoffPoints}"
+                                    XBindingPath="Price"
+                                    YBindingPath="Pnl"
+                                    Interior="#00BCD4"
+                                    StrokeThickness="2.5"
+                                    ShowTooltip="True"
+                                    TooltipTemplate="{StaticResource PayoffTooltipTemplate}"
+                                    Label="P&amp;L"/>
+
+                <!-- Annotations -->
+                <chart:SfChart.Annotations>
+                    <!-- Zero line -->
+                    <chart:HorizontalLineAnnotation Y1="0"
+                                                     Stroke="#888888"
+                                                     StrokeDashArray="4,3"
+                                                     StrokeThickness="1"/>
+                    <!-- Current spot -->
+                    <chart:VerticalLineAnnotation X1="{Binding SpotAnnotation}"
+                                                   Stroke="#2196F3"
+                                                   StrokeDashArray="5,3"
+                                                   StrokeThickness="1.5"/>
+                    <!-- Upper breakeven -->
+                    <chart:VerticalLineAnnotation X1="{Binding UpperBeAnnotation}"
+                                                   Stroke="#FF9800"
+                                                   StrokeDashArray="4,3"
+                                                   StrokeThickness="1"/>
+                    <!-- Lower breakeven -->
+                    <chart:VerticalLineAnnotation X1="{Binding LowerBeAnnotation}"
+                                                   Stroke="#FF9800"
+                                                   StrokeDashArray="4,3"
+                                                   StrokeThickness="1"/>
+                </chart:SfChart.Annotations>
+
+                <chart:SfChart.Legend>
+                    <chart:ChartLegend Visibility="Collapsed"/>
+                </chart:SfChart.Legend>
+
+            </chart:SfChart>
+        </Border>
+
+    </Grid>
+
+    <Window.Resources>
+        <conv:IsNegativeConverter x:Key="IsNegativeConverter"/>
+
+        <!-- Tooltip template for payoff line -->
+        <DataTemplate x:Key="PayoffTooltipTemplate">
+            <Border Background="#222" CornerRadius="4" Padding="8,5">
+                <StackPanel>
+                    <TextBlock Text="{Binding Item.Price, StringFormat='Price: ₹{0:N0}'}" Foreground="White" FontSize="12"/>
+                    <TextBlock Text="{Binding Item.Pnl,   StringFormat='P&amp;L:  ₹{0:N0}'}"
+                               FontSize="12" FontWeight="Bold">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#4CAF50"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Item.Pnl, Converter={StaticResource IsNegativeConverter}}" Value="True">
+                                        <Setter Property="Foreground" Value="#F44336"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+    </Window.Resources>
+</Window>

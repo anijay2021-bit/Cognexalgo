@@ -40,6 +40,8 @@ namespace Cognexalgo.Core.Models
         // Optional settings
         public bool AutoExecute { get; set; } = true;
         public string CandleStartTime { get; set; } = "09:15";
+        /// <summary>Time-based square-off (HH:mm). Empty = disabled. All open legs force-exited when wall-clock reaches this time.</summary>
+        public string SquareOffTime { get; set; } = string.Empty;
         public int MaxProfitPercent { get; set; } = 0; // 0 = disabled
         public int MaxLossPercent { get; set; } = 0; // 0 = disabled
 

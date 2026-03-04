@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Input;
 using Cognexalgo.Core.Models;
 using Cognexalgo.Core.Rules;
+using Cognexalgo.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Newtonsoft.Json;
@@ -223,8 +224,38 @@ namespace Cognexalgo.UI.ViewModels
         public IEnumerable<Comparator> Comparators => Enum.GetValues(typeof(Comparator)).Cast<Comparator>();
         public IEnumerable<ValueSource> ValueSources => Enum.GetValues(typeof(ValueSource)).Cast<ValueSource>();
 
-        public ObservableCollection<string> Symbols { get; } = new ObservableCollection<string> { "NIFTY", "BANKNIFTY" };
+        public ObservableCollection<string> Symbols { get; } = new ObservableCollection<string> { "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX" };
         public ObservableCollection<string> Timeframes { get; } = new ObservableCollection<string> { "1min", "3min", "5min", "10min", "15min", "30min", "60min" };
+
+        // ── Top-level category: Indicator Strategy vs Option Strategy ──
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsOptionStrategyCategory))]
+        [NotifyPropertyChangedFor(nameof(IsIndicatorStrategyCategory))]
+        private string _strategyCategory = "Indicator Strategy";
+
+        public ObservableCollection<string> StrategyCategories { get; } = new ObservableCollection<string> { "Indicator Strategy", "Option Strategy" };
+
+        public bool IsOptionStrategyCategory => StrategyCategory == "Option Strategy";
+        public bool IsIndicatorStrategyCategory => StrategyCategory == "Indicator Strategy";
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AvailableOptionStrategies))]
+        private string _marketBiasType = string.Empty;
+
+        public ObservableCollection<string> MarketBiasTypes { get; } = new ObservableCollection<string> { "Neutral", "Bullish", "Bearish" };
+
+        [ObservableProperty]
+        private string _selectedOptionStrategy = string.Empty;
+
+        public ObservableCollection<string> AvailableOptionStrategies { get; } = new ObservableCollection<string>();
+
+        partial void OnMarketBiasTypeChanged(string value)
+        {
+            AvailableOptionStrategies.Clear();
+            SelectedOptionStrategy = string.Empty;
+            foreach (var s in StrategyRepository.GetStrategies(value))
+                AvailableOptionStrategies.Add(s);
+        }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsRuleBuilderVisible))]

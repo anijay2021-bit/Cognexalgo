@@ -116,6 +116,16 @@ namespace Cognexalgo.Core.Domain.Strategies
                 DateTime.Now.TimeOfDay < startTime)
                 return Task.CompletedTask;
 
+            // Time-based squareoff: force-exit all open legs at SquareOffTime
+            if (!string.IsNullOrEmpty(_config.SquareOffTime) &&
+                TimeSpan.TryParse(_config.SquareOffTime, out var exitTs) &&
+                DateTime.Now.TimeOfDay >= exitTs &&
+                _config.Legs.Any(l => l.Status == "OPEN"))
+            {
+                SquareOffAll("TIME-EXIT");
+                return Task.CompletedTask;
+            }
+
             // Track whether any leg enters this tick so we set IN_POSITION after all legs are processed.
             // This fixes multi-leg: setting IN_POSITION mid-loop blocked subsequent PENDING legs.
             bool anyLegEnteredThisTick = false;
@@ -126,15 +136,20 @@ namespace Cognexalgo.Core.Domain.Strategies
 
                 decimal spotLtp = leg.Index switch
                 {
-                    "BANKNIFTY" => tick.BankNiftyLtp,
-                    "FINNIFTY"  => tick.FinniftyLtp,
-                    _           => tick.NiftyLtp
+                    "BANKNIFTY"  => tick.BankNiftyLtp,
+                    "FINNIFTY"   => tick.FinniftyLtp,
+                    "MIDCPNIFTY" => tick.MidcpniftyLtp,
+                    "SENSEX"     => tick.SensexLtp,
+                    _            => tick.NiftyLtp
                 };
 
                 var chain = leg.Index switch
                 {
-                    "BANKNIFTY" => tick.BankNiftyOptionChain,
-                    _           => tick.NiftyOptionChain
+                    "BANKNIFTY"  => tick.BankNiftyOptionChain,
+                    "FINNIFTY"   => tick.FinniftyOptionChain,
+                    "MIDCPNIFTY" => tick.MidcpniftyOptionChain,
+                    "SENSEX"     => tick.SensexOptionChain,
+                    _            => tick.NiftyOptionChain
                 };
 
                 string optType = leg.OptionType == Models.OptionType.Call ? "CE" : "PE";
@@ -166,6 +181,17 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.Status           = "OPEN";
                     // Store lot size from instrument master (populated on option chain items)
                     if (opt.LotSize > 0) leg.LotSize = opt.LotSize;
+
+                    // Compute absolute SL / Target from % of entry premium (overrides fixed prices)
+                    if (leg.StopLossPercent > 0)
+                        leg.StopLossPrice = leg.Action == ActionType.Sell
+                            ? leg.EntryPrice * (1.0 + leg.StopLossPercent / 100.0)   // sell: SL fires when premium rises X%
+                            : leg.EntryPrice * (1.0 - leg.StopLossPercent / 100.0);  // buy: SL fires when premium drops X%
+                    if (leg.TargetPercent > 0)
+                        leg.TargetPrice = leg.Action == ActionType.Sell
+                            ? leg.EntryPrice * (1.0 - leg.TargetPercent / 100.0)     // sell: profit when premium falls X%
+                            : leg.EntryPrice * (1.0 + leg.TargetPercent / 100.0);    // buy: profit when premium rises X%
+
                     anyLegEnteredThisTick = true; // defer CurrentState change until after loop
 
                     // Record entry spot for UnderlyingMove trigger (F8)
@@ -395,6 +421,38 @@ namespace Cognexalgo.Core.Domain.Strategies
             if (_strategyEntrySpotLtp == 0) return false;
             double move = Math.Abs(currentSpot - _strategyEntrySpotLtp);
             return (decimal)move >= adjLeg.AdjustmentTriggerValue;
+        }
+
+        /// <summary>Force-exit all OPEN legs (used for time-based squareoff).</summary>
+        private void SquareOffAll(string reason)
+        {
+            for (int i = 0; i < _config.Legs.Count; i++)
+            {
+                var leg = _config.Legs[i];
+                if (leg.Status != "OPEN") continue;
+
+                leg.Status     = "EXITED";
+                leg.ExitPrice  = leg.Ltp;
+                leg.ExitTime   = DateTime.Now;
+                leg.ExitReason = reason;
+                _legTrailBestPrices.Remove(i);
+
+                string optType = leg.OptionType == Models.OptionType.Call ? "CE" : "PE";
+                FireSignal(new Entities.Signal
+                {
+                    StrategyId       = StrategyId,
+                    LegId            = $"LEG-{StrategyId}-{i:D2}",
+                    SignalType       = SignalType.Exit,
+                    Symbol           = leg.Index,
+                    Price            = leg.Ltp,
+                    Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
+                    TriggerCondition = $"{reason}: {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}"
+                });
+
+                Log("INFO", $"[{Name}] SQOFF ({reason}): {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}");
+            }
+
+            CurrentState = SignalState.COMPLETED;
         }
     }
 }

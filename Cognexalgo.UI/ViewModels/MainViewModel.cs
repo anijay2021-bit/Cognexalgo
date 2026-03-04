@@ -25,6 +25,9 @@ namespace Cognexalgo.UI.ViewModels
         private V2Bridge? _v2;
         [ObservableProperty] private EnterpriseDashboardViewModel _enterpriseDashboard;
 
+        // ─── Strategy Scheduler ───────────────────────────────────
+        private readonly Cognexalgo.Core.Application.Services.StrategyScheduler _scheduler = new();
+
         // Window Bindings
         [ObservableProperty] private double _windowHeight;
         [ObservableProperty] private double _windowWidth;
@@ -401,9 +404,14 @@ namespace Cognexalgo.UI.ViewModels
                 // ─── V2: Forward tick to V2 Orchestrator ─────
                 if (_v2?.IsInitialized == true)
                 {
-                    _ = _v2.DispatchTickAsync(LtpNifty, LtpBankNifty, LtpFinnifty);
+                    _ = _v2.DispatchTickAsync(LtpNifty, LtpBankNifty, LtpFinnifty, LtpMidcpNifty, LtpSensex);
                     // F9: Update combined portfolio P&L
                     TotalV2Pnl = _v2.Orchestrator.TotalDailyPnl;
+
+                    // ── Scheduler: auto-start strategies whose entry time has arrived ──
+                    var readyConfigs = _scheduler.GetReadyStrategies(DateTime.Now);
+                    foreach (var cfg in readyConfigs)
+                        _ = StartV2Strategy(cfg);
                 }
             });
         }
@@ -751,6 +759,15 @@ namespace Cognexalgo.UI.ViewModels
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(found) { UseShellExecute = true });
         }
 
+        // Open Strategy Scheduler window
+        [RelayCommand]
+        public void OpenScheduler()
+        {
+            var vm  = new SchedulerViewModel(_scheduler);
+            var win = new Views.SchedulerWindow(vm) { Owner = Application.Current.MainWindow };
+            win.Show();
+        }
+
         // F3: Open Performance Report window
         [RelayCommand]
         public void OpenReports()
@@ -911,14 +928,18 @@ namespace Cognexalgo.UI.ViewModels
                 SpotPrice = spot;
                 Log($"✓ Option chain: {OptionChain.Count} strikes with market IV & Greeks for {idx}.", "SUCCESS");
 
-                // Cache option chain for V2 strategy strike resolution
+                // Cache option chain for V2 strategy strike resolution (all 5 indices)
                 if (_v2 != null)
                 {
                     var chainList = OptionChain.ToList();
-                    if (idx == "BANKNIFTY")
-                        _v2.CachedBankNiftyChain = chainList;
-                    else
-                        _v2.CachedNiftyChain = chainList;
+                    switch (idx)
+                    {
+                        case "BANKNIFTY":  _v2.CachedBankNiftyChain    = chainList; break;
+                        case "FINNIFTY":   _v2.CachedFinniftyChain     = chainList; break;
+                        case "MIDCPNIFTY": _v2.CachedMidcpniftyChain   = chainList; break;
+                        case "SENSEX":     _v2.CachedSensexChain        = chainList; break;
+                        default:           _v2.CachedNiftyChain         = chainList; break;
+                    }
                 }
             }
             catch (Exception ex)
