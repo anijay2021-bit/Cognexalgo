@@ -117,9 +117,12 @@ namespace Cognexalgo.Core
             Logger = new FileLoggingService();
             _totpService = new TotpService();
             
-            // [PRE-LOGIN PROTOCOL] Reuse pre-loaded DataService or create new
-            Api = new SmartApiClient(); 
-            DataService = preLoadedDataService ?? new AngelOneDataService(Api, TokenService, Logger);
+            // BUGFIX: Always create DataService with TradingEngine.Api so JWT propagates after login.
+            // The preLoadedDataService held a separate unauthenticated SmartApiClient (created in
+            // LoginViewModel before the user logged in), so DataService._api.JwtToken was always null.
+            // The pre-loaded service contained no candle cache — only TokenService was worth reusing.
+            Api = new SmartApiClient();
+            DataService = new AngelOneDataService(Api, TokenService, Logger);
             SmartStream = new SmartStreamService();
 
             // Relay binary ticks → JSON ticker (existing behaviour)

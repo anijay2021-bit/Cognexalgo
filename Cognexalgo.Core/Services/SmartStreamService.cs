@@ -133,6 +133,58 @@ namespace Cognexalgo.Core.Services
                     break;
                 }
             }
+
+            // Reconnect with exponential backoff (max 5 attempts: 2s, 4s, 8s, 16s, 32s)
+            if (!token.IsCancellationRequested)
+            {
+                await ReconnectWithBackoffAsync(token);
+            }
+        }
+
+        private async Task ReconnectWithBackoffAsync(CancellationToken token)
+        {
+            int maxAttempts = 5;
+            int delaySeconds = 2;
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                if (token.IsCancellationRequested) return;
+
+                OnStatusChanged?.Invoke($"SmartStream disconnected. Reconnecting in {delaySeconds}s (attempt {attempt}/{maxAttempts})...");
+
+                try { await Task.Delay(TimeSpan.FromSeconds(delaySeconds), token); }
+                catch (TaskCanceledException) { return; }
+
+                try
+                {
+                    _ws?.Dispose();
+                    _ws = new ClientWebSocket();
+                    _ws.Options.SetRequestHeader("Authorization", _jwtToken);
+                    _ws.Options.SetRequestHeader("x-api-key", _apiKey);
+                    _ws.Options.SetRequestHeader("x-feed-token", _feedToken);
+                    _ws.Options.SetRequestHeader("x-client-code", _clientCode);
+
+                    await _ws.ConnectAsync(new Uri(_wsUrl), token);
+                    OnStatusChanged?.Invoke($"SmartStream reconnected (attempt {attempt}).");
+
+                    // Re-subscribe to previously subscribed tokens
+                    List<string> tokensToResubscribe;
+                    lock (_subscribedTokens) { tokensToResubscribe = new List<string>(_subscribedTokens); }
+                    if (tokensToResubscribe.Count > 0)
+                        await SubscribeAsync(tokensToResubscribe, "NSE");
+
+                    // Resume receive loop
+                    _ = ReceiveLoopAsync(token);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    OnStatusChanged?.Invoke($"Reconnect attempt {attempt} failed: {ex.Message}");
+                    delaySeconds = Math.Min(delaySeconds * 2, 60); // cap at 60s
+                }
+            }
+
+            OnStatusChanged?.Invoke("SmartStream: max reconnect attempts reached. Feed stopped.");
         }
 
         private void ParseBinaryPacket(byte[] data, int length)

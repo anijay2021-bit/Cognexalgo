@@ -76,7 +76,9 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.Log("SafeExit", $"DB Sync Failed: {ex.Message}");
+                // Log full chain: outer message + inner exception detail
+                var inner = ex.InnerException?.Message ?? "(no inner exception)";
+                _logger.Log("SafeExit", $"DB Sync Failed: {ex.Message} | Inner: {inner}");
                 // Don't throw, try to continue to Git sync
             }
         }
