@@ -164,6 +164,8 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.EntryTime        = DateTime.Now;
                     leg.EntryIndexLtp    = (double)spotLtp;
                     leg.Status           = "OPEN";
+                    // Store lot size from instrument master (populated on option chain items)
+                    if (opt.LotSize > 0) leg.LotSize = opt.LotSize;
                     anyLegEnteredThisTick = true; // defer CurrentState change until after loop
 
                     // Record entry spot for UnderlyingMove trigger (F8)
@@ -180,6 +182,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                         SignalType       = SignalType.Entry,
                         Symbol           = leg.Index,
                         Price            = opt.LTP,
+                        Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
                         TriggerCondition = $"Entry: {leg.Index} {optType} {strike} @ {opt.LTP:F2}"
                     });
 
@@ -258,6 +261,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                             SignalType       = SignalType.Exit,
                             Symbol           = leg.Index,
                             Price            = leg.Ltp,
+                            Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
                             TriggerCondition = $"{reason}: {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}"
                         });
 

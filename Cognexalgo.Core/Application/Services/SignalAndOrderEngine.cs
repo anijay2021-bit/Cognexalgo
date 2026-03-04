@@ -118,7 +118,7 @@ namespace Cognexalgo.Core.Application.Services
                         ? Direction.BUY : Direction.SELL,
                     OrderType = OrderType.MARKET,
                     ProductType = ProductType.MIS,
-                    Quantity = 1,
+                    Quantity = signal.Quantity > 0 ? signal.Quantity : 1,
                     TradingMode = strategy.TradingMode,
                     IsSimulated = strategy.TradingMode == TradingMode.PaperTrade,
                     Status = OrderStatus.PENDING,

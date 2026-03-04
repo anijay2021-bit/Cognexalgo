@@ -6,7 +6,13 @@
       "WebFetch(domain:algotest.in)",
       "WebFetch(domain:docs.algotest.in)",
       "Bash(dotnet build Cognexalgo.sln --no-restore -v quiet)",
-      "Read(//c/Users/anijay/.claude/projects/c--Users-anijay--gemini-antigravity-scratch-COGNEX/ec787c05-9b77-4f7b-b8d7-7d6a2b9e427e/tool-results/**)"
+      "Read(//c/Users/anijay/.claude/projects/c--Users-anijay--gemini-antigravity-scratch-COGNEX/ec787c05-9b77-4f7b-b8d7-7d6a2b9e427e/tool-results/**)",
+      "Read(//c/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/**)",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/net8.0/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/4.6.2/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/Assemblies/\")",
+      "Bash(ls \"C:/Program Files \\(x86\\)/Syncfusion/Essential Studio/WPF/32.2.3/precompiledassemblies/\")"
     ]
   }
 }

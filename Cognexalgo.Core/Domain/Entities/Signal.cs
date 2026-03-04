@@ -53,6 +53,10 @@ namespace Cognexalgo.Core.Domain.Entities
 
         public double Price { get; set; }
 
+        /// <summary>Total contracts (TotalLots × LotSize). Not persisted — flows from strategy to order engine.</summary>
+        [NotMapped]
+        public int Quantity { get; set; } = 1;
+
         [MaxLength(200)]
         public string? Reason { get; set; }
     }
