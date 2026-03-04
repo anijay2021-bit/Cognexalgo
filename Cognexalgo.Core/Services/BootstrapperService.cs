@@ -21,6 +21,9 @@ namespace Cognexalgo.Core.Services
         // Events to report progress to UI
         public event Action<string, int> OnProgressChanged;
 
+        // Fired when a critical non-fatal warning needs user attention (e.g. clock drift)
+        public event Action<string> OnCriticalWarning;
+
         public BootstrapperService(TradingEngine engine, AngelOneDataService dataService, IConfiguration config)
         {
             _engine = engine;
@@ -260,7 +263,10 @@ namespace Cognexalgo.Core.Services
                 if (Math.Abs(drift.TotalMilliseconds) > 500)
                 {
                     _engine.Logger.Log("Bootstrapper", $"CRITICAL: Clock drift > 500ms. Algo trading requires precise time.");
-                    // throw new Exception($"System clock drift is too high ({drift.TotalMilliseconds:F2}ms). Sync Windows Time.");
+                    OnCriticalWarning?.Invoke(
+                        $"System clock is out of sync by {drift.TotalMilliseconds:F0}ms.\n\n" +
+                        "Algo trading requires precise time. Please sync your Windows clock:\n" +
+                        "Settings → Time & Language → Date & Time → Sync Now");
                 }
             }
             catch (Exception ex)

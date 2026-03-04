@@ -18,6 +18,10 @@ namespace Cognexalgo.Core.Strategies
         private readonly CandleAggregator _aggregator;
         private readonly List<Skender.Stock.Indicators.Quote> _history = new List<Skender.Stock.Indicators.Quote>();
 
+        // One-shot guard: once we enter and then exit, never re-enter in the same session.
+        // Prevents continuous entry signals when entry conditions remain true after exit.
+        private bool _hasEnteredOnce = false;
+
         public DynamicStrategy(TradingEngine engine, string jsonConfig) 
             : base(engine, "Dynamic")
         {
@@ -116,9 +120,9 @@ namespace Cognexalgo.Core.Strategies
             {
                 await _riskManager.CheckExits(ltp, _context);
             }
-            else
+            else if (!_hasEnteredOnce)
             {
-                // 3. Evaluate Entries on EVERY TICK
+                // 3. Evaluate Entries on EVERY TICK (only before first entry)
                 // We construct a temporary context that includes the historically closed
                 // candles PLUS the currently forming synthetic candle at this exact tick.
                 var syntheticCandle = new Skender.Stock.Indicators.Quote 
@@ -158,7 +162,7 @@ namespace Cognexalgo.Core.Strategies
                     _engine.Logger?.Log("Strategy", actionMsg);
                     Console.WriteLine(actionMsg);
                     
-                    BroadcastSignal(new Signal 
+                    BroadcastSignal(new Signal
                     {
                         Timestamp = DateTime.Now,
                         StrategyName = Name,
@@ -170,6 +174,7 @@ namespace Cognexalgo.Core.Strategies
 
                     await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
                     _riskManager.InitializeEntry(currentPrice, context);
+                    _hasEnteredOnce = true; // One-shot: never re-enter after first entry
                     break; // Only take one entry per tick
                 }
             }

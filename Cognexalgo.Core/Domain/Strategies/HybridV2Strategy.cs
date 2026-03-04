@@ -116,6 +116,10 @@ namespace Cognexalgo.Core.Domain.Strategies
                 DateTime.Now.TimeOfDay < startTime)
                 return Task.CompletedTask;
 
+            // Track whether any leg enters this tick so we set IN_POSITION after all legs are processed.
+            // This fixes multi-leg: setting IN_POSITION mid-loop blocked subsequent PENDING legs.
+            bool anyLegEnteredThisTick = false;
+
             for (int legIdx = 0; legIdx < _config.Legs.Count; legIdx++)
             {
                 var leg = _config.Legs[legIdx];
@@ -160,7 +164,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.EntryTime        = DateTime.Now;
                     leg.EntryIndexLtp    = (double)spotLtp;
                     leg.Status           = "OPEN";
-                    CurrentState         = SignalState.IN_POSITION;
+                    anyLegEnteredThisTick = true; // defer CurrentState change until after loop
 
                     // Record entry spot for UnderlyingMove trigger (F8)
                     if (_strategyEntrySpotLtp == 0)
@@ -259,9 +263,16 @@ namespace Cognexalgo.Core.Domain.Strategies
 
                         Log("INFO", $"[{Name}] {reason} EXIT: {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}");
 
-                        // If all legs exited, reset state for potential re-entry
+                        // If all legs exited, check if any re-entry is still possible
                         if (_config.Legs.All(l => l.Status is "EXITED" or "SQOFF"))
-                            CurrentState = SignalState.WAITING;
+                        {
+                            bool reEntryPossible = _config.Legs.Any(l =>
+                                l.ExitReason == "SL" && l.CurrentReEntry < l.MaxReEntry);
+
+                            CurrentState = reEntryPossible
+                                ? SignalState.WAITING    // allow re-entry block to run
+                                : SignalState.COMPLETED; // no more signals — strategy is done
+                        }
                     }
                 }
 
@@ -282,6 +293,11 @@ namespace Cognexalgo.Core.Domain.Strategies
                     }
                 }
             }
+
+            // After processing all legs: if any entered this tick, move to IN_POSITION.
+            // Doing this outside the loop allows ALL PENDING legs to enter in the same tick.
+            if (anyLegEnteredThisTick)
+                CurrentState = SignalState.IN_POSITION;
 
             // ── Re-entry check (after exit processing) ──────────────────
             foreach (var leg in _config.Legs)

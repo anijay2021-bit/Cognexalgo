@@ -174,13 +174,25 @@ namespace Cognexalgo.UI.ViewModels
                 var config = (Microsoft.Extensions.Configuration.IConfiguration)System.Windows.Application.Current.Resources["Configuration"];
                 _bootstrapper = new BootstrapperService(_engine, _engine.DataService, config); // Pass Config if available
                 
-                _bootstrapper.OnProgressChanged += (msg, percent) => 
+                _bootstrapper.OnProgressChanged += (msg, percent) =>
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
                         LoadingStatus = msg;
                         LoadingProgress = percent;
                         Log($"[Bootstrapper] {msg}");
+                    });
+                };
+
+                _bootstrapper.OnCriticalWarning += (msg) =>
+                {
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        System.Windows.MessageBox.Show(
+                            msg,
+                            "⚠ Clock Sync Warning",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Warning);
                     });
                 };
 
@@ -634,6 +646,21 @@ namespace Cognexalgo.UI.ViewModels
                 try { await _engine.StrategyRepository.SaveHybridStrategyAsync(strategy); }
                 catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
                 Log($"V2 Strategy synced on-demand: {v2Id}");
+            }
+
+            // ── Reset leg statuses for a fresh run (prevents stale OPEN/EXITED from prior session) ──
+            foreach (var leg in strategy.Legs)
+            {
+                leg.Status        = "PENDING";
+                leg.CurrentReEntry = 0;
+                leg.EntryPrice    = 0;
+                leg.ExitPrice     = 0;
+                leg.ExitReason    = "";
+                leg.EntryTime     = null;
+                leg.ExitTime      = null;
+                leg.CalculatedStrike = 0;
+                leg.SymbolToken   = null;
+                leg.Ltp           = 0;
             }
 
             // ── Register RMS rules from strategy config ──────────────────────
