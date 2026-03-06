@@ -85,5 +85,9 @@ namespace Cognexalgo.Core.Models
         /// <summary>Live status fed by StrategyOrchestrator.OnStatusChanged — "Active", "Paused", "Error".</summary>
         [ObservableProperty]
         private string _v2Status = string.Empty;
+
+        /// <summary>True when this strategy has been successfully deployed/started. Drives Deploy button color.</summary>
+        [ObservableProperty]
+        private bool _isDeployed = false;
     }
 }

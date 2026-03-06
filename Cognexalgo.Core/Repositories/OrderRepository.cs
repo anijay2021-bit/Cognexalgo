@@ -9,6 +9,7 @@ namespace Cognexalgo.Core.Repositories
     {
         Task AddAsync(Order order);
         Task<System.Collections.Generic.List<Order>> GetAllAsync();
+        Task ClearAllAsync();
     }
 
     public class OrderRepository : IOrderRepository
@@ -45,6 +46,17 @@ namespace Cognexalgo.Core.Repositories
             }
         }
         
+        public async Task ClearAllAsync()
+        {
+            using (var connection = _dbService.GetConnection())
+            {
+                await connection.OpenAsync();
+                var command = connection.CreateCommand();
+                command.CommandText = "DELETE FROM Orders";
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+
         public async Task<System.Collections.Generic.List<Order>> GetAllAsync()
         {
             var result = new System.Collections.Generic.List<Order>();

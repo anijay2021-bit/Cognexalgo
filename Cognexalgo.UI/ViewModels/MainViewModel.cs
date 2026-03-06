@@ -118,6 +118,10 @@ namespace Cognexalgo.UI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(StartEngineCommand))]
         private bool _isInitialized = false;
 
+        /// <summary>True after StartEngine connects SmartStream. Drives the Connect button color.</summary>
+        [ObservableProperty]
+        private bool _isEngineRunning = false;
+
         [ObservableProperty]
         private double _loadingProgress = 0;
 
@@ -246,10 +250,7 @@ namespace Cognexalgo.UI.ViewModels
                 // Load UI Data after Bootstrap
                 await LoadStrategies();
                 await AccountManager.LoadAccountsAsync(); // Sequential load to avoid DbContext concurrency
-                Log("Initialization Complete. All systems Ready.");
-
-                // Auto-start live tick feed — connects SmartStream WebSocket so LTP updates
-                _ = StartEngine();
+                Log("Initialization Complete. All systems Ready. Click ⚡ Connect to start the live feed.");
             }
             catch (Exception ex)
             {
@@ -463,6 +464,7 @@ namespace Cognexalgo.UI.ViewModels
                 await _engine.Ticker.ConnectAsync();
                 _engine.Start();
                 Status = "Running";
+                IsEngineRunning = true;
 
                 // ── Share V1 auth session with V2 broker adapter ──
                 _v2?.SyncBrokerAuth(_engine.Api);
@@ -590,6 +592,7 @@ namespace Cognexalgo.UI.ViewModels
                 return;
             }
             _v2.Orchestrator.StopStrategy(strategy.V2Id);
+            strategy.IsDeployed = false;
             Log($"■ Stop requested for V2 strategy: {strategy.Name} ({strategy.V2Id})");
         }
 
@@ -729,6 +732,7 @@ namespace Cognexalgo.UI.ViewModels
 
             // ── Start in Orchestrator ────────────────────────────────────────
             await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
+            strategy.IsDeployed = true;
             Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id}) [{strategy.TradingModeDisplay}]");
         }
 
@@ -801,6 +805,7 @@ namespace Cognexalgo.UI.ViewModels
             Log("Auto-Refresh Stopped.");
             
             Status = "Stopped";
+            IsEngineRunning = false;
             Log("Engine Stopped.");
         }
         [RelayCommand]
@@ -1117,6 +1122,26 @@ namespace Cognexalgo.UI.ViewModels
             finally
             {
                 _isFetchingPositions = false;
+            }
+        }
+
+        [RelayCommand]
+        public async Task ClearPositions()
+        {
+            if (_engine?.OrderRepository == null) return;
+            var result = System.Windows.MessageBox.Show(
+                "This will permanently delete ALL paper trade orders. Continue?",
+                "Clear Positions", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+            if (result != System.Windows.MessageBoxResult.Yes) return;
+            try
+            {
+                await _engine.OrderRepository.ClearAllAsync();
+                System.Windows.Application.Current.Dispatcher.Invoke(() => Positions.Clear());
+                Log("All paper positions cleared.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error clearing positions: {ex.Message}");
             }
         }
 
