@@ -247,6 +247,9 @@ namespace Cognexalgo.UI.ViewModels
                 await LoadStrategies();
                 await AccountManager.LoadAccountsAsync(); // Sequential load to avoid DbContext concurrency
                 Log("Initialization Complete. All systems Ready.");
+
+                // Auto-start live tick feed — connects SmartStream WebSocket so LTP updates
+                _ = StartEngine();
             }
             catch (Exception ex)
             {
