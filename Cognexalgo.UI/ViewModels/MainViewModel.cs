@@ -658,18 +658,27 @@ namespace Cognexalgo.UI.ViewModels
                 if (result != System.Windows.MessageBoxResult.Yes) return;
             }
 
-            // ── Ensure synced to V2 DB (idempotent) ─────────────────────────
+            // ── Ensure synced to V2 DB (non-fatal — strategy can run offline) ──
             if (string.IsNullOrEmpty(strategy.V2Id))
             {
                 var adapter = new V2StrategyAdapter(_v2);
                 string? v2Id = null;
                 try { v2Id = await Task.Run(() => adapter.SyncToV2Async(strategy)); }
-                catch (Exception ex) { Log($"V2 sync failed: {ex.Message}", "ERROR"); return; }
-                if (v2Id == null) { Log($"V2 sync returned null for '{strategy.Name}'", "ERROR"); return; }
-                strategy.V2Id = v2Id;
-                try { await _engine.StrategyRepository.SaveHybridStrategyAsync(strategy); }
-                catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
-                Log($"V2 Strategy synced on-demand: {v2Id}");
+                catch (Exception ex) { Log($"V2 sync failed (non-fatal): {ex.Message}", "WARN"); }
+
+                if (!string.IsNullOrEmpty(v2Id))
+                {
+                    strategy.V2Id = v2Id;
+                    try { await _engine.StrategyRepository.SaveHybridStrategyAsync(strategy); }
+                    catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
+                    Log($"V2 Strategy synced: {v2Id}");
+                }
+                else
+                {
+                    // DB unavailable (e.g. Supabase IP blocked) — assign local ID and continue
+                    strategy.V2Id = $"LOCAL-{DateTime.Now:yyyyMMdd}-{strategy.Id:D4}";
+                    Log($"DB unavailable — strategy will run with local ID: {strategy.V2Id}", "WARN");
+                }
             }
 
             // ── Reset leg statuses for a fresh run (prevents stale OPEN/EXITED from prior session) ──
