@@ -80,9 +80,23 @@ namespace Cognexalgo.UI;
                     preLoadedTokenService: _loginViewModel?.PreLoadedTokenService,
                     preLoadedDataService: _loginViewModel?.PreLoadedDataService);
 
-                await engine.InitializeDatabaseAsync();
-                
-                engine.SetCloudService(_firebaseService); 
+                // DB init is non-fatal — app works without Supabase (strategies stored locally)
+                try
+                {
+                    await engine.InitializeDatabaseAsync();
+                }
+                catch (Exception dbEx)
+                {
+                    string msg = dbEx.Message.Contains("allow_list")
+                        ? $"Supabase connection blocked — your IP is not in the allowlist.\n\n" +
+                          $"Fix: Supabase Dashboard → Settings → Network → add your IP, or allow all (0.0.0.0/0).\n\n" +
+                          $"The app will continue without cloud database."
+                        : $"Database init skipped ({dbEx.GetType().Name}: {dbEx.Message})\n\nThe app will continue without cloud database.";
+
+                    MessageBox.Show(msg, "Database Unavailable", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                engine.SetCloudService(_firebaseService);
                 var mainViewModel = new ViewModels.MainViewModel(engine);
                 var mainWindow = new MainWindow { DataContext = mainViewModel };
                 
