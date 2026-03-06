@@ -74,26 +74,25 @@ namespace Cognexalgo.Core.Services
                     return 0;
                 }
 
-                // Map index name to hardcoded Angel One NSE Index Tokens
-                (string token, string symbol) = index.ToUpper() switch
+                // Map index name to hardcoded Angel One tokens.
+                // SENSEX (99919017) trades on BSE — all others are NSE.
+                (string token, string symbol, string exchange) = index.ToUpper() switch
                 {
-                    "NIFTY" => ("99926000", "Nifty 50"),
-                    "BANKNIFTY" => ("99926009", "Nifty Bank"),
-                    "FINNIFTY" => ("99926037", "Nifty Fin Service"),
-                    "MIDCPNIFTY" => ("99926030", "NIFTY MID SELECT"),
-                    "SENSEX" => ("99919017", "SENSEX"),
+                    "NIFTY"      => ("99926000", "Nifty 50",          "NSE"),
+                    "BANKNIFTY"  => ("99926009", "Nifty Bank",         "NSE"),
+                    "FINNIFTY"   => ("99926037", "Nifty Fin Service",  "NSE"),
+                    "MIDCPNIFTY" => ("99926030", "NIFTY MID SELECT",   "NSE"),
+                    "SENSEX"     => ("99919017", "SENSEX",             "BSE"),  // BSE instrument
                     _ => throw new ArgumentException($"Unsupported index: {index}")
                 };
 
-                _logger?.Log("DataService", $"Fetching spot price for {index} using Token: {token}");
-                Console.WriteLine($"DEBUG: DataService Fetching {index} ({token})");
+                _logger?.Log("DataService", $"Fetching spot price for {index} ({exchange}) using Token: {token}");
 
                 // Apply rate limiting
                 await _rateLimiter.WaitAsync();
 
-                // Fetch LTP from Angel One using the 'NSE' exchange for indices
                 var ltpData = await _api.GetLTPDataAsync(
-                    exchange: "NSE",
+                    exchange: exchange,
                     tradingSymbol: symbol,
                     symbolToken: token
                 );
@@ -104,18 +103,18 @@ namespace Cognexalgo.Core.Services
                 {
                     spotPrice = ltpData.Data.Ltp;
                 }
-                else 
+                else
                 {
-                    // FALLBACK: Use Batch/Full Market Data call if LTP solo call fails
-                    var batchData = await _api.GetMarketDataBatchAsync("NSE", new List<string> { token });
+                    // FALLBACK: Batch market data call
+                    var batchData = await _api.GetMarketDataBatchAsync(exchange, new List<string> { token });
                     if (batchData != null && batchData.ContainsKey(token))
                     {
                         spotPrice = batchData[token];
-                        _logger?.Log("DataService", $"✓ [Fallback] Spot price for {index} fetched via Batch API: ₹{spotPrice:N2}");
+                        _logger?.Log("DataService", $"✓ [Fallback] Spot price for {index} via Batch API: ₹{spotPrice:N2}");
                     }
-                    else 
+                    else
                     {
-                        throw new Exception($"Failed to fetch LTP for {index} after fallback. API returned null/empty.");
+                        throw new Exception($"Failed to fetch LTP for {index} ({exchange}) after fallback. API returned null/empty.");
                     }
                 }
 
@@ -124,7 +123,7 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
-                _logger?.Log("DataService", $"ERROR: Fetching spot price for {index}: {ex.Message}", "ERROR");
+                _logger?.Log("DataService", $"WARN: Spot price fetch failed for {index}: {ex.Message}");
                 throw new Exception($"Failed to get spot price for {index}: {ex.Message}", ex);
             }
         }

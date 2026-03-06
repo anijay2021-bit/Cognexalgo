@@ -172,9 +172,9 @@ namespace Cognexalgo.Core.Strategies
                         Reason = rule.Action
                     });
 
+                    _hasEnteredOnce = true; // Set BEFORE await to prevent duplicate entries from concurrent ticks
                     await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
                     _riskManager.InitializeEntry(currentPrice, context);
-                    _hasEnteredOnce = true; // One-shot: never re-enter after first entry
                     break; // Only take one entry per tick
                 }
             }

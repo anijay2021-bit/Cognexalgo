@@ -146,9 +146,39 @@ namespace Cognexalgo.Core.Application.Services
                         useSLM = leg?.UseSLMOnExit == true;
                     }
 
+                    // ─── Pre-flight validation ───────────────────────────────
+                    if (string.IsNullOrEmpty(order.TradingSymbol))
+                    {
+                        Log("ERROR", $"[{strategy.Name}] Order rejected: TradingSymbol is empty. Cannot place live order.");
+                        order.Status = OrderStatus.REJECTED;
+                        order.RejectionReason = "TradingSymbol empty";
+                        try { await _orderRepo.AddAsync(order); } catch { }
+                        OnOrderGenerated?.Invoke(order);
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(signal.SymbolToken))
+                    {
+                        Log("ERROR", $"[{strategy.Name}] Order rejected: SymbolToken is empty for {order.TradingSymbol}. Cannot place live order.");
+                        order.Status = OrderStatus.REJECTED;
+                        order.RejectionReason = "SymbolToken empty";
+                        try { await _orderRepo.AddAsync(order); } catch { }
+                        OnOrderGenerated?.Invoke(order);
+                        return;
+                    }
+                    if (order.Quantity <= 0)
+                    {
+                        Log("ERROR", $"[{strategy.Name}] Order rejected: Quantity={order.Quantity} for {order.TradingSymbol}. Check lot size config.");
+                        order.Status = OrderStatus.REJECTED;
+                        order.RejectionReason = "Quantity <= 0";
+                        try { await _orderRepo.AddAsync(order); } catch { }
+                        OnOrderGenerated?.Invoke(order);
+                        return;
+                    }
+
                     var angelReq = new AngelOrderRequest
                     {
                         TradingSymbol   = order.TradingSymbol,
+                        SymbolToken     = signal.SymbolToken,
                         TransactionType = order.Direction == Direction.BUY ? "BUY" : "SELL",
                         Quantity        = order.Quantity,
                         Price           = (decimal)order.Price,
@@ -519,6 +549,54 @@ namespace Cognexalgo.Core.Application.Services
             {
                 Log("ERROR", $"[OrderPoll] Error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Apply a real-time WebSocket order update without waiting for the poll interval.
+        /// Called by OrderUpdateService when Angel One pushes a status change.
+        /// Status codes: AB05 = Complete, AB03 = Rejected, AB02 = Cancelled.
+        /// AB01/AB04/AB09/AB10 are intermediate states — order stays tracked.
+        /// </summary>
+        public async Task HandleWebSocketUpdateAsync(
+            string brokerOrderId, string statusCode, decimal filledPrice, int filledQty)
+        {
+            if (!_pendingOrders.TryGetValue(brokerOrderId, out var order)) return;
+
+            var newStatus = statusCode switch
+            {
+                "AB05" => OrderStatus.COMPLETE,
+                "AB03" => OrderStatus.REJECTED,
+                "AB02" => OrderStatus.CANCELLED,
+                _      => (OrderStatus?)null   // AB01/AB04/AB09/AB10 — still in-flight
+            };
+
+            if (newStatus == null) return;
+
+            order.Status = newStatus.Value;
+
+            if (newStatus == OrderStatus.COMPLETE)
+            {
+                order.FilledPrice    = filledPrice > 0 ? filledPrice : order.Price;
+                order.FilledQuantity = filledQty > 0 ? filledQty : order.Quantity;
+                order.PendingQuantity = 0;
+                order.FilledAt = DateTime.UtcNow;
+
+                Log("INFO", $"[OrderWS] ✓ FILLED: {brokerOrderId} " +
+                    $"({order.TradingSymbol} @ ₹{order.FilledPrice:N2})");
+                OnOrderFilled?.Invoke(order);
+            }
+            else if (newStatus == OrderStatus.REJECTED)
+            {
+                Log("WARN", $"[OrderWS] ✗ REJECTED: {brokerOrderId} ({order.TradingSymbol})");
+                OnOrderRejected?.Invoke(order);
+            }
+            else
+            {
+                Log("WARN", $"[OrderWS] CANCELLED: {brokerOrderId} ({order.TradingSymbol})");
+            }
+
+            try { await _orderRepo.UpdateAsync(order); } catch { }
+            _pendingOrders.TryRemove(brokerOrderId, out _);
         }
 
         private void Log(string level, string msg) => OnLog?.Invoke(level, msg);

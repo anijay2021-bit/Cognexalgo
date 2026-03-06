@@ -35,6 +35,7 @@ namespace Cognexalgo.Core.Infrastructure.Services
         public TelegramNotifier Telegram { get; private set; }
         public WindowsToastNotifier Toast { get; private set; }
         public OrderPollingService OrderPoller { get; private set; }
+        public OrderUpdateService OrderUpdateWs { get; private set; }
         // F2: Exposed so MainViewModel can pass to HybridV2Strategy.SetHistoryCacheService
         public Cognexalgo.Core.Services.HistoryCacheService? HistoryCache { get; private set; }
 
@@ -257,6 +258,24 @@ namespace Cognexalgo.Core.Infrastructure.Services
                 bridge.OrderPoller.TrackOrder(order);
             };
 
+            // ─── Order Update WebSocket (real-time fill notifications) ───
+            bridge.OrderUpdateWs = new OrderUpdateService();
+            bridge.OrderUpdateWs.OnLog += (level, msg) =>
+            {
+                switch (level)
+                {
+                    case "ERROR": bridge.Logger.Error("OrderWS", msg); break;
+                    case "WARN":  bridge.Logger.Warn("OrderWS", msg);  break;
+                    default:      bridge.Logger.Info("OrderWS", msg);  break;
+                }
+            };
+            // Route WebSocket updates into the same OrderPoller update logic
+            bridge.OrderUpdateWs.OnOrderUpdate += async (brokerOrderId, statusCode, filledPrice, filledQty) =>
+            {
+                await bridge.OrderPoller.HandleWebSocketUpdateAsync(
+                    brokerOrderId, statusCode, filledPrice, filledQty);
+            };
+
             // ─── Schedule EOD auto-square-off at 15:20 ───────────
             bridge.ScheduleEodSquareOff();
 
@@ -305,6 +324,16 @@ namespace Cognexalgo.Core.Infrastructure.Services
         {
             if (BrokerAdapter is SmartApiClientAdapter adapter)
                 adapter.UseExistingClient(v1Client);
+        }
+
+        /// <summary>
+        /// Connect the order update WebSocket using the V1 session's JWT token.
+        /// Call this immediately after SyncBrokerAuth.
+        /// </summary>
+        public async Task ConnectOrderUpdateWsAsync(string jwtToken)
+        {
+            if (OrderUpdateWs == null || string.IsNullOrWhiteSpace(jwtToken)) return;
+            await OrderUpdateWs.ConnectAsync(jwtToken);
         }
 
         /// <summary>Kill Switch — immediately stop everything.</summary>

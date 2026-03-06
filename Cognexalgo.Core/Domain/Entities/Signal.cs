@@ -57,6 +57,10 @@ namespace Cognexalgo.Core.Domain.Entities
         [NotMapped]
         public int Quantity { get; set; } = 1;
 
+        /// <summary>Angel One symbol token for the traded instrument. Not persisted — flows from strategy to order engine.</summary>
+        [NotMapped]
+        public string SymbolToken { get; set; } = string.Empty;
+
         [MaxLength(200)]
         public string? Reason { get; set; }
     }

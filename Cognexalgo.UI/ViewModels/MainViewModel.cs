@@ -305,7 +305,9 @@ namespace Cognexalgo.UI.ViewModels
                             ? (s.Legs.FirstOrDefault()?.EntryTime ?? DateTime.Now) 
                             : DateTime.Now;
                             
-                        s.Pnl = 0; 
+                        s.Pnl = 0;
+                        // Risk 5: Log TradingMode so we can verify LIVE strategies survive restart
+                        Log($"[Load] Strategy '{s.Name}': Mode={s.TradingModeDisplay}, Active={s.IsActive}");
                         Strategies.Add(s);
                     }
                     UpdateCounts();
@@ -470,6 +472,13 @@ namespace Cognexalgo.UI.ViewModels
                 _v2?.SyncBrokerAuth(_engine.Api);
                 Log("V2 broker auth synced from V1 session.");
 
+                // ── Connect order update WebSocket for real-time fill notifications ──
+                if (_v2 != null && !string.IsNullOrEmpty(_engine.Api.JwtToken))
+                {
+                    _ = _v2.ConnectOrderUpdateWsAsync(_engine.Api.JwtToken);
+                    Log("Order update WebSocket connecting...");
+                }
+
                 // Start Auto-Refresh
                 _autoRefreshTimer.Start();
                 Log("Auto-Refresh Started (3s Interval)");
@@ -633,14 +642,10 @@ namespace Cognexalgo.UI.ViewModels
         private async Task StartV2Strategy(object parameter)
         {
             if (parameter is not HybridStrategyConfig strategy) return;
+            if (strategy.IsDeployed) return; // Guard against double-clicks and scheduler re-triggers
             if (_v2?.IsInitialized != true)
             {
                 Log("V2 Bridge is not initialized.", "WARN");
-                return;
-            }
-            if (strategy.V2Status == "Active")
-            {
-                Log($"Strategy '{strategy.Name}' is already running in V2.", "WARN");
                 return;
             }
 
@@ -731,9 +736,17 @@ namespace Cognexalgo.UI.ViewModels
                 v2Strategy.SetHistoryCacheService(_v2.HistoryCache);
 
             // ── Start in Orchestrator ────────────────────────────────────────
-            await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
-            strategy.IsDeployed = true;
-            Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id}) [{strategy.TradingModeDisplay}]");
+            strategy.IsDeployed = true; // Set BEFORE await to block re-entrant calls during async start
+            try
+            {
+                await _v2.Orchestrator.StartStrategyAsync(v2Strategy);
+                Log($"▶ Started V2 strategy: {strategy.Name} ({strategy.V2Id}) [{strategy.TradingModeDisplay}]");
+            }
+            catch (Exception startEx)
+            {
+                strategy.IsDeployed = false; // Reset on failure so user can retry
+                Log($"Failed to start strategy '{strategy.Name}': {startEx.Message}", "ERROR");
+            }
         }
 
         [RelayCommand]

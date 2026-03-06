@@ -30,6 +30,24 @@ namespace Cognexalgo.Core.Domain.Strategies
         // F8: Underlying price at strategy first-entry (for UnderlyingMove trigger)
         private double _strategyEntrySpotLtp = 0;
 
+        // Fallback lot sizes per SEBI circular (effective Jan 2026).
+        // Used when OptionChainItem.LotSize is 0 (not returned by option chain API).
+        private static readonly Dictionary<string, int> _fallbackLotSizes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "NIFTY",      65 },
+            { "BANKNIFTY",  30 },
+            { "FINNIFTY",   60 },
+            { "MIDCPNIFTY", 120 },
+            { "SENSEX",     20 },
+        };
+
+        private static int ResolvedLotSize(Models.StrategyLeg leg)
+        {
+            if (leg.LotSize > 0) return leg.LotSize;
+            var key = leg.Index?.ToUpperInvariant() ?? "";
+            return _fallbackLotSizes.TryGetValue(key, out var sz) ? sz : 1;
+        }
+
         public HybridV2Strategy(HybridStrategyConfig config)
         {
             _config    = config ?? throw new ArgumentNullException(nameof(config));
@@ -179,8 +197,14 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.EntryTime        = DateTime.Now;
                     leg.EntryIndexLtp    = (double)spotLtp;
                     leg.Status           = "OPEN";
-                    // Store lot size from instrument master (populated on option chain items)
-                    if (opt.LotSize > 0) leg.LotSize = opt.LotSize;
+                    // Resolve lot size: option chain item first, then SEBI-mandated fallback table
+                    if (opt.LotSize > 0)
+                        leg.LotSize = opt.LotSize;
+                    else
+                    {
+                        leg.LotSize = _fallbackLotSizes.TryGetValue(leg.Index?.ToUpperInvariant() ?? "", out var fb) ? fb : 1;
+                        Log("WARN", $"[{Name}] LotSize=0 for {leg.Index} — using fallback {leg.LotSize}");
+                    }
 
                     // Compute absolute SL / Target from % of entry premium (overrides fixed prices)
                     if (leg.StopLossPercent > 0)
@@ -207,8 +231,9 @@ namespace Cognexalgo.Core.Domain.Strategies
                         LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                         SignalType       = SignalType.Entry,
                         Symbol           = leg.Index,
+                        SymbolToken      = leg.SymbolToken ?? "",
                         Price            = opt.LTP,
-                        Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
+                        Quantity         = leg.TotalLots * ResolvedLotSize(leg),
                         TriggerCondition = $"Entry: {leg.Index} {optType} {strike} @ {opt.LTP:F2}"
                     });
 
@@ -286,8 +311,9 @@ namespace Cognexalgo.Core.Domain.Strategies
                             LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                             SignalType       = SignalType.Exit,
                             Symbol           = leg.Index,
+                            SymbolToken      = leg.SymbolToken ?? "",
                             Price            = leg.Ltp,
-                            Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
+                            Quantity         = leg.TotalLots * ResolvedLotSize(leg),
                             TriggerCondition = $"{reason}: {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}"
                         });
 
@@ -444,8 +470,9 @@ namespace Cognexalgo.Core.Domain.Strategies
                     LegId            = $"LEG-{StrategyId}-{i:D2}",
                     SignalType       = SignalType.Exit,
                     Symbol           = leg.Index,
+                    SymbolToken      = leg.SymbolToken ?? "",
                     Price            = leg.Ltp,
-                    Quantity         = leg.TotalLots * (leg.LotSize > 0 ? leg.LotSize : 1),
+                    Quantity         = leg.TotalLots * ResolvedLotSize(leg),
                     TriggerCondition = $"{reason}: {optType} {leg.CalculatedStrike} @ {leg.Ltp:F2}"
                 });
 
