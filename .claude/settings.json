@@ -20,7 +20,8 @@
       "Bash(dotnet build Cognexalgo.UI/Cognexalgo.UI.csproj)",
       "Bash(dotnet build Cognexalgo.sln --no-restore -clp:ErrorsOnly)",
       "Bash(xargs grep -l \"class TickContext\")",
-      "Bash(dotnet build Cognexalgo.sln --no-restore)"
+      "Bash(dotnet build Cognexalgo.sln --no-restore)",
+      "Bash(dotnet build Cognexalgo.Core/Cognexalgo.Core.csproj --no-restore -v q)"
     ],
     "additionalDirectories": [
       "C:\\Users\\anijay\\.gemini\\antigravity\\scratch\\COGNEX\\SYNCUI\\Design1\\Preview"

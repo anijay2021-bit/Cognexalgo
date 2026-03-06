@@ -27,6 +27,11 @@ namespace Cognexalgo.Core.Domain.Strategies
         private readonly IndicatorEngine _indicatorEngine = new();
         private HistoryCacheService? _historyCache;
 
+        // Edge-trigger: tracks per-leg whether ALL indicator conditions were met on the previous tick.
+        // Entry is only allowed when conditions flip false → true (the crossing candle).
+        // Without this, a condition like "Price < EMA" would fire on every tick it remains true.
+        private readonly Dictionary<int, bool> _prevEntryConditionsMet = new();
+
         // F8: Underlying price at strategy first-entry (for UnderlyingMove trigger)
         private double _strategyEntrySpotLtp = 0;
 
@@ -178,9 +183,17 @@ namespace Cognexalgo.Core.Domain.Strategies
                     if (chain == null || chain.Count == 0)
                         continue;
 
-                    // F2: Check all indicator entry conditions before entering
-                    if (leg.EntryConditions?.Count > 0 && !AllConditionsMet(leg.EntryConditions))
-                        continue;
+                    // F2 + Edge-trigger: only enter on the FIRST candle conditions become true.
+                    // If conditions were already true last tick, skip (no new crossing occurred).
+                    if (leg.EntryConditions?.Count > 0)
+                    {
+                        bool currentMet = AllConditionsMet(leg.EntryConditions);
+                        _prevEntryConditionsMet.TryGetValue(legIdx, out bool prevMet);
+                        _prevEntryConditionsMet[legIdx] = currentMet; // update for next tick
+
+                        if (!currentMet || prevMet) // not met, OR already was met → no crossing
+                            continue;
+                    }
 
                     int strike = leg.GetTargetStrike((double)spotLtp, chain);
                     if (strike == 0) continue;
@@ -192,6 +205,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                     leg.CalculatedStrike = strike;
                     leg.SelectedPremium  = opt.LTP;
                     leg.SymbolToken      = opt.Token;
+                    leg.TradingSymbol    = opt.Symbol ?? "";
                     leg.EntryPrice       = opt.LTP;
                     leg.Ltp              = opt.LTP;
                     leg.EntryTime        = DateTime.Now;
@@ -230,7 +244,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                         StrategyId       = StrategyId,
                         LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                         SignalType       = SignalType.Entry,
-                        Symbol           = leg.Index,
+                        Symbol           = leg.TradingSymbol,
                         SymbolToken      = leg.SymbolToken ?? "",
                         Price            = opt.LTP,
                         Quantity         = leg.TotalLots * ResolvedLotSize(leg),
@@ -310,7 +324,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                             StrategyId       = StrategyId,
                             LegId            = $"LEG-{StrategyId}-{legIdx:D2}",
                             SignalType       = SignalType.Exit,
-                            Symbol           = leg.Index,
+                            Symbol           = leg.TradingSymbol,
                             SymbolToken      = leg.SymbolToken ?? "",
                             Price            = leg.Ltp,
                             Quantity         = leg.TotalLots * ResolvedLotSize(leg),
@@ -365,6 +379,11 @@ namespace Cognexalgo.Core.Domain.Strategies
                     int legIdx = _config.Legs.IndexOf(leg);
                     leg.CurrentReEntry++;
                     leg.Status = "PENDING"; // picked up by entry block on next tick
+
+                    // Edge-trigger reset: mark prev as true so re-entry also waits for a
+                    // fresh condition crossing (conditions must go false before firing again).
+                    if (leg.EntryConditions?.Count > 0)
+                        _prevEntryConditionsMet[legIdx] = true;
 
                     FireSignal(new Entities.Signal
                     {
@@ -469,7 +488,7 @@ namespace Cognexalgo.Core.Domain.Strategies
                     StrategyId       = StrategyId,
                     LegId            = $"LEG-{StrategyId}-{i:D2}",
                     SignalType       = SignalType.Exit,
-                    Symbol           = leg.Index,
+                    Symbol           = leg.TradingSymbol,
                     SymbolToken      = leg.SymbolToken ?? "",
                     Price            = leg.Ltp,
                     Quantity         = leg.TotalLots * ResolvedLotSize(leg),
