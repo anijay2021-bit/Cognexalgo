@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Cognexalgo.Core.Domain.Enums;
 using Cognexalgo.Core.Infrastructure.Persistence;
 using Cognexalgo.Core.Infrastructure.Services;
+using Cognexalgo.Core.Services;
 using Newtonsoft.Json;
 
 // Alias to disambiguate Domain.Entities from Models namespace
@@ -22,10 +23,12 @@ namespace Cognexalgo.Core.Infrastructure.Services
     public class V2StrategyAdapter
     {
         private readonly V2Bridge _bridge;
+        private readonly TokenService? _tokenService;
 
-        public V2StrategyAdapter(V2Bridge bridge)
+        public V2StrategyAdapter(V2Bridge bridge, TokenService? tokenService = null)
         {
             _bridge = bridge;
+            _tokenService = tokenService;
         }
 
         /// <summary>
@@ -107,12 +110,17 @@ namespace Cognexalgo.Core.Infrastructure.Services
                 };
 
                 // Map legacy legs → V2 StrategyLegs
+                string underlyingSymbol = legacyConfig.Legs?.FirstOrDefault()?.Index ?? "NIFTY";
+                int lotSize = _tokenService?.GetLotSize(underlyingSymbol) ?? 65;
+                if (lotSize <= 1) lotSize = 65; // fallback if not found in master
+
                 if (legacyConfig.Legs != null)
                 {
                     int legNum = 0;
                     foreach (var leg in legacyConfig.Legs)
                     {
                         legNum++;
+                        int lots = leg.TotalLots > 0 ? leg.TotalLots : 1;
                         v2Strategy.Legs.Add(new V2StrategyLeg
                         {
                             LegId = $"{strategyId}-L{legNum}",
@@ -123,10 +131,10 @@ namespace Cognexalgo.Core.Infrastructure.Services
                             Exchange = "NFO",
                             InstrumentType = InstrumentType.OPTIDX,
                             OptionType = leg.OptionType.ToString(),
-                            Direction = leg.Action == Models.ActionType.Buy 
+                            Direction = leg.Action == Models.ActionType.Buy
                                 ? Direction.BUY : Direction.SELL,
-                            Quantity = leg.TotalLots > 0 ? leg.TotalLots * 25 : 25,
-                            Lots = leg.TotalLots > 0 ? leg.TotalLots : 1,
+                            Quantity = lots * lotSize,
+                            Lots = lots,
                             StrikePrice = (decimal)leg.CalculatedStrike,
                             EntryPrice = (decimal)leg.EntryPrice,
                             ExitPrice = (decimal)leg.ExitPrice,

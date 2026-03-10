@@ -13,6 +13,7 @@ using System.Windows; // For Window handling
 using Cognexalgo.UI.Services; // [NEW]
 using Cognexalgo.Core.Services; // [NEW]
 using Cognexalgo.Core.Infrastructure.Services; // V2
+using Cognexalgo.Core.Domain.Strategies; // HybridV2Strategy
 
 namespace Cognexalgo.UI.ViewModels
 {
@@ -365,16 +366,27 @@ namespace Cognexalgo.UI.ViewModels
                         if (!double.TryParse(pos.NetQty, out double netQty) || netQty == 0)
                             continue; // closed position — skip
 
-                        double ltp = pos.TradingSymbol switch
+                        double ltp;
+                        if (pos.ParsedStrike > 0)
                         {
-                            var s when s != null && s.Contains("BANKNIFTY")  => LtpBankNifty,
-                            var s when s != null && s.Contains("FINNIFTY")   => LtpFinnifty,
-                            var s when s != null && s.Contains("MIDCPNIFTY") => LtpMidcpNifty,
-                            var s when s != null && s.Contains("SENSEX")     => LtpSensex,
-                            var s when s != null && s.Contains("NIFTY")      => LtpNifty,
-                            _                                                 => 0
-                        };
-                        if (ltp <= 0) continue;
+                            // Option position: use live premium from the running strategy leg, not the spot price
+                            ltp = GetOptionLtpFromStrategy(pos.TradingSymbol);
+                            if (ltp <= 0) continue;
+                        }
+                        else
+                        {
+                            // Underlying / futures position: use spot price
+                            ltp = pos.TradingSymbol switch
+                            {
+                                var s when s != null && s.Contains("BANKNIFTY")  => LtpBankNifty,
+                                var s when s != null && s.Contains("FINNIFTY")   => LtpFinnifty,
+                                var s when s != null && s.Contains("MIDCPNIFTY") => LtpMidcpNifty,
+                                var s when s != null && s.Contains("SENSEX")     => LtpSensex,
+                                var s when s != null && s.Contains("NIFTY")      => LtpNifty,
+                                _                                                 => 0
+                            };
+                            if (ltp <= 0) continue;
+                        }
 
                         pos.Ltp = ltp;
                         pos.Pnl = netQty > 0
@@ -424,11 +436,46 @@ namespace Cognexalgo.UI.ViewModels
 
         private void OnSignal(Signal signal)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() => 
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 Signals.Insert(0, signal); // Add to top
                 if (Signals.Count > 100) Signals.RemoveAt(Signals.Count - 1);
             });
+        }
+
+        /// <summary>
+        /// P1: Returns the live option premium for a given trading symbol.
+        /// Priority: (1) SmartStream tick if subscribed, (2) V2 strategy leg Ltp.
+        /// Returns 0 if neither source has a value yet.
+        /// </summary>
+        private double GetOptionLtpFromStrategy(string? tradingSymbol)
+        {
+            if (string.IsNullOrEmpty(tradingSymbol)) return 0;
+
+            // 1. SmartStream: best source — token subscribed during FetchPositions
+            var token = _engine?.TokenService?.GetToken(tradingSymbol);
+            if (!string.IsNullOrEmpty(token))
+            {
+                double streamLtp = _engine!.SmartStream?.GetLastLtp(token) ?? 0;
+                if (streamLtp > 0) return streamLtp;
+            }
+
+            // 2. V2 strategy leg: fallback when SmartStream hasn't received a tick yet
+            if (_v2?.Orchestrator?.Contexts != null)
+            {
+                foreach (var ctx in _v2.Orchestrator.Contexts.Values)
+                {
+                    if (ctx.Strategy is HybridV2Strategy hvs)
+                    {
+                        var leg = hvs.GetConfig().Legs
+                            .FirstOrDefault(l => l.TradingSymbol == tradingSymbol && l.Status == "OPEN");
+                        if (leg != null && leg.Ltp > 0)
+                            return leg.Ltp;
+                    }
+                }
+            }
+
+            return 0;
         }
 
         [RelayCommand(CanExecute = nameof(IsInitialized))]
@@ -522,7 +569,7 @@ namespace Cognexalgo.UI.ViewModels
                      var latest = Strategies.LastOrDefault();
                      if (latest != null)
                      {
-                         var adapter = new V2StrategyAdapter(_v2);
+                         var adapter = new V2StrategyAdapter(_v2, _engine?.TokenService);
                          var latestSnapshot = latest; // capture for closure
                          _ = Task.Run(async () =>
                          {
@@ -672,7 +719,7 @@ namespace Cognexalgo.UI.ViewModels
             // ── Ensure synced to V2 DB (non-fatal — strategy can run offline) ──
             if (string.IsNullOrEmpty(strategy.V2Id))
             {
-                var adapter = new V2StrategyAdapter(_v2);
+                var adapter = new V2StrategyAdapter(_v2, _engine?.TokenService);
                 string? v2Id = null;
                 try { v2Id = await Task.Run(() => adapter.SyncToV2Async(strategy)); }
                 catch (Exception ex) { Log($"V2 sync failed (non-fatal): {ex.Message}", "WARN"); }
@@ -1077,6 +1124,42 @@ namespace Cognexalgo.UI.ViewModels
                                 p.ParsedIsCall = call;
                             }
                         }
+
+                        // P2: Populate StopLoss / Target / EntryPrice from running strategy legs
+                        if (_v2?.Orchestrator?.Contexts != null)
+                        {
+                            var legsBySymbol = _v2.Orchestrator.Contexts.Values
+                                .Where(c => c.Strategy is HybridV2Strategy)
+                                .SelectMany(c => ((HybridV2Strategy)c.Strategy).GetConfig().Legs)
+                                .Where(l => !string.IsNullOrEmpty(l.TradingSymbol))
+                                .GroupBy(l => l.TradingSymbol!)
+                                .ToDictionary(g => g.Key, g => g.First());
+
+                            foreach (var p in mockPositions)
+                            {
+                                if (p.TradingSymbol != null && legsBySymbol.TryGetValue(p.TradingSymbol, out var leg))
+                                {
+                                    p.StopLoss   = leg.StopLossPrice;
+                                    p.Target     = leg.TargetPrice;
+                                    p.EntryPrice = leg.EntryPrice;
+                                }
+                            }
+                        }
+
+                        // P1: Resolve option token from TokenService and subscribe to SmartStream
+                        // so GetLastLtp(token) returns live option premiums on subsequent ticks.
+                        var tokensToSubscribe = new System.Collections.Generic.List<string>();
+                        foreach (var p in mockPositions.Where(p => p.ParsedStrike > 0))
+                        {
+                            var tok = _engine.TokenService?.GetToken(p.TradingSymbol);
+                            if (!string.IsNullOrEmpty(tok))
+                            {
+                                p.SymbolToken = tok;
+                                tokensToSubscribe.Add(tok);
+                            }
+                        }
+                        if (tokensToSubscribe.Count > 0 && _engine.SmartStream?.IsConnected == true)
+                            _ = _engine.SmartStream.SubscribeAsync(tokensToSubscribe, "NFO");
 
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
