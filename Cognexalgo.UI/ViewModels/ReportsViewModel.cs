@@ -27,6 +27,7 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty] private double _sharpeRatio;
         [ObservableProperty] private string _selectedRange = "Today";
         [ObservableProperty] private bool _isLoading;
+        [ObservableProperty] private bool _isEmpty = true;
 
         // ── Equity curve data ──────────────────────────────────────
         public ObservableCollection<EquityPoint> EquityCurve { get; } = new();
@@ -93,6 +94,7 @@ namespace Cognexalgo.UI.ViewModels
                     });
                 }
 
+                IsEmpty = !filled.Any();
                 TotalPnl = cumPnl;
                 MaxDrawdown = maxDd;
                 WinningTrades = filled.Count(o => o.ActualProfit > 0);

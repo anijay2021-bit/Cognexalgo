@@ -260,6 +260,11 @@
                                     </WrapPanel>
                                     
                                     <WrapPanel Orientation="Horizontal">
+                                        <!-- F2: timeframe for indicator condition -->
+                                        <TextBlock Text="TF:" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,4,0"/>
+                                        <ComboBox ItemsSource="{x:Static vm:StrategyBuilderViewModel.TimeFrames}"
+                                                  SelectedItem="{Binding SelectedEntryRuleTimeFrame}"
+                                                  Width="72" Margin="0,0,10,0" Style="{StaticResource DarkComboBoxStyle}"/>
                                         <TextBlock Text="Then" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,5,0"/>
                                         <ComboBox SelectedItem="{Binding Action}" Width="80" Margin="0,0,10,0" Style="{StaticResource DarkComboBoxStyle}">
                                             <System:String xmlns:System="clr-namespace:System;assembly=mscorlib">BUY_CE</System:String>
@@ -271,12 +276,13 @@
                             </Border>
 
                             <!-- List -->
-                            <DataGrid Grid.Row="2" ItemsSource="{Binding EntryRules}" AutoGenerateColumns="False" 
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding EntryRules}" AutoGenerateColumns="False"
                                       CanUserAddRows="False"
                                       Style="{StaticResource DarkDataGridStyle}">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Logic" Binding="{Binding Description}" Width="*"/>
-                                    <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="80"/>
+                                    <DataGridTextColumn Header="Logic"      Binding="{Binding Description}" Width="*"/>
+                                    <DataGridTextColumn Header="Timeframe"  Binding="{Binding TimeFrame}"   Width="70"/>
+                                    <DataGridTextColumn Header="Action"     Binding="{Binding Action}"      Width="80"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
@@ -416,23 +422,33 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Product Type and Expiry -->
+                <!-- Product Type / Expiry / Expiry Offset -->
                 <Grid Grid.Row="3" Margin="0,0,0,15">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Margin="0,0,10,0">
                         <TextBlock Text="Product Type" Style="{StaticResource LabelTextStyle}"/>
-                        <ComboBox ItemsSource="{Binding ProductTypes}" SelectedItem="{Binding SelectedProductType}" 
+                        <ComboBox ItemsSource="{Binding ProductTypes}" SelectedItem="{Binding SelectedProductType}"
                                   Style="{StaticResource DarkComboBoxStyle}"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1">
+                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
                         <TextBlock Text="Expiry Type" Style="{StaticResource LabelTextStyle}"/>
-                        <ComboBox ItemsSource="{Binding ExpiryTypes}" SelectedItem="{Binding SelectedExpiryType}" 
+                        <ComboBox ItemsSource="{Binding ExpiryTypes}" SelectedItem="{Binding SelectedExpiryType}"
                                   Style="{StaticResource DarkComboBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Width="120">
+                        <TextBlock Text="Expiry Offset" Style="{StaticResource LabelTextStyle}"/>
+                        <ComboBox ItemsSource="{x:Static vm:StrategyBuilderViewModel.ExpiryOffsets}"
+                                  SelectedItem="{Binding NewLegExpiryOffset}"
+                                  Style="{StaticResource DarkComboBoxStyle}"/>
+                        <TextBlock Text="0=Current 1=Next 2=Next+1" Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="9" Margin="0,2,0,0" FontStyle="Italic"/>
                     </StackPanel>
                 </Grid>
 
@@ -462,6 +478,16 @@
 
                                 <!-- F1: Per-leg trailing SL (0 = disabled) -->
                                 <DataGridTextColumn Header="Trail SL" Binding="{Binding TrailingSL, UpdateSourceTrigger=PropertyChanged}" Width="65"/>
+
+                                <!-- SL % and Target % of entry premium -->
+                                <DataGridTextColumn Header="SL %" Binding="{Binding StopLossPercent, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                <DataGridTextColumn Header="Tgt %" Binding="{Binding TargetPercent, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+
+                                <!-- Max re-entries after SL -->
+                                <DataGridTextColumn Header="Re#" Binding="{Binding MaxReEntry, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
+
+                                <!-- Expiry offset: 0=current, 1=next, 2=next+1 -->
+                                <DataGridTextColumn Header="Exp+" Binding="{Binding ExpiryOffset, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
 
                                 <!-- F6: SL-M exit checkbox -->
                                 <DataGridCheckBoxColumn Header="SL-M" Binding="{Binding UseSLMOnExit, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
@@ -649,7 +675,7 @@
                     <StackPanel>
                         <TextBlock Text="Paper Trade &amp; MTM Settings" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,12"/>
 
-                        <!-- F4: Slippage -->
+                        <!-- F4: Slippage + Square-off Time -->
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -660,6 +686,11 @@
                                 <TextBlock Text="Slippage %" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding SlippagePct}" Style="{StaticResource DarkTextBoxStyle}"/>
                                 <TextBlock Text="Applied in paper trade mode" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Square-off Time (HH:mm)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,3"/>
+                                <TextBox Text="{Binding SquareOffTime}" Style="{StaticResource DarkTextBoxStyle}" ToolTip="e.g. 15:20 — all open legs force-exited at this time. Leave empty to disable."/>
+                                <TextBlock Text="Empty = disabled" Foreground="{StaticResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" FontStyle="Italic"/>
                             </StackPanel>
                         </Grid>
 

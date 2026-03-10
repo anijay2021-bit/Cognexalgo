@@ -105,9 +105,10 @@ namespace Cognexalgo.UI.ViewModels
                     SourceType = SelectedSourceType,
                     StaticValue = StaticValue,
                     RightIndicator = SelectedRightIndicator,
-                    RightPeriod = RightPeriod   
+                    RightPeriod = RightPeriod
                 },
-                Action = Action
+                Action = Action,
+                TimeFrame = SelectedEntryRuleTimeFrame  // F2: capture timeframe
             };
             EntryRules.Add(rule);
         }
@@ -170,7 +171,8 @@ namespace Cognexalgo.UI.ViewModels
                 Action = SelectedAction == "Buy" ? ActionType.Buy : ActionType.Sell,
                 TotalLots = TotalLots,
                 ProductType = SelectedProductType,
-                ExpiryType = SelectedExpiryType.ToString()
+                ExpiryType = SelectedExpiryType.ToString(),
+                ExpiryOffset = NewLegExpiryOffset
             };
 
             HybridLegs.Add(leg);
@@ -450,6 +452,21 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty]
         private double _newLegTargetDelta = 0.30;
 
+        // Expiry offset for the leg being added (0 = current, 1 = next, 2 = next+1)
+        [ObservableProperty]
+        private int _newLegExpiryOffset = 0;
+
+        // Per-strategy square-off time (HH:mm). Empty = disabled.
+        [ObservableProperty]
+        private string _squareOffTime = string.Empty;
+
+        // F2: Timeframe for the entry rule being built
+        [ObservableProperty]
+        private string _selectedEntryRuleTimeFrame = "Min15";
+
+        public static int[] ExpiryOffsets { get; } = new[] { 0, 1, 2 };
+        public static string[] TimeFrames { get; } = new[] { "Min1", "Min3", "Min5", "Min10", "Min15", "Min30", "Hour1", "Day1" };
+
         // F4: Per-strategy slippage (paper trade)
         [ObservableProperty]
         private decimal _slippagePct = 0.05m;
@@ -572,6 +589,7 @@ namespace Cognexalgo.UI.ViewModels
             StrategyMtmTrailingIsPercent = config.StrategyTrailingIsPercent;
             StrategyLockProfitAt = config.StrategyLockProfitAt;
             StrategyLockProfitTo = config.StrategyLockProfitTo;
+            SquareOffTime = config.SquareOffTime ?? string.Empty;
             
             // Load Legs
             HybridLegs.Clear();
@@ -801,8 +819,45 @@ namespace Cognexalgo.UI.ViewModels
                 StrategyTrailingSL = StrategyMtmTrailingSL,
                 StrategyTrailingIsPercent = StrategyMtmTrailingIsPercent,
                 StrategyLockProfitAt = StrategyLockProfitAt,
-                StrategyLockProfitTo = StrategyLockProfitTo
+                StrategyLockProfitTo = StrategyLockProfitTo,
+
+                // Square-off time
+                SquareOffTime = SquareOffTime
             };
+
+            // F2: Bridge V1 EntryRules → V2 StrategyLeg.EntryConditions so HybridV2Strategy
+            // can evaluate indicator guards before each leg entry.
+            // Only StaticValue conditions (indicator vs number) are supported; indicator-vs-indicator rules are skipped.
+            var f2Conditions = EntryRules
+                .Where(r => r.Condition.SourceType == ValueSource.StaticValue)
+                .Select(r => new Cognexalgo.Core.Models.IndicatorCondition
+                {
+                    IndicatorType = r.Condition.Indicator switch
+                    {
+                        Cognexalgo.Core.Rules.IndicatorType.SUPERTREND      => "SuperTrend",
+                        Cognexalgo.Core.Rules.IndicatorType.BOLLINGER_BANDS => "BollingerBands",
+                        _ => r.Condition.Indicator.ToString() // RSI, EMA, SMA, VWAP, ATR, LTP, MACD
+                    },
+                    Period     = r.Condition.Period,
+                    TimeFrame  = r.TimeFrame,  // per-rule timeframe from builder
+                    Comparator = r.Condition.Operator switch
+                    {
+                        Cognexalgo.Core.Rules.Comparator.GREATER_THAN => ">",
+                        Cognexalgo.Core.Rules.Comparator.LESS_THAN    => "<",
+                        Cognexalgo.Core.Rules.Comparator.EQUALS       => "==",
+                        Cognexalgo.Core.Rules.Comparator.CROSS_ABOVE  => ">",
+                        Cognexalgo.Core.Rules.Comparator.CROSS_BELOW  => "<",
+                        Cognexalgo.Core.Rules.Comparator.CLOSES_ABOVE => ">=",
+                        Cognexalgo.Core.Rules.Comparator.CLOSES_BELOW => "<=",
+                        _ => ">"
+                    },
+                    Value = r.Condition.StaticValue
+                })
+                .ToList();
+
+            if (f2Conditions.Count > 0)
+                foreach (var leg in config.Legs)
+                    leg.EntryConditions = f2Conditions;
 
             await _engine.StrategyRepository.SaveHybridStrategyAsync(config, "User");
             _onSave?.Invoke();
@@ -831,5 +886,7 @@ namespace Cognexalgo.UI.ViewModels
         public string Description { get; set; }
         public Condition Condition { get; set; }
         public string Action { get; set; }
+        /// <summary>F2: timeframe for IndicatorCondition bridge. Matches IndicatorEngine.TimeFrame enum names.</summary>
+        public string TimeFrame { get; set; } = "Min15";
     }
 }

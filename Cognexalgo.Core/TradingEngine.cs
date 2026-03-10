@@ -440,6 +440,12 @@ namespace Cognexalgo.Core
             }
         }
 
+        /// <summary>Returns the running CalendarStrategy for the given config ID, or null if not started.</summary>
+        public Cognexalgo.Core.Strategies.CalendarStrategy GetCalendarStrategy(int configId) =>
+            _activeStrategies
+                .OfType<Cognexalgo.Core.Strategies.CalendarStrategy>()
+                .FirstOrDefault();
+
         public double GetTotalPnL()
         {
             if (_activeStrategies == null || !_activeStrategies.Any()) return 0.0;

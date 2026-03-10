@@ -797,6 +797,22 @@ namespace Cognexalgo.UI.ViewModels
             win.Show();
         }
 
+        // Calendar Trades popup
+        [RelayCommand]
+        public void OpenCalendarTrades(Cognexalgo.Core.Models.HybridStrategyConfig config)
+        {
+            if (_engine == null) return;
+            var cal = _engine.GetCalendarStrategy(config.Id);
+            if (cal == null)
+            {
+                System.Windows.MessageBox.Show("Calendar strategy is not running. Start the engine first.", "Not Running");
+                return;
+            }
+            var vm  = new CalendarTradesViewModel(cal, config.Name);
+            var win = new Views.CalendarTradesWindow(vm) { Owner = System.Windows.Application.Current.MainWindow };
+            win.Show();
+        }
+
         // F3: Open Performance Report window
         [RelayCommand]
         public void OpenReports()

@@ -17,6 +17,7 @@ namespace Cognexalgo.Core.Models
         // UI Helper Properties
         public string StrategyType { get; set; } = "Hybrid";
         public string InstrumentType => Legs.Count > 0 ? Legs[0].Index : "N/A";
+        public bool IsCalendar => StrategyType == "CALENDAR";
 
         // Dashboard Properties (Observable for Real-time Binding)
         [ObservableProperty]

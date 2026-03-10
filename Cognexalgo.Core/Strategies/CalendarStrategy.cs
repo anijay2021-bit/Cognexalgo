@@ -21,7 +21,7 @@ namespace Cognexalgo.Core.Strategies
         public double BuyStopLossPercent { get; set; } = 6.0;
         public int TotalLots { get; set; } = 1;
         public string ProductType { get; set; } = "NRML";
-        public double ShortStraddleCombinedSL { get; set; } = 20.0; 
+        public double ShortStraddleCombinedSL { get; set; } = 0.0; // 0 = trigger when combined returns to entry level
 
         // Parsed TimeSpans
         [JsonIgnore]
@@ -35,6 +35,12 @@ namespace Cognexalgo.Core.Strategies
         private CalendarStrategyConfig _config;
         private List<StrategyLeg> _activeLegs = new List<StrategyLeg>();
         private bool _isReversalActive = false;
+
+        // Full trade history for the current monthly cycle (open + closed legs)
+        private readonly List<StrategyLeg> _monthlyCycleLegs = new List<StrategyLeg>();
+
+        /// <summary>All legs entered since the current monthly cycle started (for trade history display).</summary>
+        public IReadOnlyList<StrategyLeg> MonthlyCycleLegs => _monthlyCycleLegs.AsReadOnly();
 
         public CalendarStrategy(TradingEngine engine, string jsonConfig) : base(engine, "Calendar")
         {
@@ -158,12 +164,13 @@ namespace Cognexalgo.Core.Strategies
             {
                 leg.Status = "OPEN";
                 _activeLegs.Add(leg);
+                _monthlyCycleLegs.Add(leg); // persist in history for the whole monthly cycle
             }
         }
 
         private async Task ManageWeeklyRoll(TickerData ticker)
         {
-            // 1. Close ALL current weekly legs
+            // 1. Close ALL current weekly legs (shorts + any active reversal buys)
             var weeklyLegs = _activeLegs.Where(l => l.ExpiryType == "Weekly" && l.Status == "OPEN").ToList();
             foreach (var leg in weeklyLegs)
             {
@@ -173,6 +180,7 @@ namespace Cognexalgo.Core.Strategies
                 leg.ExitTime = DateTime.Now;
                 _activeLegs.Remove(leg);
             }
+            _isReversalActive = false; // reset so risk monitoring resumes fresh for new weekly legs
 
             // 2. Check Last Week
             if (IsLastWeekOfMonthlyCycle())
@@ -186,6 +194,8 @@ namespace Cognexalgo.Core.Strategies
                      leg.ExitTime = DateTime.Now;
                      _activeLegs.Remove(leg);
                  }
+                 // Monthly cycle complete — reset history so next cycle starts fresh
+                 _monthlyCycleLegs.Clear();
                  return;
             }
 
@@ -248,10 +258,9 @@ namespace Cognexalgo.Core.Strategies
             double combinedPremium = 0;
             foreach(var leg in shortLegs) combinedPremium += GetLtp(leg, ticker);
 
-            // Check Combined SL
-            // Simplified: If Combined Premium > Entry Premium + SL
+            // Check Combined SL: trigger when combined LTP >= entry combined (full premium given back)
             double entryPremium = shortLegs.Sum(l => l.EntryPrice);
-            if (combinedPremium > entryPremium + _config.ShortStraddleCombinedSL)
+            if (combinedPremium >= entryPremium + _config.ShortStraddleCombinedSL)
             {
                 Console.WriteLine($"[Calendar] Short Straddle SL Hit! Initiating Reversal...");
                 
@@ -291,6 +300,24 @@ namespace Cognexalgo.Core.Strategies
              if ((symbol == "NIFTY" || symbol == "NIFTY 50") && ticker.Nifty != null) return ticker.Nifty.Ltp;
              if ((symbol == "BANKNIFTY" || symbol == "NIFTY BANK") && ticker.BankNifty != null) return ticker.BankNifty.Ltp;
              return 0;
+        }
+
+        /// <summary>P&L for one leg. Uses ExitPrice for closed legs, Ltp for open legs.</summary>
+        private double ComputeLegPnl(StrategyLeg leg)
+        {
+            double currentPrice = leg.Status == "EXITED" ? leg.ExitPrice : (leg.Ltp > 0 ? leg.Ltp : leg.EntryPrice);
+            int qty = leg.TotalLots * leg.LotSize;
+            return leg.Action == ActionType.Sell
+                ? (leg.EntryPrice - currentPrice) * qty
+                : (currentPrice - leg.EntryPrice) * qty;
+        }
+
+        /// <summary>Combined monthly P&L: realized (closed) + unrealized (open).</summary>
+        public (double Realized, double Unrealized, double Total) GetMonthlyPnl()
+        {
+            double realized   = _monthlyCycleLegs.Where(l => l.Status == "EXITED").Sum(ComputeLegPnl);
+            double unrealized = _monthlyCycleLegs.Where(l => l.Status == "OPEN").Sum(ComputeLegPnl);
+            return (realized, unrealized, realized + unrealized);
         }
     }
 }

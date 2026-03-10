@@ -399,7 +399,12 @@
                                                     CommandParameter="{Binding}" Style="{StaticResource TonalBtn}" Padding="10,4" Margin="0,0,6,0" FontSize="11"/>
                                             <Button Content="✎"
                                                     Command="{Binding DataContext.EditStrategyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}" Style="{StaticResource TonalBtn}" Padding="10,4" FontSize="11"/>
+                                                    CommandParameter="{Binding}" Style="{StaticResource TonalBtn}" Padding="10,4" FontSize="11" Margin="0,0,6,0"/>
+                                            <Button Content="Trades"
+                                                    Command="{Binding DataContext.OpenCalendarTradesCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource TonalBtn}" Padding="10,4" FontSize="11"
+                                                    Visibility="{Binding IsCalendar, Converter={StaticResource BoolToVis}}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </syncfusion:GridTemplateColumn.CellTemplate>

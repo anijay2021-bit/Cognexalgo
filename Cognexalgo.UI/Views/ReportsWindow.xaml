@@ -5,23 +5,37 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
         xmlns:conv="clr-namespace:Cognexalgo.UI.Converters"
+        xmlns:chart="clr-namespace:Syncfusion.UI.Xaml.Charts;assembly=Syncfusion.SfChart.WPF"
         mc:Ignorable="d"
         Title="Performance Report"
-        Width="900" Height="650"
+        Width="960" Height="720"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterOwner">
 
     <Window.Resources>
         <conv:IsNegativeConverter x:Key="IsNegativeConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <SolidColorBrush x:Key="Positive" Color="#2E7D32"/>
+        <SolidColorBrush x:Key="Negative" Color="#C62828"/>
+
+        <Style x:Key="CellCenter" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment"   Value="Center"/>
+        </Style>
+        <Style x:Key="CellRight" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment"   Value="Center"/>
+            <Setter Property="Padding"             Value="0,0,6,0"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>   <!-- Header -->
+            <RowDefinition Height="Auto"/>   <!-- Filter bar -->
+            <RowDefinition Height="Auto"/>   <!-- Stats cards -->
+            <RowDefinition Height="180"/>    <!-- Equity curve chart -->
+            <RowDefinition Height="*"/>      <!-- Per-strategy breakdown -->
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -29,7 +43,7 @@
                    Style="{StaticResource HeaderTextStyle}"
                    HorizontalAlignment="Center" Margin="0,0,0,16"/>
 
-        <!-- Date range + Load button -->
+        <!-- Filter bar -->
         <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,12">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock Text="Period:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -68,10 +82,10 @@
                                HorizontalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Positive}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding TotalPnl, Converter={StaticResource IsNegativeConverter}}" Value="True">
-                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource Negative}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -113,8 +127,45 @@
             </UniformGrid>
         </Border>
 
+        <!-- Equity Curve Chart -->
+        <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="8,4" Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Equity Curve"
+                           Style="{StaticResource LabelTextStyle}" Margin="4,2,0,4"/>
+                <chart:SfChart Grid.Row="1"
+                               Background="Transparent"
+                               BorderThickness="0"
+                               Margin="0,0,8,0">
+                    <chart:SfChart.PrimaryAxis>
+                        <chart:CategoryAxis ShowGridLines="False" Visibility="Collapsed"/>
+                    </chart:SfChart.PrimaryAxis>
+                    <chart:SfChart.SecondaryAxis>
+                        <chart:NumericalAxis LabelFormat="₹#,0"
+                                             ShowGridLines="True"/>
+                    </chart:SfChart.SecondaryAxis>
+                    <chart:LineSeries ItemsSource="{Binding EquityCurve}"
+                                      XBindingPath="Label"
+                                      YBindingPath="CumPnl"
+                                      Stroke="{StaticResource PrimaryBrush}"
+                                      StrokeThickness="2"
+                                      EnableAnimation="False"/>
+                </chart:SfChart>
+
+                <!-- Empty state label -->
+                <TextBlock Grid.Row="1"
+                           Text="No data — select a period and click Load Report"
+                           Style="{StaticResource LabelTextStyle}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}"/>
+            </Grid>
+        </Border>
+
         <!-- Per-strategy breakdown -->
-        <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="8">
+        <Border Grid.Row="4" Style="{StaticResource CardBorderStyle}" Padding="8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -126,16 +177,14 @@
                           ItemsSource="{Binding StrategyRows}"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
-                          Background="Transparent"
-                          RowBackground="Transparent"
-                          BorderThickness="0"
-                          HeadersVisibility="Column"
-                          CanUserSortColumns="True">
+                          Style="{StaticResource DarkDataGridStyle}"
+                          CanUserSortColumns="True"
+                          RowHeight="36">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Strategy" Binding="{Binding StrategyId}" Width="*"/>
-                        <DataGridTextColumn Header="Trades"   Binding="{Binding Trades}"     Width="80"/>
-                        <DataGridTextColumn Header="Win %"    Binding="{Binding WinPct, StringFormat='{}{0:F1}%'}" Width="80"/>
-                        <DataGridTextColumn Header="Total P&amp;L" Binding="{Binding TotalPnl, StringFormat='₹{0:N0}'}" Width="120"/>
+                        <DataGridTextColumn Header="Strategy"      Binding="{Binding StrategyId}"                                       Width="*"/>
+                        <DataGridTextColumn Header="Trades"        Binding="{Binding Trades}"                                           Width="80"  ElementStyle="{StaticResource CellCenter}"/>
+                        <DataGridTextColumn Header="Win %"         Binding="{Binding WinPct, StringFormat='{}{0:F1}%'}"                  Width="80"  ElementStyle="{StaticResource CellCenter}"/>
+                        <DataGridTextColumn Header="Total P&amp;L" Binding="{Binding TotalPnl, StringFormat='₹{0:N0}'}"                  Width="120" ElementStyle="{StaticResource CellRight}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
