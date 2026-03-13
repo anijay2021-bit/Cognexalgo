@@ -219,11 +219,9 @@ namespace Cognexalgo.Core.Services
                     else if (token == "99926037") tickerData.FinNifty = new InstrumentInfo { Ltp = ltp };
                     else if (token == "99926030") tickerData.MidcpNifty = new InstrumentInfo { Ltp = ltp };
                     else if (token == "99919017") tickerData.Sensex = new InstrumentInfo { Ltp = ltp };
-                    
-                    if (tickerData.Nifty != null || tickerData.BankNifty != null || tickerData.FinNifty != null || tickerData.MidcpNifty != null || tickerData.Sensex != null)
-                    {
-                        OnTickReceived?.Invoke(tickerData);
-                    }
+                    else tickerData.Options[token] = new InstrumentInfo { Ltp = ltp }; // option tick
+
+                    OnTickReceived?.Invoke(tickerData);
                 }
             }
             catch { /* Ignore malformed packets */ }

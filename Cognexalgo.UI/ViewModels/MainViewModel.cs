@@ -369,9 +369,15 @@ namespace Cognexalgo.UI.ViewModels
                         double ltp;
                         if (pos.ParsedStrike > 0)
                         {
-                            // Option position: use live premium from the running strategy leg, not the spot price
-                            ltp = GetOptionLtpFromStrategy(pos.TradingSymbol);
-                            if (ltp <= 0) continue;
+                            // Fast path: tick carries this option's LTP directly
+                            if (!string.IsNullOrEmpty(pos.SymbolToken) &&
+                                data.Options.TryGetValue(pos.SymbolToken, out var optInfo) && optInfo.Ltp > 0)
+                                ltp = optInfo.Ltp;
+                            else
+                            {
+                                ltp = GetOptionLtpFromStrategy(pos.TradingSymbol);
+                                if (ltp <= 0) continue;
+                            }
                         }
                         else
                         {
@@ -1227,15 +1233,81 @@ namespace Cognexalgo.UI.ViewModels
                     catch { /* trade book enrichment is best-effort; never fail FetchPositions */ }
                 }
             }
-            catch(Exception ex)
+
+            // ── V2 Orchestrator Positions ─────────────────────────────────────────
+            // Show OPEN legs from running V2 strategies regardless of SQLite/API source.
+            if (_v2?.IsInitialized == true && _v2.Orchestrator?.Contexts != null)
             {
-                Log($"Error Fetching Positions: {ex.Message}");
-            }
-            finally
-            {
-                _isFetchingPositions = false;
+                var existingSymbols = new System.Collections.Generic.HashSet<string>(
+                    Positions.Select(p => p.TradingSymbol ?? ""),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var v2Positions = new System.Collections.Generic.List<Position>();
+                foreach (var ctx in _v2.Orchestrator.Contexts.Values)
+                {
+                    if (ctx.Strategy is not HybridV2Strategy hvs) continue;
+                    var config = hvs.GetConfig();
+                    foreach (var leg in config.Legs.Where(l => l.Status == "OPEN" &&
+                             !string.IsNullOrEmpty(l.TradingSymbol)))
+                    {
+                        if (existingSymbols.Contains(leg.TradingSymbol)) continue;
+                        int lotSize = leg.LotSize > 0 ? leg.LotSize : 65;
+                        int qty = leg.TotalLots * lotSize;
+                        bool isBuy = leg.Action == Models.ActionType.Buy;
+                        double netQty = isBuy ? qty : -qty;
+
+                        var pos = new Position
+                        {
+                            TradingSymbol = leg.TradingSymbol,
+                            SymbolToken   = leg.SymbolToken ?? "",
+                            Exchange      = "NFO",
+                            NetQty        = netQty.ToString(),
+                            BuyAvgPrice   = isBuy  ? leg.EntryPrice : 0,
+                            SellAvgPrice  = !isBuy ? leg.EntryPrice : 0,
+                            AvgNetPrice   = leg.EntryPrice,
+                            EntryPrice    = leg.EntryPrice,
+                            StopLoss      = leg.StopLossPrice,
+                            Target        = leg.TargetPrice,
+                            Status        = "OPEN"
+                        };
+                        if (SymbolParser.TryParse(leg.TradingSymbol, out _, out var exp, out var stk, out var call))
+                        {
+                            pos.ParsedStrike = stk;
+                            pos.ParsedExpiry = exp;
+                            pos.ParsedIsCall = call;
+                        }
+                        v2Positions.Add(pos);
+                        existingSymbols.Add(leg.TradingSymbol);
+                    }
+                }
+
+                // Subscribe live option tokens to SmartStream
+                var v2Tokens = v2Positions
+                    .Where(p => !string.IsNullOrEmpty(p.SymbolToken) && p.ParsedStrike > 0)
+                    .Select(p => p.SymbolToken!)
+                    .Distinct().ToList();
+                if (v2Tokens.Count > 0 && _engine.SmartStream?.IsConnected == true)
+                    _ = _engine.SmartStream.SubscribeAsync(v2Tokens, "NFO");
+
+                if (v2Positions.Count > 0)
+                {
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        foreach (var p in v2Positions) Positions.Add(p);
+                    });
+                    Log($"Added {v2Positions.Count} V2 strategy positions.");
+                }
             }
         }
+        catch (Exception ex)
+        {
+            Log($"Error Fetching Positions: {ex.Message}");
+        }
+        finally
+        {
+            _isFetchingPositions = false;
+        }
+    }
 
         [RelayCommand]
         public async Task ClearPositions()
