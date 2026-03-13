@@ -145,39 +145,96 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task EvaluateEntryRulesAsync(EvaluationContext context, double currentPrice)
         {
-            if (_config.EntryRules == null || !_config.EntryRules.Any()) 
-            {
-                // _engine.Logger?.Log("Strategy", $"[{Name}] No entry rules defined.");
-                return;
-            }
+            if (_config.EntryRules == null || !_config.EntryRules.Any()) return;
 
             foreach (var rule in _config.EntryRules)
             {
-                bool isMatch = _evaluator.Evaluate(rule, context, Name, (msg) => _engine.Logger?.Log("Strategy", msg));
-                // _engine.Logger?.Log("Strategy", $"[RuleEval] {Name} => Rule {rule.Action}: Match={isMatch}");
+                bool isMatch = _evaluator.Evaluate(rule, context, Name,
+                    (msg) => _engine.Logger?.Log("Strategy", msg));
 
                 if (isMatch)
                 {
-                    string actionMsg = $"[Dynamic] {Name} Live Entry Signal: {rule.Action} @ {currentPrice}";
-                    _engine.Logger?.Log("Strategy", actionMsg);
-                    Console.WriteLine(actionMsg);
-                    
+                    // Determine option type from rule action (CE = bullish, PE = bearish, BUY defaults to CE)
+                    bool isBullish = rule.Action.Contains("CE") || rule.Action == "BUY";
+                    string optionType = isBullish ? "CE" : "PE";
+
+                    // Resolve ATM option from cached option chain
+                    var atmResult = ResolveATMOption(currentPrice, optionType);
+                    if (atmResult == null)
+                    {
+                        _engine.Logger?.Log("Strategy",
+                            $"[{Name}] ATM option not found in chain. " +
+                            $"Spot={currentPrice}, Type={optionType}. " +
+                            $"Ensure option chain is loaded before strategy starts.");
+                        return;
+                    }
+
+                    string optionSymbol = atmResult.Symbol;
+                    string optionToken  = atmResult.Token ?? "";
+                    double optionLtp    = atmResult.LTP;
+
+                    _engine.Logger?.Log("Strategy",
+                        $"[{Name}] Entry Signal: BUY {optionSymbol} @ ₹{optionLtp} | Spot={currentPrice}");
+
                     BroadcastSignal(new Signal
                     {
-                        Timestamp = DateTime.Now,
+                        Timestamp    = DateTime.Now,
                         StrategyName = Name,
-                        Symbol = _config.Symbol,
-                        SignalType = rule.Action,
-                        Price = currentPrice,
-                        Reason = rule.Action
+                        Symbol       = optionSymbol,
+                        SignalType   = rule.Action,
+                        Price        = optionLtp,
+                        Reason       = $"EMA crossover → {optionType}"
                     });
 
-                    _hasEnteredOnce = true; // Set BEFORE await to prevent duplicate entries from concurrent ticks
-                    await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name=Name }, _config.Symbol, rule.Action);
-                    _riskManager.InitializeEntry(currentPrice, context);
-                    break; // Only take one entry per tick
+                    _hasEnteredOnce = true; // Set BEFORE await to prevent duplicate entries
+                    // Execute order with option symbol + token + current LTP as fill price
+                    await _engine.ExecuteOrderAsync(
+                        new StrategyConfig { Id = 0, Name = Name },
+                        optionSymbol,
+                        "BUY",
+                        optionToken,
+                        optionLtp);
+
+                    _riskManager.InitializeEntry(optionLtp, context);
+                    break;
                 }
             }
+        }
+
+        private Cognexalgo.Core.Models.OptionChainItem? ResolveATMOption(double spotPrice, string optionType)
+        {
+            // Round to nearest 50 for Nifty, nearest 100 for BankNifty
+            double step = _config.Symbol == "BANKNIFTY" ? 100.0 : 50.0;
+            double atmStrike = Math.Round(spotPrice / step) * step;
+            bool   isCall    = optionType == "CE";
+
+            var chain = _config.Symbol switch
+            {
+                "BANKNIFTY"  => _engine.V2?.CachedBankNiftyChain,
+                "FINNIFTY"   => _engine.V2?.CachedFinniftyChain,
+                "MIDCPNIFTY" => _engine.V2?.CachedMidcpniftyChain,
+                "SENSEX"     => _engine.V2?.CachedSensexChain,
+                _            => _engine.V2?.CachedNiftyChain
+            };
+
+            if (chain == null || chain.Count == 0)
+            {
+                _engine.Logger?.Log("Strategy",
+                    $"[{Name}] Option chain for {_config.Symbol} is empty. " +
+                    $"Click 'Refresh Chain' before starting this strategy.");
+                return null;
+            }
+
+            // Weekly = nearest expiry (DaysToExpiry <= 10); Monthly = further expiry
+            bool useWeekly = _config.ExpiryType == ExpiryType.Weekly;
+
+            return chain
+                .Where(c => c.IsCall == isCall
+                         && Math.Abs(c.Strike - atmStrike) < 1.0
+                         && (useWeekly ? c.DaysToExpiry <= 10 : c.DaysToExpiry > 10)
+                         && c.LTP > 0)
+                .OrderBy(c => c.DaysToExpiry)
+                .FirstOrDefault();
         }
 
         private async Task OnCandleClosedAsync(Skender.Stock.Indicators.Quote candle)
@@ -205,9 +262,19 @@ namespace Cognexalgo.Core.Strategies
         
         private double GetLtp(TickerData ticker, string symbol)
         {
-            if (symbol == "NIFTY" && ticker.Nifty != null) return ticker.Nifty.Ltp;
-            if (symbol == "BANKNIFTY" && ticker.BankNifty != null) return ticker.BankNifty.Ltp;
-            // Add Options lookup if needed
+            if (symbol == "NIFTY"      && ticker.Nifty      != null) return ticker.Nifty.Ltp;
+            if (symbol == "BANKNIFTY"  && ticker.BankNifty  != null) return ticker.BankNifty.Ltp;
+            if (symbol == "FINNIFTY"   && ticker.FinNifty   != null) return ticker.FinNifty.Ltp;
+            if (symbol == "MIDCPNIFTY" && ticker.MidcpNifty != null) return ticker.MidcpNifty.Ltp;
+            if (symbol == "SENSEX"     && ticker.Sensex     != null) return ticker.Sensex.Ltp;
+
+            // Option symbol — look up from cached chain
+            var chain = _engine.V2?.CachedNiftyChain;
+            if (chain != null)
+            {
+                var item = chain.FirstOrDefault(c => c.Symbol == symbol);
+                if (item != null && item.LTP > 0) return item.LTP;
+            }
             return 0;
         }
     }

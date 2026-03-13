@@ -60,6 +60,24 @@ namespace Cognexalgo.Core.Models
         public double Vega  { get; set; }
         public double Gamma { get; set; }
 
+        /// <summary>Alias for Symbol — used by CalendarStrategy / shared callers.</summary>
+        public string TradingSymbol => Symbol ?? "";
+
+        /// <summary>
+        /// True when this is a weekly (non-monthly) expiry.
+        /// Heuristic: if the Thursday one week later falls in the same month, this is NOT the
+        /// last Thursday → weekly.  If it rolls into the next month, this IS the monthly expiry.
+        /// </summary>
+        public bool IsWeeklyExpiry
+        {
+            get
+            {
+                if (ExpiryDate == default) return DaysToExpiry <= 10;
+                // The next Thursday after this expiry
+                return ExpiryDate.AddDays(7).Month == ExpiryDate.Month;
+            }
+        }
+
         public override string ToString()
         {
             return $"{Strike} {OptionType} @ ₹{LTP:N2}";

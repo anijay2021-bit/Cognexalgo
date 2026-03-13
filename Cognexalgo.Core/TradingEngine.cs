@@ -25,6 +25,10 @@ namespace Cognexalgo.Core
         public SmartStreamService SmartStream { get; private set; } // [NEW] Binary Stream
         public AngelOneDataService DataService { get; private set; } // [NEW] Real-time data service
 
+        /// <summary>Reference to V2Bridge — set by MainViewModel after V2 init.
+        /// Used by DynamicStrategy to access cached option chains.</summary>
+        public Cognexalgo.Core.Infrastructure.Services.V2Bridge? V2 { get; set; }
+
         public bool IsRunning { get; private set; }
         public bool IsPaperTrading { get; set; } = true; // Default to Paper Logic
         
@@ -51,6 +55,9 @@ namespace Cognexalgo.Core
         
         // [NEW] Track active strategies for PnL aggregation
         private List<Cognexalgo.Core.Strategies.StrategyBase> _activeStrategies = new List<Cognexalgo.Core.Strategies.StrategyBase>();
+
+        // ── Calendar strategies (registered externally by CalendarStrategyViewModel) ──
+        private readonly List<Cognexalgo.Core.Strategies.CalendarStrategy> _calendarStrategies = new();
 
         // ── Telegram alert bot ────────────────────────────────────────────────
         private TelegramNotifier _telegram;
@@ -440,11 +447,19 @@ namespace Cognexalgo.Core
             }
         }
 
-        /// <summary>Returns the running CalendarStrategy for the given config ID, or null if not started.</summary>
-        public Cognexalgo.Core.Strategies.CalendarStrategy GetCalendarStrategy(int configId) =>
-            _activeStrategies
-                .OfType<Cognexalgo.Core.Strategies.CalendarStrategy>()
-                .FirstOrDefault();
+        /// <summary>
+        /// Registers a CalendarStrategy so it receives OnTickAsync calls from the engine loop.
+        /// Called from CalendarStrategyViewModel.StartStrategy().
+        /// </summary>
+        public void RegisterCalendarStrategy(Cognexalgo.Core.Strategies.CalendarStrategy strategy)
+        {
+            _calendarStrategies.Add(strategy);
+            Logger?.Log("Engine", $"Calendar strategy '{strategy.Name}' registered.");
+        }
+
+        /// <summary>Returns the first active CalendarStrategy, or null.</summary>
+        public Cognexalgo.Core.Strategies.CalendarStrategy? GetCalendarStrategy(int configId) =>
+            _calendarStrategies.FirstOrDefault(s => s.IsActive);
 
         public double GetTotalPnL()
         {
@@ -642,10 +657,15 @@ namespace Cognexalgo.Core
                     }
                     else if (config.StrategyType == "CALENDAR")
                     {
-                        var strategy = new Cognexalgo.Core.Strategies.CalendarStrategy(this, config.Parameters);
+                        var calCfg = string.IsNullOrEmpty(config.Parameters)
+                            ? new Cognexalgo.Core.Models.CalendarStrategyConfig { Name = config.Name }
+                            : JsonConvert.DeserializeObject<Cognexalgo.Core.Models.CalendarStrategyConfig>(
+                                  config.Parameters)
+                              ?? new Cognexalgo.Core.Models.CalendarStrategyConfig { Name = config.Name };
+                        var strategy = new Cognexalgo.Core.Strategies.CalendarStrategy(this, calCfg);
                         strategy.IsActive = true;
                         strategy.OnSignalGenerated += (s) => OnSignalReceived?.Invoke(s);
-                        _activeStrategies.Add(strategy);
+                        _calendarStrategies.Add(strategy);
                     }
                 }
                 catch (Exception ex)
@@ -726,16 +746,29 @@ namespace Cognexalgo.Core
                         }
 
                         // 4. Update Strategies
-                        foreach (var strategy in _activeStrategies.ToList()) 
+                        foreach (var strategy in _activeStrategies.ToList())
                         {
-                            try 
+                            try
                             {
                                 await strategy.OnTickAsync(data);
-                                strategy.RecalculatePnl(data); 
+                                strategy.RecalculatePnl(data);
                             }
                             catch (Exception ex)
                             {
                                 Logger.Log("Engine", $"Error in strategy {strategy.Name}: {ex.Message}");
+                            }
+                        }
+
+                        // 5. Update Calendar Strategies (registered externally)
+                        foreach (var cal in _calendarStrategies.Where(s => s.IsActive).ToList())
+                        {
+                            try
+                            {
+                                await cal.OnTickAsync(data);
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log("Engine", $"Error in calendar strategy {cal.Name}: {ex.Message}");
                             }
                         }
                     }
@@ -859,6 +892,79 @@ namespace Cognexalgo.Core
             {
                 Console.WriteLine($"Execution Error: {ex.Message}");
                 Logger.Log("Order", $"Execution Failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Overload that accepts option token and fill price for paper trading.
+        /// Token is used to subscribe SmartStream for live LTP updates.
+        /// FillPrice is used as the paper trade entry price instead of 0.
+        /// </summary>
+        public async Task ExecuteOrderAsync(
+            StrategyConfig config,
+            string symbol,
+            string action,
+            string token,
+            double fillPrice = 0)
+        {
+            try
+            {
+                // Subscribe token to SmartStream if provided (for live option LTP)
+                if (!string.IsNullOrEmpty(token) && SmartStream?.IsConnected == true)
+                {
+                    _ = SmartStream.SubscribeAsync(new List<string> { token }, "NFO");
+                    Logger?.Log("Engine", $"Subscribed SmartStream token {token} for {symbol}");
+                }
+
+                string transactionType = action.Contains("SELL") || action == "EXIT" ? "SELL" : "BUY";
+
+                // Resolve token from TokenService if not provided
+                string resolvedToken = !string.IsNullOrEmpty(token) ? token : TokenService?.GetInstrumentInfo(symbol).Item1 ?? "12345";
+
+                // Quantity: 1 lot by default
+                var (_, lotSize) = TokenService?.GetInstrumentInfo(symbol) ?? (string.Empty, 1);
+                int qty = lotSize > 0 ? lotSize : 1;
+
+                string? orderId = null;
+                double executionPrice = fillPrice;
+
+                if (IsPaperTrading)
+                {
+                    orderId = "PAPER_" + Guid.NewGuid().ToString().Substring(0, 8);
+                    Logger?.Log("Execution", $"[PAPER] {transactionType} {qty} {symbol} @ ₹{fillPrice} | Order: {orderId}");
+                }
+                else
+                {
+                    orderId = await Api.PlaceOrderAsync(
+                        symbol, resolvedToken, transactionType, qty,
+                        fillPrice > 0 ? fillPrice : 0, "NORMAL", "MIS");
+                }
+
+                if (string.IsNullOrEmpty(orderId))
+                {
+                    Logger?.Log("Execution", $"Order placement FAILED for {symbol}.");
+                    return;
+                }
+
+                var order = new Order
+                {
+                    OrderId         = orderId,
+                    StrategyId      = config.Id,
+                    StrategyName    = config.Name,
+                    Symbol          = symbol,
+                    Token           = resolvedToken,
+                    TransactionType = transactionType,
+                    Qty             = qty,
+                    Price           = executionPrice,
+                    Status          = "OPEN",
+                    Timestamp       = DateTime.Now
+                };
+                await OrderRepository.AddAsync(order);
+                Logger?.Log("Order", $"Order placed: {orderId} | {transactionType} {qty} {symbol} @ ₹{executionPrice}");
+            }
+            catch (Exception ex)
+            {
+                Logger?.Log("Order", $"Execution failed: {ex.Message}");
             }
         }
 

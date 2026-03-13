@@ -69,7 +69,7 @@ public class PaperTradingBroker : IBroker
             BuySell = request.BuySell,
             OrderQty = request.Qty,
             FilledQty = request.Qty, // Instant fill in paper mode
-            AvgPrice = request.OrderType == OrderType.LIMIT ? request.LimitPrice : 0, // LTP would come from live data
+            AvgPrice = request.LimitPrice > 0 ? request.LimitPrice : 0,
             LimitPrice = request.LimitPrice,
             TriggerPrice = request.TriggerPrice,
             OrderType = request.OrderType,
@@ -154,29 +154,34 @@ public class PaperTradingBroker : IBroker
         {
             existing = new Position
             {
-                Symbol = request.Symbol,
-                Token = request.Token,
-                Exchange = request.Exchange,
+                Symbol      = request.Symbol,
+                Token       = request.Token,
+                Exchange    = request.Exchange,
                 ProductType = request.ProductType,
-                BrokerType = BrokerType.AngelOne
+                BrokerType  = BrokerType.AngelOne
             };
             _positions.Add(existing);
         }
 
+        decimal fillPrice = request.LimitPrice > 0 ? request.LimitPrice : 0;
+
         if (request.BuySell == BuySell.BUY)
         {
-            existing.BuyQty += request.Qty;
-            existing.BuyAvg = request.LimitPrice;
-            existing.NetQty += request.Qty;
+            // Weighted average buy price
+            decimal totalCost = existing.BuyAvg * existing.BuyQty + fillPrice * request.Qty;
+            existing.BuyQty  += request.Qty;
+            existing.BuyAvg   = existing.BuyQty > 0 ? totalCost / existing.BuyQty : fillPrice;
+            existing.NetQty  += request.Qty;
+            _balance         -= fillPrice * request.Qty;
         }
         else
         {
+            decimal totalCost = existing.SellAvg * existing.SellQty + fillPrice * request.Qty;
             existing.SellQty += request.Qty;
-            existing.SellAvg = request.LimitPrice;
-            existing.NetQty -= request.Qty;
+            existing.SellAvg  = existing.SellQty > 0 ? totalCost / existing.SellQty : fillPrice;
+            existing.NetQty  -= request.Qty;
+            _balance         += fillPrice * request.Qty;
         }
-
-        _balance -= (request.BuySell == BuySell.BUY ? 1 : -1) * request.Qty * request.LimitPrice;
     }
 
     // ── Portfolio stubs (paper broker has no real demat / trade book) ────────

@@ -237,6 +237,7 @@ namespace Cognexalgo.UI.ViewModels
                         });
                     };
 
+                    _engine.V2 = _v2;
                     Log("V2 Bridge initialized successfully.");
                 }
                 catch (Exception v2ex)
@@ -376,7 +377,12 @@ namespace Cognexalgo.UI.ViewModels
                             else
                             {
                                 ltp = GetOptionLtpFromStrategy(pos.TradingSymbol);
-                                if (ltp <= 0) continue;
+                                if (ltp <= 0)
+                                {
+                                    // Fallback: show entry price so PnL column is not blank
+                                    ltp = pos.BuyAvgPrice > 0 ? pos.BuyAvgPrice : pos.SellAvgPrice;
+                                    if (ltp <= 0) continue;
+                                }
                             }
                         }
                         else
@@ -866,6 +872,16 @@ namespace Cognexalgo.UI.ViewModels
             win.Show();
         }
 
+        // Open Calendar Strategy configuration + control window
+        [RelayCommand]
+        public void OpenCalendarStrategy()
+        {
+            var vm  = new CalendarStrategyViewModel(_engine);
+            var win = new Views.CalendarStrategyWindow { DataContext = vm };
+            win.Owner = System.Windows.Application.Current.MainWindow;
+            win.Show();
+        }
+
         // F3: Open Performance Report window
         [RelayCommand]
         public void OpenReports()
@@ -1157,11 +1173,21 @@ namespace Cognexalgo.UI.ViewModels
                         var tokensToSubscribe = new System.Collections.Generic.List<string>();
                         foreach (var p in mockPositions.Where(p => p.ParsedStrike > 0))
                         {
-                            var tok = _engine.TokenService?.GetToken(p.TradingSymbol);
+                            // Try option chain first (most reliable token source for NFO options)
+                            var chainItem = _v2?.CachedNiftyChain?
+                                .FirstOrDefault(c => c.Symbol == p.TradingSymbol);
+                            var tok = chainItem?.Token
+                                   ?? _engine.TokenService?.GetToken(p.TradingSymbol);
                             if (!string.IsNullOrEmpty(tok))
                             {
                                 p.SymbolToken = tok;
                                 tokensToSubscribe.Add(tok);
+                            }
+                            else
+                            {
+                                _engine.Logger?.Log("UI",
+                                    $"[FetchPositions] Token not found for {p.TradingSymbol} — " +
+                                    $"live LTP will not update until option chain is refreshed.", "WARN");
                             }
                         }
                         if (tokensToSubscribe.Count > 0 && _engine.SmartStream?.IsConnected == true)
@@ -1232,82 +1258,81 @@ namespace Cognexalgo.UI.ViewModels
                     }
                     catch { /* trade book enrichment is best-effort; never fail FetchPositions */ }
                 }
-            }
 
-            // ── V2 Orchestrator Positions ─────────────────────────────────────────
-            // Show OPEN legs from running V2 strategies regardless of SQLite/API source.
-            if (_v2?.IsInitialized == true && _v2.Orchestrator?.Contexts != null)
-            {
-                var existingSymbols = new System.Collections.Generic.HashSet<string>(
-                    Positions.Select(p => p.TradingSymbol ?? ""),
-                    StringComparer.OrdinalIgnoreCase);
-
-                var v2Positions = new System.Collections.Generic.List<Position>();
-                foreach (var ctx in _v2.Orchestrator.Contexts.Values)
+                // ── V2 Orchestrator Positions ─────────────────────────────────────────
+                // Show OPEN legs from running V2 strategies regardless of SQLite/API source.
+                if (_v2?.IsInitialized == true && _v2.Orchestrator?.Contexts != null)
                 {
-                    if (ctx.Strategy is not HybridV2Strategy hvs) continue;
-                    var config = hvs.GetConfig();
-                    foreach (var leg in config.Legs.Where(l => l.Status == "OPEN" &&
-                             !string.IsNullOrEmpty(l.TradingSymbol)))
-                    {
-                        if (existingSymbols.Contains(leg.TradingSymbol)) continue;
-                        int lotSize = leg.LotSize > 0 ? leg.LotSize : 65;
-                        int qty = leg.TotalLots * lotSize;
-                        bool isBuy = leg.Action == Models.ActionType.Buy;
-                        double netQty = isBuy ? qty : -qty;
+                    var existingSymbols = new System.Collections.Generic.HashSet<string>(
+                        Positions.Select(p => p.TradingSymbol ?? ""),
+                        StringComparer.OrdinalIgnoreCase);
 
-                        var pos = new Position
+                    var v2Positions = new System.Collections.Generic.List<Position>();
+                    foreach (var ctx in _v2.Orchestrator.Contexts.Values)
+                    {
+                        if (ctx.Strategy is not HybridV2Strategy hvs) continue;
+                        var config = hvs.GetConfig();
+                        foreach (var leg in config.Legs.Where(l => l.Status == "OPEN" &&
+                                 !string.IsNullOrEmpty(l.TradingSymbol)))
                         {
-                            TradingSymbol = leg.TradingSymbol,
-                            SymbolToken   = leg.SymbolToken ?? "",
-                            Exchange      = "NFO",
-                            NetQty        = netQty.ToString(),
-                            BuyAvgPrice   = isBuy  ? leg.EntryPrice : 0,
-                            SellAvgPrice  = !isBuy ? leg.EntryPrice : 0,
-                            AvgNetPrice   = leg.EntryPrice,
-                            EntryPrice    = leg.EntryPrice,
-                            StopLoss      = leg.StopLossPrice,
-                            Target        = leg.TargetPrice,
-                            Status        = "OPEN"
-                        };
-                        if (SymbolParser.TryParse(leg.TradingSymbol, out _, out var exp, out var stk, out var call))
-                        {
-                            pos.ParsedStrike = stk;
-                            pos.ParsedExpiry = exp;
-                            pos.ParsedIsCall = call;
+                            if (existingSymbols.Contains(leg.TradingSymbol)) continue;
+                            int lotSize = leg.LotSize > 0 ? leg.LotSize : 65;
+                            int qty = leg.TotalLots * lotSize;
+                            bool isBuy = leg.Action == ActionType.Buy;
+                            double netQty = isBuy ? qty : -qty;
+
+                            var pos = new Position
+                            {
+                                TradingSymbol = leg.TradingSymbol,
+                                SymbolToken   = leg.SymbolToken ?? "",
+                                Exchange      = "NFO",
+                                NetQty        = netQty.ToString(),
+                                BuyAvgPrice   = isBuy  ? leg.EntryPrice : 0,
+                                SellAvgPrice  = !isBuy ? leg.EntryPrice : 0,
+                                AvgNetPrice   = leg.EntryPrice,
+                                EntryPrice    = leg.EntryPrice,
+                                StopLoss      = leg.StopLossPrice,
+                                Target        = leg.TargetPrice,
+                                Status        = "OPEN"
+                            };
+                            if (SymbolParser.TryParse(leg.TradingSymbol, out _, out var exp, out var stk, out var call))
+                            {
+                                pos.ParsedStrike = stk;
+                                pos.ParsedExpiry = exp;
+                                pos.ParsedIsCall = call;
+                            }
+                            v2Positions.Add(pos);
+                            existingSymbols.Add(leg.TradingSymbol);
                         }
-                        v2Positions.Add(pos);
-                        existingSymbols.Add(leg.TradingSymbol);
+                    }
+
+                    // Subscribe live option tokens to SmartStream
+                    var v2Tokens = v2Positions
+                        .Where(p => !string.IsNullOrEmpty(p.SymbolToken) && p.ParsedStrike > 0)
+                        .Select(p => p.SymbolToken!)
+                        .Distinct().ToList();
+                    if (v2Tokens.Count > 0 && _engine.SmartStream?.IsConnected == true)
+                        _ = _engine.SmartStream.SubscribeAsync(v2Tokens, "NFO");
+
+                    if (v2Positions.Count > 0)
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            foreach (var p in v2Positions) Positions.Add(p);
+                        });
+                        Log($"Added {v2Positions.Count} V2 strategy positions.");
                     }
                 }
-
-                // Subscribe live option tokens to SmartStream
-                var v2Tokens = v2Positions
-                    .Where(p => !string.IsNullOrEmpty(p.SymbolToken) && p.ParsedStrike > 0)
-                    .Select(p => p.SymbolToken!)
-                    .Distinct().ToList();
-                if (v2Tokens.Count > 0 && _engine.SmartStream?.IsConnected == true)
-                    _ = _engine.SmartStream.SubscribeAsync(v2Tokens, "NFO");
-
-                if (v2Positions.Count > 0)
-                {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        foreach (var p in v2Positions) Positions.Add(p);
-                    });
-                    Log($"Added {v2Positions.Count} V2 strategy positions.");
-                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error Fetching Positions: {ex.Message}");
+            }
+            finally
+            {
+                _isFetchingPositions = false;
             }
         }
-        catch (Exception ex)
-        {
-            Log($"Error Fetching Positions: {ex.Message}");
-        }
-        finally
-        {
-            _isFetchingPositions = false;
-        }
-    }
 
         [RelayCommand]
         public async Task ClearPositions()

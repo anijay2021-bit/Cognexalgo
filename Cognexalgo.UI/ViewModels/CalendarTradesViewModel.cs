@@ -10,11 +10,11 @@ namespace Cognexalgo.UI.ViewModels
     /// <summary>One row in the calendar trades DataGrid.</summary>
     public class CalendarLegRow : ObservableObject
     {
-        private string _symbol;
-        private string _type;
-        private string _expiryType;
-        private string _action;
-        private string _status;
+        private string _symbol = "";
+        private string _type = "";
+        private string _expiryType = "";
+        private string _action = "";
+        private string _status = "";
         private double _entryPrice;
         private double _currentPrice;
         private double _pnl;
@@ -59,63 +59,55 @@ namespace Cognexalgo.UI.ViewModels
 
         private void Refresh()
         {
-            var source = _strategy.MonthlyCycleLegs;
+            var s = _strategy.State;
 
-            // Sync rows: add new, update existing, preserve order
-            for (int i = 0; i < source.Count; i++)
+            // Build display rows from the 4 fixed legs in the current strategy state
+            var legDefs = new (string Label, CalendarLeg Leg)[]
             {
-                var leg = source[i];
-                double current = leg.Status == "EXITED"
-                    ? leg.ExitPrice
-                    : (leg.Ltp > 0 ? leg.Ltp : leg.EntryPrice);
+                ("Buy Call",  s.BuyCallLeg),
+                ("Buy Put",   s.BuyPutLeg),
+                ("Sell Call", s.SellCallLeg),
+                ("Sell Put",  s.SellPutLeg),
+            };
 
-                int qty = leg.TotalLots * leg.LotSize;
-                double pnl = leg.Action == ActionType.Sell
-                    ? (leg.EntryPrice - current) * qty
-                    : (current - leg.EntryPrice) * qty;
+            for (int i = 0; i < legDefs.Length; i++)
+            {
+                var (label, leg) = legDefs[i];
+                double current = leg.CurrentLTP > 0 ? leg.CurrentLTP : leg.EntryPrice;
+                string expiryType = leg.IsWeekly ? "Weekly" : "Monthly";
 
                 if (i < Legs.Count)
                 {
-                    // Update existing row in-place (keeps DataGrid stable)
                     var row = Legs[i];
-                    row.Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : leg.SymbolToken;
-                    row.Type         = leg.OptionType == OptionType.Call ? "CE" : "PE";
-                    row.ExpiryType   = leg.ExpiryType;
-                    row.Action       = leg.Action == ActionType.Buy ? "BUY" : "SELL";
+                    row.Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : label;
+                    row.Type         = leg.OptionType;
+                    row.ExpiryType   = expiryType;
+                    row.Action       = leg.IsFlippedBuyLeg ? "FLIPPED-BUY" : leg.Action;
                     row.Status       = leg.Status;
                     row.EntryPrice   = leg.EntryPrice;
                     row.CurrentPrice = current;
-                    row.Pnl         = pnl;
-                    row.EntryTime    = leg.EntryTime;
-                    row.ExitTime     = leg.ExitTime;
+                    row.Pnl          = leg.UnrealizedPnL + leg.RealizedPnL;
                 }
                 else
                 {
                     Legs.Add(new CalendarLegRow
                     {
-                        Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : leg.SymbolToken,
-                        Type         = leg.OptionType == OptionType.Call ? "CE" : "PE",
-                        ExpiryType   = leg.ExpiryType,
-                        Action       = leg.Action == ActionType.Buy ? "BUY" : "SELL",
+                        Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : label,
+                        Type         = leg.OptionType,
+                        ExpiryType   = expiryType,
+                        Action       = leg.IsFlippedBuyLeg ? "FLIPPED-BUY" : leg.Action,
                         Status       = leg.Status,
                         EntryPrice   = leg.EntryPrice,
                         CurrentPrice = current,
-                        Pnl         = pnl,
-                        EntryTime    = leg.EntryTime,
-                        ExitTime     = leg.ExitTime
+                        Pnl          = leg.UnrealizedPnL + leg.RealizedPnL,
                     });
                 }
             }
 
-            // Remove stale rows if cycle was reset
-            while (Legs.Count > source.Count)
-                Legs.RemoveAt(Legs.Count - 1);
-
-            // Footer P&L
-            var (realized, unrealized, total) = _strategy.GetMonthlyPnl();
-            Realized   = realized;
-            Unrealized = unrealized;
-            Total      = total;
+            // Footer P&L from strategy state
+            Realized   = s.TotalRealizedPnL;
+            Unrealized = s.TotalUnrealizedPnL;
+            Total      = s.TotalPnL;
         }
 
         public void StopRefresh() => _timer.Stop();
