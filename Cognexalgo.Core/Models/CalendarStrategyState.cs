@@ -24,8 +24,7 @@ namespace Cognexalgo.Core.Models
         public double CombinedSellEntryPrice { get; set; }
 
         // ── Monthly expiry info ──────────────────────────────────────────────
-        public DateTime MonthlyExpiry              { get; set; }
-        public string   MonthlyExpirySymbolSuffix  { get; set; } = "";
+        public DateTime MonthlyExpiry        { get; set; }
 
         // ── Weekly expiry info ───────────────────────────────────────────────
         public DateTime CurrentWeeklyExpiry { get; set; }
@@ -50,32 +49,34 @@ namespace Cognexalgo.Core.Models
         }
     }
 
-    /// <summary>Represents a single option leg inside the calendar strategy.</summary>
+    /// <summary>
+    /// Single option leg. Property names match OptionChainItem exactly:
+    ///   Symbol / TradingSymbol (alias), Token, OptionType, Strike,
+    ///   ExpiryDate, DaysToExpiry, IsWeeklyExpiry, LTP, IsCall, IsPut
+    /// </summary>
     public class CalendarLeg
     {
-        public string   TradingSymbol     { get; set; } = "";
-        public string   Token             { get; set; } = "";
-        public string   OptionType        { get; set; } = "";   // "CE" or "PE"
-        public string   Action            { get; set; } = "";   // "BUY" or "SELL"
-        public double   Strike            { get; set; }
-        public DateTime Expiry            { get; set; }
-        public bool     IsWeekly          { get; set; }
-        public double   EntryPrice        { get; set; }
-        public double   CurrentLTP        { get; set; }
-        public double   SLPrice           { get; set; }
-        public string   Status            { get; set; } = "PENDING"; // PENDING/OPEN/SL_HIT/EXITED
-        public string   OrderId           { get; set; } = "";
-        public double   RealizedPnL       { get; set; }
+        public string   TradingSymbol  { get; set; } = ""; // = OptionChainItem.Symbol / TradingSymbol
+        public string   Token          { get; set; } = "";
+        public string   OptionType     { get; set; } = ""; // "CE" or "PE"
+        public string   Action         { get; set; } = ""; // "BUY" or "SELL"
+        public double   Strike         { get; set; }
+        public DateTime ExpiryDate     { get; set; }       // = OptionChainItem.ExpiryDate
+        public bool     IsWeeklyExpiry { get; set; }       // = OptionChainItem.IsWeeklyExpiry
+        public double   EntryPrice     { get; set; }
+        public double   CurrentLTP     { get; set; }
+        public double   SLPrice        { get; set; }
+        public string   Status         { get; set; } = "PENDING";
+        public string   OrderId        { get; set; } = "";
+        public double   RealizedPnL    { get; set; }
+        public bool     IsFlippedBuyLeg { get; set; }
 
-        // For buy legs created after SL hit on sell leg
-        public bool     IsFlippedBuyLeg   { get; set; }
-        public double   FlippedBuySLPrice { get; set; }
-
-        public double UnrealizedPnL => Status == "OPEN"
-            ? (Action == "BUY"
-                ? (CurrentLTP - EntryPrice)
-                : (EntryPrice - CurrentLTP))
-            : 0;
+        public double UnrealizedPnL =>
+            Status == "OPEN" && EntryPrice > 0 && CurrentLTP > 0
+                ? (Action == "BUY"
+                    ? (CurrentLTP - EntryPrice)
+                    : (EntryPrice - CurrentLTP))
+                : 0;
     }
 
     public enum CalendarPhase

@@ -15,7 +15,7 @@ namespace Cognexalgo.UI.ViewModels
     /// </summary>
     public class LegDisplayRow
     {
-        public string Label        { get; set; } = "";   // "Buy Call", "Buy Put", "Sell Call", "Sell Put"
+        public string Leg          { get; set; } = "";   // "Buy Call", "Buy Put", "Sell Call", "Sell Put"
         public string Symbol       { get; set; } = "";
         public string Action       { get; set; } = "";
         public string OptionType   { get; set; } = "";
@@ -58,6 +58,7 @@ namespace Cognexalgo.UI.ViewModels
         [ObservableProperty] private double  _totalPnL;
         [ObservableProperty] private string  _statusMessage  = "";
         [ObservableProperty] private double  _combinedSellEntry;
+        [ObservableProperty] private bool    _isRunning      = false;
 
         // ── Leg Grid (4 rows: BuyCall, BuyPut, SellCall, SellPut) ────────────
         public ObservableCollection<LegDisplayRow> LegRows { get; } = new();
@@ -94,6 +95,7 @@ namespace Cognexalgo.UI.ViewModels
                 var config = BuildConfig();
                 _runningStrategy = new CalendarStrategy(_engine, config);
                 _engine.RegisterCalendarStrategy(_runningStrategy);
+                IsRunning = true;
                 _refreshTimer.Start();
                 StatusMessage = $"Strategy '{config.Name}' started. " +
                                 $"Waiting for entry at {config.FirstEntryTime:hh\\:mm}.";
@@ -110,6 +112,7 @@ namespace Cognexalgo.UI.ViewModels
             if (_runningStrategy == null) return;
             _runningStrategy.IsActive = false;
             _refreshTimer.Stop();
+            IsRunning     = false;
             StatusMessage = "Strategy stopped manually.";
         }
 
@@ -163,6 +166,7 @@ namespace Cognexalgo.UI.ViewModels
                 if (s.Phase == CalendarPhase.Completed)
                 {
                     _refreshTimer.Stop();
+                    IsRunning     = false;
                     StatusMessage = $"Strategy completed. Final P&L = ₹{s.TotalPnL:F2}";
                 }
             });
@@ -187,7 +191,7 @@ namespace Cognexalgo.UI.ViewModels
 
             return new LegDisplayRow
             {
-                Label        = label,
+                Leg          = label,
                 Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : "-",
                 Action       = leg.IsFlippedBuyLeg ? "FLIPPED-BUY" : leg.Action,
                 OptionType   = leg.OptionType,

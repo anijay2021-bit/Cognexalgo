@@ -106,7 +106,7 @@ namespace Cognexalgo.Core.Strategies
 
             // ── SL checks on every tick (LTP basis) ──────────────────────────
             if (!_cfg.EnableBuySLOnCandleClose)
-                await CheckAllSLsAsync(spotLtp);
+                await CheckAllSLsAsync();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ namespace Cognexalgo.Core.Strategies
         {
             if (_state.Phase != CalendarPhase.Active) return;
             if (_cfg.EnableBuySLOnCandleClose)
-                await CheckAllSLsAsync((double)candle.Close);
+                await CheckAllSLsAsync();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -140,6 +140,7 @@ namespace Cognexalgo.Core.Strategies
             {
                 _state.Log("ERROR: Could not resolve expiry dates from option chain. " +
                            "Ensure option chain is loaded.");
+                _state.FirstEntryDone = false;
                 return;
             }
 
@@ -156,6 +157,7 @@ namespace Cognexalgo.Core.Strategies
             if (buyCall == null || buyPut == null)
             {
                 _state.Log("ERROR: Could not find monthly ATM straddle in option chain.");
+                _state.FirstEntryDone = false;
                 return;
             }
 
@@ -195,53 +197,53 @@ namespace Cognexalgo.Core.Strategies
         // SL CHECKS
         // ─────────────────────────────────────────────────────────────────────
 
-        private async Task CheckAllSLsAsync(double referencePrice)
+        private async Task CheckAllSLsAsync()
         {
-            await CheckSellLegSLAsync(_state.SellCallLeg, _state.SellPutLeg, referencePrice);
-            await CheckSellLegSLAsync(_state.SellPutLeg,  _state.SellCallLeg, referencePrice);
-            await CheckBuyLegSLAsync(_state.SellCallLeg, referencePrice);
-            await CheckBuyLegSLAsync(_state.SellPutLeg,  referencePrice);
+            await CheckSellLegSLAsync(_state.SellCallLeg);
+            await CheckSellLegSLAsync(_state.SellPutLeg);
+            await CheckFlippedBuyLegSLAsync(_state.SellCallLeg);
+            await CheckFlippedBuyLegSLAsync(_state.SellPutLeg);
         }
 
-        private async Task CheckSellLegSLAsync(
-            CalendarLeg sellLeg, CalendarLeg otherSellLeg, double referencePrice)
+        /// <summary>Sell leg SL = CombinedSellEntryPrice. If LTP >= SL → exit sell → flip to buy with BuySL%.</summary>
+        private async Task CheckSellLegSLAsync(CalendarLeg leg)
         {
-            if (sellLeg.Status != "OPEN" || sellLeg.Action != "SELL") return;
-            if (sellLeg.CurrentLTP <= 0) return;
+            if (leg.Status != "OPEN" || leg.Action != "SELL") return;
+            if (leg.CurrentLTP <= 0 || leg.SLPrice <= 0) return;
+            if (leg.CurrentLTP < leg.SLPrice) return;
 
-            if (sellLeg.CurrentLTP < sellLeg.SLPrice) return;
-
-            _state.Log($"SL hit on SELL {sellLeg.OptionType}! " +
-                       $"LTP={sellLeg.CurrentLTP:F2} >= SL={sellLeg.SLPrice:F2}. " +
+            _state.Log($"SL hit on SELL {leg.OptionType}! " +
+                       $"LTP={leg.CurrentLTP:F2} >= SL={leg.SLPrice:F2}. " +
                        $"Exiting sell → flipping to BUY.");
 
-            await ExitLegAsync(sellLeg, "SL hit");
+            await ExitLegAsync(leg, "SL hit");
 
-            var chainItem = ResolveOptionBySymbol(sellLeg.TradingSymbol);
+            var chainItem = ResolveOptionBySymbol(leg.TradingSymbol);
             if (chainItem == null)
             {
-                _state.Log($"ERROR: Could not find {sellLeg.TradingSymbol} in chain to flip to buy.");
+                _state.Log($"ERROR: Could not find {leg.TradingSymbol} in chain to flip to buy.");
                 return;
             }
 
-            sellLeg.Action            = "BUY";
-            sellLeg.EntryPrice        = chainItem.LTP;
-            sellLeg.CurrentLTP        = chainItem.LTP;
-            sellLeg.IsFlippedBuyLeg   = true;
-            sellLeg.FlippedBuySLPrice = chainItem.LTP * (1 - _cfg.BuySLPercent / 100.0);
-            sellLeg.SLPrice           = sellLeg.FlippedBuySLPrice;
-            sellLeg.Status            = "OPEN";
+            double buyEntry = chainItem.LTP;
+            double buySL    = buyEntry * (1.0 - _cfg.BuySLPercent / 100.0);
 
-            await PlaceLegOrderAsync(sellLeg, "BUY", chainItem.LTP);
-            _state.Log($"Flipped {sellLeg.OptionType} to BUY @ {chainItem.LTP:F2}, " +
-                       $"BuySL={sellLeg.SLPrice:F2}");
+            leg.Action          = "BUY";
+            leg.EntryPrice      = buyEntry;
+            leg.CurrentLTP      = buyEntry;
+            leg.SLPrice         = buySL;
+            leg.IsFlippedBuyLeg = true;
+            leg.Status          = "OPEN";
+
+            await PlaceLegOrderAsync(leg, "BUY", buyEntry);
+            _state.Log($"Flipped {leg.OptionType} to BUY @ {buyEntry:F2}, BuySL={buySL:F2}");
         }
 
-        private async Task CheckBuyLegSLAsync(CalendarLeg leg, double referencePrice)
+        /// <summary>Flipped buy leg SL = entry × (1 - BuySL%). If LTP ≤ SL → exit buy → flip back to sell.</summary>
+        private async Task CheckFlippedBuyLegSLAsync(CalendarLeg leg)
         {
             if (leg.Status != "OPEN" || !leg.IsFlippedBuyLeg) return;
-            if (leg.CurrentLTP <= 0) return;
-
+            if (leg.CurrentLTP <= 0 || leg.SLPrice <= 0) return;
             if (leg.CurrentLTP > leg.SLPrice) return;
 
             _state.Log($"BuySL hit on flipped BUY {leg.OptionType}! " +
@@ -257,25 +259,24 @@ namespace Cognexalgo.Core.Strategies
                 return;
             }
 
+            double sellEntry = chainItem.LTP;
             leg.Action          = "SELL";
-            leg.EntryPrice      = chainItem.LTP;
-            leg.CurrentLTP      = chainItem.LTP;
+            leg.EntryPrice      = sellEntry;
+            leg.CurrentLTP      = sellEntry;
             leg.IsFlippedBuyLeg = false;
+            leg.Status          = "OPEN";
 
-            double combinedEntry = leg.EntryPrice +
-                (leg.OptionType == "CE"
-                    ? _state.SellPutLeg.EntryPrice
-                    : _state.SellCallLeg.EntryPrice);
-            leg.SLPrice                   = combinedEntry;
-            _state.CombinedSellEntryPrice = combinedEntry;
+            CalendarLeg otherSellLeg = leg.OptionType == "CE"
+                ? _state.SellPutLeg : _state.SellCallLeg;
 
-            if (leg.OptionType == "CE") _state.SellPutLeg.SLPrice  = combinedEntry;
-            else                        _state.SellCallLeg.SLPrice = combinedEntry;
+            double newCombined = sellEntry + otherSellLeg.EntryPrice;
+            leg.SLPrice                   = newCombined;
+            otherSellLeg.SLPrice          = newCombined;
+            _state.CombinedSellEntryPrice = newCombined;
 
-            leg.Status = "OPEN";
-            await PlaceLegOrderAsync(leg, "SELL", chainItem.LTP);
-            _state.Log($"Flipped {leg.OptionType} back to SELL @ {chainItem.LTP:F2}, " +
-                       $"New combined SL={combinedEntry:F2}");
+            await PlaceLegOrderAsync(leg, "SELL", sellEntry);
+            _state.Log($"Flipped {leg.OptionType} back to SELL @ {sellEntry:F2}, " +
+                       $"New combined SL={newCombined:F2}");
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -412,37 +413,33 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task PlaceLegAsync(CalendarLeg leg, OptionChainItem item, string action)
         {
-            leg.TradingSymbol = item.TradingSymbol;   // alias → item.Symbol
-            leg.Token         = item.Token ?? "";
-            leg.OptionType    = item.IsCall ? "CE" : "PE";
-            leg.Action        = action;
-            leg.Strike        = item.Strike;
-            leg.Expiry        = item.ExpiryDate;
-            leg.IsWeekly      = item.IsWeeklyExpiry;
-            leg.EntryPrice    = item.LTP;
-            leg.CurrentLTP    = item.LTP;
-            leg.Status        = "OPEN";
+            leg.TradingSymbol  = item.TradingSymbol;   // alias → item.Symbol
+            leg.Token          = item.Token ?? "";
+            leg.OptionType     = item.IsCall ? "CE" : "PE";
+            leg.Action         = action;
+            leg.Strike         = item.Strike;
+            leg.ExpiryDate     = item.ExpiryDate;
+            leg.IsWeeklyExpiry = item.IsWeeklyExpiry;
+            leg.EntryPrice     = item.LTP;
+            leg.CurrentLTP     = item.LTP;
+            leg.Status         = "OPEN";
 
             await PlaceLegOrderAsync(leg, action, item.LTP);
             _state.Log($"Placed {action} {leg.OptionType} {leg.TradingSymbol} " +
-                       $"Strike={leg.Strike} Expiry={leg.Expiry:dd-MMM} @ ₹{leg.EntryPrice:F2}");
+                       $"Strike={leg.Strike} Expiry={leg.ExpiryDate:dd-MMM} @ ₹{leg.EntryPrice:F2}");
         }
 
         private async Task PlaceLegOrderAsync(CalendarLeg leg, string action, double price)
         {
             try
             {
-                string orderId = await _engine.Api.PlaceOrderAsync(
-                    symbol:          leg.TradingSymbol,
-                    token:           leg.Token,
-                    transactionType: action,
-                    qty:             _cfg.TotalQty,
-                    price:           price,
-                    variety:         "NORMAL",
-                    productType:     "MIS",
-                    exchange:        "NFO");
-
-                leg.OrderId = orderId ?? "";
+                var sc = new StrategyConfig { Id = 0, Name = _cfg.Name };
+                await _engine.ExecuteOrderAsync(
+                    sc,
+                    leg.TradingSymbol,
+                    action,
+                    leg.Token,
+                    price);
 
                 if (!string.IsNullOrEmpty(leg.Token) && _engine.SmartStream?.IsConnected == true)
                     _ = _engine.SmartStream.SubscribeAsync(

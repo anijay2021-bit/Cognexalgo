@@ -158,7 +158,7 @@
 
                     <StackPanel Margin="0,0,10,0">
                         <TextBlock Text="ATM Strike" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
-                        <TextBlock Text="{Binding ATMStrike, StringFormat=N0}"
+                        <TextBlock Text="{Binding AtmStrike, StringFormat=N0}"
                                    Foreground="{StaticResource TextMainBrush}" FontSize="13" FontWeight="SemiBold"/>
                     </StackPanel>
 
@@ -215,7 +215,7 @@
                       Margin="0,0,0,10"
                       MaxHeight="180">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Leg"    Binding="{Binding Label}"      Width="80"/>
+                    <DataGridTextColumn Header="Leg"    Binding="{Binding Leg}"        Width="80"/>
                     <DataGridTextColumn Header="Action" Binding="{Binding Action}"     Width="90"/>
                     <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}"     Width="*"/>
                     <DataGridTextColumn Header="Status" Binding="{Binding Status}"     Width="75"/>

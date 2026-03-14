@@ -74,7 +74,7 @@ namespace Cognexalgo.UI.ViewModels
             {
                 var (label, leg) = legDefs[i];
                 double current = leg.CurrentLTP > 0 ? leg.CurrentLTP : leg.EntryPrice;
-                string expiryType = leg.IsWeekly ? "Weekly" : "Monthly";
+                string expiryType = leg.IsWeeklyExpiry ? "Weekly" : "Monthly";
 
                 if (i < Legs.Count)
                 {

@@ -339,6 +339,7 @@
                             <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
                                 <Button Content="+ New Strategy" Style="{StaticResource FilledBtn}" Command="{Binding AddStrategyCommand}" Padding="14,7" FontSize="12"/>
                                 <Button Content="📊 Reports" Style="{StaticResource TonalBtn}" Command="{Binding OpenReportsCommand}" Margin="8,0,0,0" Padding="14,7" FontSize="12"/>
+                                <Button Content="📅 Calendar Strategy" Style="{StaticResource TonalBtn}" Command="{Binding OpenCalendarStrategyCommand}" Margin="8,0,0,0" Padding="14,7" FontSize="12"/>
                             </StackPanel>
                         </Grid>
                     </Border>
