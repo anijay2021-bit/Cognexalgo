@@ -3,13 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:conv="clr-namespace:Cognexalgo.UI.Converters"
         Title="Calendar Spread Strategy"
-        Width="900" Height="780"
+        Width="900" Height="830"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize">
 
     <Window.Resources>
         <conv:IsNegativeConverter x:Key="IsNegativeConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </Window.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -17,6 +18,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>  <!-- Header -->
                 <RowDefinition Height="Auto"/>  <!-- Config card -->
+                <RowDefinition Height="Auto"/>  <!-- Hedge section -->
                 <RowDefinition Height="Auto"/>  <!-- Buttons -->
                 <RowDefinition Height="Auto"/>  <!-- Status bar -->
                 <RowDefinition Height="Auto"/>  <!-- Leg DataGrid -->
@@ -131,8 +133,41 @@
                 </Grid>
             </Border>
 
+            <!-- ── Hedge Section ── -->
+            <Border Grid.Row="2"
+                    Background="#1A2744" CornerRadius="4"
+                    Padding="12,10" Margin="0,0,0,10">
+                <StackPanel Orientation="Horizontal">
+                    <CheckBox IsChecked="{Binding EnableHedgeBuying}"
+                              Content="Enable Hedge Buying (1 day before expiry)"
+                              Foreground="{StaticResource TextMainBrush}"
+                              FontWeight="SemiBold"
+                              VerticalAlignment="Center"
+                              Margin="0,0,24,0"/>
+                    <TextBlock Text="Strike Offset (1–10):"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               FontSize="11"/>
+                    <ComboBox ItemsSource="{Binding HedgeOffsetOptions}"
+                              SelectedValue="{Binding HedgeStrikeOffset}"
+                              Width="70" Margin="8,0,0,0"
+                              IsEnabled="{Binding EnableHedgeBuying}"/>
+                    <TextBlock Text="strikes away from sell strike"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" FontSize="11"/>
+                    <Border Background="#0D47A1" CornerRadius="4"
+                            Padding="8,4" Margin="24,0,0,0"
+                            Visibility="{Binding HedgeActive, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="⚡ HEDGE ACTIVE"
+                                   Foreground="#64B5F6"
+                                   FontWeight="Bold" FontSize="11"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <!-- ── Buttons Row ── -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,12">
                 <Button Content="▶  Start Strategy"
                         Command="{Binding StartStrategyCommand}"
                         Style="{StaticResource PrimaryButtonStyle}"
@@ -144,7 +179,7 @@
             </StackPanel>
 
             <!-- ── Status Bar (5 boxes) ── -->
-            <Border Grid.Row="3"
+            <Border Grid.Row="4"
                     Style="{StaticResource CardBorderStyle}"
                     Padding="14,10"
                     Margin="0,0,0,10">
@@ -206,35 +241,35 @@
             </Border>
 
             <!-- ── Leg Status DataGrid ── -->
-            <DataGrid Grid.Row="4"
+            <DataGrid Grid.Row="5"
                       ItemsSource="{Binding LegRows}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       Style="{StaticResource DarkDataGridStyle}"
                       RowStyle="{StaticResource DarkDataGridRowStyle}"
                       Margin="0,0,0,10"
-                      MaxHeight="180">
+                      MaxHeight="200">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Leg"    Binding="{Binding Leg}"        Width="80"/>
-                    <DataGridTextColumn Header="Action" Binding="{Binding Action}"     Width="90"/>
-                    <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}"     Width="*"/>
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"     Width="75"/>
-                    <DataGridTextColumn Header="Entry"  Binding="{Binding EntryPrice,  StringFormat=N2}" Width="70"/>
-                    <DataGridTextColumn Header="LTP"    Binding="{Binding CurrentLTP,  StringFormat=N2}" Width="70"/>
-                    <DataGridTextColumn Header="SL"     Binding="{Binding SLPrice,     StringFormat=N2}" Width="70"/>
-                    <DataGridTextColumn Header="P&amp;L"   Binding="{Binding PnL,          StringFormat=N2}" Width="75"/>
+                    <DataGridTextColumn Header="Leg"    Binding="{Binding Leg}"                        Width="140"/>
+                    <DataGridTextColumn Header="Action" Binding="{Binding Action}"                     Width="90"/>
+                    <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}"                     Width="*"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"                     Width="85"/>
+                    <DataGridTextColumn Header="Entry"  Binding="{Binding Entry,  StringFormat=N2}"    Width="70"/>
+                    <DataGridTextColumn Header="LTP"    Binding="{Binding Ltp,    StringFormat=N2}"    Width="70"/>
+                    <DataGridTextColumn Header="SL"     Binding="{Binding SL,     StringFormat=N2}"    Width="70"/>
+                    <DataGridTextColumn Header="P&amp;L" Binding="{Binding PnL,   StringFormat=N2}"   Width="75"/>
                 </DataGrid.Columns>
             </DataGrid>
 
             <!-- ── Event Log label ── -->
-            <TextBlock Grid.Row="5"
+            <TextBlock Grid.Row="6"
                        Text="Event Log"
                        Foreground="{StaticResource TextMutedBrush}"
                        FontSize="11" FontWeight="SemiBold"
                        Margin="0,0,0,4"/>
 
             <!-- ── Event Log ── -->
-            <ListBox Grid.Row="6"
+            <ListBox Grid.Row="7"
                      ItemsSource="{Binding EventLog}"
                      Background="#0D1117"
                      BorderBrush="{StaticResource BorderBrush}"

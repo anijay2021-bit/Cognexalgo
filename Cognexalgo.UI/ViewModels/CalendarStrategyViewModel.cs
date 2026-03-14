@@ -11,94 +11,107 @@ using CommunityToolkit.Mvvm.Input;
 namespace Cognexalgo.UI.ViewModels
 {
     /// <summary>
-    /// Represents a single leg row for display in the Calendar Strategy window.
-    /// </summary>
-    public class LegDisplayRow
-    {
-        public string Leg          { get; set; } = "";   // "Buy Call", "Buy Put", "Sell Call", "Sell Put"
-        public string Symbol       { get; set; } = "";
-        public string Action       { get; set; } = "";
-        public string OptionType   { get; set; } = "";
-        public string Status       { get; set; } = "";
-        public double EntryPrice   { get; set; }
-        public double CurrentLTP   { get; set; }
-        public double SLPrice      { get; set; }
-        public double PnL          { get; set; }
-        public bool   IsFlippedBuy { get; set; }
-    }
-
-    /// <summary>
-    /// ViewModel for the Calendar Strategy configuration and live status display.
-    /// Bind this to CalendarStrategyWindow.xaml.
+    /// ViewModel for CalendarStrategyWindow.
+    /// Binds all config inputs, hedge parameters, start/stop, and live leg/PnL status.
     /// </summary>
     public partial class CalendarStrategyViewModel : ObservableObject
     {
         private readonly TradingEngine _engine;
+        private CalendarStrategy? _running;
+        private readonly System.Windows.Threading.DispatcherTimer _timer;
 
-        // ── Config Properties (bound to UI input fields) ──────────────────────
+        // ── Config inputs ─────────────────────────────────────────────────────
+        [ObservableProperty] private string _strategyName             = "Calendar Strategy";
+        [ObservableProperty] private string _symbol                   = "NIFTY";
+        [ObservableProperty] private string _firstEntryTime           = "09:30";
+        [ObservableProperty] private int    _lots                     = 1;
+        [ObservableProperty] private double _buySLPercent             = 50.0;
+        [ObservableProperty] private bool   _enableBuySLOnCandleClose = false;
+        [ObservableProperty] private int    _timeframe                = 5;
+        [ObservableProperty] private string _weeklyExpiryExitTime     = "15:20";
+        [ObservableProperty] private double _maxProfit                = 10000;
+        [ObservableProperty] private double _maxLoss                  = 5000;
+        [ObservableProperty] private bool   _isLiveMode               = false;
 
-        [ObservableProperty] private string  _strategyName             = "Calendar Strategy";
-        [ObservableProperty] private string  _symbol                   = "NIFTY";
-        [ObservableProperty] private string  _firstEntryTime           = "09:30";
-        [ObservableProperty] private int     _lots                     = 1;
-        [ObservableProperty] private double  _buySLPercent             = 50.0;
-        [ObservableProperty] private bool    _enableBuySLOnCandleClose = false;
-        [ObservableProperty] private int     _timeframe                = 5;
-        [ObservableProperty] private string  _weeklyExpiryExitTime     = "15:20";
-        [ObservableProperty] private double  _maxProfit                = 10000;
-        [ObservableProperty] private double  _maxLoss                  = 5000;
-        [ObservableProperty] private bool    _isLiveMode               = false;
+        // ── Hedge config inputs ───────────────────────────────────────────────
+        [ObservableProperty] private bool _enableHedgeBuying = false;
+        [ObservableProperty] private int  _hedgeStrikeOffset = 2;
 
-        // ── Runtime Status (updated from live strategy state) ─────────────────
+        // ── Live status ───────────────────────────────────────────────────────
+        [ObservableProperty] private string _phase             = "Not Started";
+        [ObservableProperty] private double _atmStrike;
+        [ObservableProperty] private double _combinedSellEntry;
+        [ObservableProperty] private double _unrealizedPnL;
+        [ObservableProperty] private double _realizedPnL;
+        [ObservableProperty] private double _totalPnL;
+        [ObservableProperty] private string _statusMessage     = "";
+        [ObservableProperty] private bool   _isRunning         = false;
+        [ObservableProperty] private bool   _hedgeActive       = false;
 
-        [ObservableProperty] private string  _phase          = "Not Started";
-        [ObservableProperty] private double  _atmStrike;
-        [ObservableProperty] private double  _unrealizedPnL;
-        [ObservableProperty] private double  _realizedPnL;
-        [ObservableProperty] private double  _totalPnL;
-        [ObservableProperty] private string  _statusMessage  = "";
-        [ObservableProperty] private double  _combinedSellEntry;
-        [ObservableProperty] private bool    _isRunning      = false;
-
-        // ── Leg Grid (4 rows: BuyCall, BuyPut, SellCall, SellPut) ────────────
-        public ObservableCollection<LegDisplayRow> LegRows { get; } = new();
-
-        // ── Event Log ─────────────────────────────────────────────────────────
-        public ObservableCollection<string> EventLog { get; } = new();
-
-        // ── Combo Options ─────────────────────────────────────────────────────
-        public ObservableCollection<int>    TimeframeOptions { get; } =
-            new() { 1, 3, 5, 10, 15, 30, 60 };
-        public ObservableCollection<string> SymbolOptions { get; } =
+        // ── Dropdown options ──────────────────────────────────────────────────
+        public ObservableCollection<string> SymbolOptions     { get; } =
             new() { "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX" };
+        public ObservableCollection<int>    TimeframeOptions  { get; } =
+            new() { 1, 3, 5, 10, 15, 30, 60 };
+        public ObservableCollection<int>    HedgeOffsetOptions { get; } =
+            new() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
-        private CalendarStrategy? _runningStrategy;
-
-        private readonly System.Windows.Threading.DispatcherTimer _refreshTimer;
+        // ── Leg grid + event log ──────────────────────────────────────────────
+        public ObservableCollection<LegDisplayRow> LegRows  { get; } = new();
+        public ObservableCollection<string>         EventLog { get; } = new();
 
         public CalendarStrategyViewModel(TradingEngine engine)
         {
             _engine = engine;
-
-            _refreshTimer = new System.Windows.Threading.DispatcherTimer
+            _timer  = new System.Windows.Threading.DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(1)
             };
-            _refreshTimer.Tick += (_, _) => RefreshState();
+            _timer.Tick += (_, _) => RefreshState();
         }
+
+        // ── Commands ──────────────────────────────────────────────────────────
 
         [RelayCommand]
         public void StartStrategy()
         {
             try
             {
-                var config = BuildConfig();
-                _runningStrategy = new CalendarStrategy(_engine, config);
-                _engine.RegisterCalendarStrategy(_runningStrategy);
-                IsRunning = true;
-                _refreshTimer.Start();
-                StatusMessage = $"Strategy '{config.Name}' started. " +
-                                $"Waiting for entry at {config.FirstEntryTime:hh\\:mm}.";
+                if (!TimeSpan.TryParseExact(
+                        FirstEntryTime, @"hh\:mm", null, out var entryTs))
+                    entryTs = new TimeSpan(9, 30, 0);
+
+                if (!TimeSpan.TryParseExact(
+                        WeeklyExpiryExitTime, @"hh\:mm", null, out var exitTs))
+                    exitTs = new TimeSpan(15, 20, 0);
+
+                var cfg = new CalendarStrategyConfig
+                {
+                    Name                     = StrategyName,
+                    Symbol                   = Symbol,
+                    FirstEntryTime           = entryTs,
+                    Lots                     = Lots,
+                    BuySLPercent             = BuySLPercent,
+                    EnableBuySLOnCandleClose = EnableBuySLOnCandleClose,
+                    Timeframe                = Timeframe,
+                    WeeklyExpiryExitTime     = exitTs,
+                    MaxProfit                = MaxProfit,
+                    MaxLoss                  = MaxLoss,
+                    IsLiveMode               = IsLiveMode,
+                    EnableHedgeBuying        = EnableHedgeBuying,
+                    HedgeStrikeOffset        = HedgeStrikeOffset
+                };
+
+                _running = new CalendarStrategy(_engine, cfg);
+                _engine.RegisterCalendarStrategy(_running);
+
+                IsRunning     = true;
+                StatusMessage = $"Strategy '{cfg.Name}' started. " +
+                                $"Entry at {cfg.FirstEntryTime:hh\\:mm}. " +
+                                (cfg.EnableHedgeBuying
+                                    ? $"Hedge enabled (+{cfg.HedgeStrikeOffset} strikes)."
+                                    : "Hedge disabled.");
+                _timer.Start();
             }
             catch (Exception ex)
             {
@@ -109,99 +122,92 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public void StopStrategy()
         {
-            if (_runningStrategy == null) return;
-            _runningStrategy.IsActive = false;
-            _refreshTimer.Stop();
+            if (_running == null) return;
+            _running.IsActive = false;
+            _timer.Stop();
             IsRunning     = false;
             StatusMessage = "Strategy stopped manually.";
         }
 
-        private CalendarStrategyConfig BuildConfig()
-        {
-            if (!TimeSpan.TryParseExact(FirstEntryTime, @"hh\:mm",
-                    null, out var entryTime))
-                entryTime = new TimeSpan(9, 30, 0);
-
-            if (!TimeSpan.TryParseExact(WeeklyExpiryExitTime, @"hh\:mm",
-                    null, out var exitTime))
-                exitTime = new TimeSpan(15, 20, 0);
-
-            return new CalendarStrategyConfig
-            {
-                Name                     = StrategyName,
-                Symbol                   = Symbol,
-                FirstEntryTime           = entryTime,
-                Lots                     = Lots,
-                BuySLPercent             = BuySLPercent,
-                EnableBuySLOnCandleClose = EnableBuySLOnCandleClose,
-                Timeframe                = Timeframe,
-                WeeklyExpiryExitTime     = exitTime,
-                MaxProfit                = MaxProfit,
-                MaxLoss                  = MaxLoss,
-                IsLiveMode               = IsLiveMode
-            };
-        }
+        // ── State refresh (every 1 second) ────────────────────────────────────
 
         private void RefreshState()
         {
-            if (_runningStrategy == null) return;
-            var s = _runningStrategy.State;
+            if (_running == null) return;
+            var s = _running.State;
 
             Application.Current.Dispatcher.Invoke(() =>
             {
                 Phase             = s.Phase.ToString();
                 AtmStrike         = s.ATMStrike;
+                CombinedSellEntry = s.CombinedSellEntryPrice;
                 UnrealizedPnL     = s.TotalUnrealizedPnL;
                 RealizedPnL       = s.TotalRealizedPnL;
                 TotalPnL          = s.TotalPnL;
-                CombinedSellEntry = s.CombinedSellEntryPrice;
+                HedgeActive       = s.HedgeBought;
 
-                RefreshLegRows(s);
+                // Rebuild leg grid
+                LegRows.Clear();
+                LegRows.Add(MakeRow("Buy Call (Monthly)",  s.BuyCallLeg,   false));
+                LegRows.Add(MakeRow("Buy Put (Monthly)",   s.BuyPutLeg,    false));
+                LegRows.Add(MakeRow("Sell Call (Weekly)",  s.SellCallLeg,  false));
+                LegRows.Add(MakeRow("Sell Put (Weekly)",   s.SellPutLeg,   false));
 
-                // Sync event log (newest entries only)
-                var newEntries = s.EventLog.TakeLast(50).ToList();
-                foreach (var entry in newEntries)
+                if (EnableHedgeBuying && s.HedgeBought)
+                {
+                    LegRows.Add(MakeRow("⚡ Hedge Call", s.HedgeCallLeg, true));
+                    LegRows.Add(MakeRow("⚡ Hedge Put",  s.HedgePutLeg,  true));
+                }
+
+                // Append new event log entries
+                foreach (var entry in s.EventLog.TakeLast(100))
                     if (!EventLog.Contains(entry)) EventLog.Add(entry);
 
                 if (s.Phase == CalendarPhase.Completed)
                 {
-                    _refreshTimer.Stop();
+                    _timer.Stop();
                     IsRunning     = false;
-                    StatusMessage = $"Strategy completed. Final P&L = ₹{s.TotalPnL:F2}";
+                    StatusMessage = $"Strategy completed. P&L=₹{s.TotalPnL:F2}";
                 }
             });
         }
 
-        private void RefreshLegRows(CalendarStrategyState s)
+        private static LegDisplayRow MakeRow(string label, CalendarLeg leg, bool isHedge)
         {
-            LegRows.Clear();
-            LegRows.Add(MakeLegRow("Buy Call",  s.BuyCallLeg));
-            LegRows.Add(MakeLegRow("Buy Put",   s.BuyPutLeg));
-            LegRows.Add(MakeLegRow("Sell Call", s.SellCallLeg));
-            LegRows.Add(MakeLegRow("Sell Put",  s.SellPutLeg));
-        }
-
-        private static LegDisplayRow MakeLegRow(string label, CalendarLeg leg)
-        {
-            double pnl = leg.Status == "OPEN" && leg.EntryPrice > 0
+            double pnl = leg.Status == "OPEN" && leg.EntryPrice > 0 && leg.CurrentLTP > 0
                 ? (leg.Action == "BUY"
-                    ? (leg.CurrentLTP - leg.EntryPrice)
-                    : (leg.EntryPrice - leg.CurrentLTP))
+                    ? leg.CurrentLTP - leg.EntryPrice
+                    : leg.EntryPrice - leg.CurrentLTP)
                 : leg.RealizedPnL;
+
+            string displayStatus = leg.IsFlippedBuyLeg ? "FLIPPED-BUY"
+                                 : leg.Status.Length > 0 ? leg.Status
+                                 : "PENDING";
 
             return new LegDisplayRow
             {
-                Leg          = label,
-                Symbol       = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : "-",
-                Action       = leg.IsFlippedBuyLeg ? "FLIPPED-BUY" : leg.Action,
-                OptionType   = leg.OptionType,
-                Status       = leg.Status,
-                EntryPrice   = leg.EntryPrice,
-                CurrentLTP   = leg.CurrentLTP,
-                SLPrice      = leg.SLPrice,
-                PnL          = pnl,
-                IsFlippedBuy = leg.IsFlippedBuyLeg
+                Leg    = label,
+                Action = leg.Action.Length > 0 ? leg.Action : "-",
+                Symbol = leg.TradingSymbol.Length > 0 ? leg.TradingSymbol : "-",
+                Status = displayStatus,
+                Entry  = leg.EntryPrice,
+                Ltp    = leg.CurrentLTP,
+                SL     = leg.SLPrice,
+                PnL    = pnl
             };
         }
+    }
+
+    /// <summary>Row data for the leg status DataGrid.</summary>
+    public class LegDisplayRow
+    {
+        public string Leg    { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string Symbol { get; set; } = "";
+        public string Status { get; set; } = "";
+        public double Entry  { get; set; }
+        public double Ltp    { get; set; }
+        public double SL     { get; set; }
+        public double PnL    { get; set; }
     }
 }

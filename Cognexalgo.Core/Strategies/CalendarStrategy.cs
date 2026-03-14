@@ -8,17 +8,24 @@ using Cognexalgo.Core.Services;
 namespace Cognexalgo.Core.Strategies
 {
     /// <summary>
-    /// Calendar Spread Strategy Engine.
+    /// Calendar Spread Strategy with Hedge Support.
     ///
-    /// Logic summary:
+    /// Core Logic:
     ///   1. At FirstEntryTime — Buy next-month ATM straddle + Sell nearest-weekly ATM straddle.
-    ///   2. Combined sell entry price = SL for each individual sell leg.
-    ///   3. If sell CE/PE hits SL — exit sell leg — flip to buy with BuySL%.
-    ///      If flipped buy leg hits SL — exit buy — flip back to sell. Repeat indefinitely.
-    ///   4. At WeeklyExpiryExitTime — exit all weekly legs — sell next weekly ATM straddle.
-    ///   5. On monthly expiry day — if buy strike == new weekly ATM strike, skip sell legs.
-    ///      At WeeklyExpiryExitTime — exit everything — strategy Completed.
-    ///   6. MaxProfit / MaxLoss — exit all positions immediately.
+    ///   2. Combined sell entry price (CE+PE) = SL for each individual sell leg.
+    ///   3. Sell SL hit — Exit sell + Exit its hedge (same tick) — Flip to Buy with BuySL%.
+    ///   4. Flipped buy SL hit — Exit buy — Flip back to Sell with new combined SL.
+    ///   5. At WeeklyExpiryExitTime — Exit weekly legs + their hedges — Roll to next weekly.
+    ///   6. Monthly expiry day — If buy strike == new weekly ATM — skip sell — hold buys.
+    ///   7. MaxProfit / MaxLoss — Exit all legs + all hedges immediately.
+    ///
+    /// Hedge Logic (when EnableHedgeBuying = true):
+    ///   - Triggered 1 day before weekly expiry AND 1 day before monthly expiry.
+    ///   - Only buys hedge for legs where Action == "SELL" (not for flipped buy legs).
+    ///   - CE hedge: Buy strike = Sell strike + (HedgeStrikeOffset × StrikeStep).
+    ///   - PE hedge: Buy strike = Sell strike - (HedgeStrikeOffset × StrikeStep).
+    ///   - Hedge exits IMMEDIATELY with its sell leg — no exceptions.
+    ///   - HedgeBought flag reset on weekly roll so new hedges bought next cycle.
     /// </summary>
     public class CalendarStrategy : StrategyBase
     {
@@ -27,7 +34,6 @@ namespace Cognexalgo.Core.Strategies
         private readonly CandleAggregator       _aggregator;
         private readonly List<Skender.Stock.Indicators.Quote> _candles = new();
 
-        // Cached option chain reference (set from engine.V2 cache)
         private List<OptionChainItem>? OptionChain =>
             _cfg.Symbol switch
             {
@@ -43,10 +49,10 @@ namespace Cognexalgo.Core.Strategies
         public CalendarStrategy(TradingEngine engine, CalendarStrategyConfig config)
             : base(engine, "Calendar")
         {
-            _cfg  = config;
-            Name  = config.Name;
+            _cfg = config;
+            Name = config.Name;
 
-            _aggregator = new CandleAggregator(config.Timeframe);
+            _aggregator = new CandleAggregator(_cfg.Timeframe);
             _aggregator.OnCandleClosed += candle =>
             {
                 _candles.Add(candle);
@@ -56,7 +62,7 @@ namespace Cognexalgo.Core.Strategies
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // TICK HANDLER
+        // TICK ENTRY POINT
         // ─────────────────────────────────────────────────────────────────────
 
         public override async Task OnTickAsync(TickerData ticker)
@@ -66,16 +72,13 @@ namespace Cognexalgo.Core.Strategies
             double spotLtp = GetSpotLtp(ticker, _cfg.Symbol);
             if (spotLtp <= 0) return;
 
+            _aggregator.AddTick(DateTime.Now, (decimal)spotLtp);
+            UpdateLegLTPs(ticker);
+
             var now   = DateTime.Now.TimeOfDay;
             var today = DateTime.Today;
 
-            // Feed aggregator for candle-based SL checks
-            _aggregator.AddTick(DateTime.Now, (decimal)spotLtp);
-
-            // Update all open leg LTPs from tick
-            UpdateLegLTPs(ticker);
-
-            // ── Phase: Waiting for first entry ────────────────────────────────
+            // ── Wait for first entry ──────────────────────────────────────────
             if (_state.Phase == CalendarPhase.WaitingFirstEntry)
             {
                 if (now >= _cfg.FirstEntryTime && !_state.FirstEntryDone)
@@ -83,34 +86,44 @@ namespace Cognexalgo.Core.Strategies
                 return;
             }
 
-            // ── Max Profit / Max Loss check ───────────────────────────────────
+            // ── Update PnL and check max limits ───────────────────────────────
             UpdateUnrealizedPnL();
-            if (await CheckMaxProfitLoss()) return;
+            if (await CheckMaxProfitLossAsync()) return;
 
-            // ── Monthly expiry day exit ───────────────────────────────────────
+            // ── Monthly expiry day — wait for exit time ───────────────────────
             if (_state.Phase == CalendarPhase.MonthlyExpiryDay)
             {
                 if (now >= _cfg.WeeklyExpiryExitTime)
-                    await ExitAllAndCompleteAsync("Monthly expiry exit");
+                    await ExitAllAndCompleteAsync("Monthly expiry");
                 return;
             }
 
+            // ── Hedge buying — 1 day before weekly expiry ─────────────────────
+            if (_cfg.EnableHedgeBuying && !_state.HedgeBought)
+            {
+                bool oneDayBeforeWeekly  = today == _state.CurrentWeeklyExpiry.Date.AddDays(-1);
+                bool oneDayBeforeMonthly = today == _state.MonthlyExpiry.Date.AddDays(-1);
+
+                if (oneDayBeforeWeekly || oneDayBeforeMonthly)
+                    await BuyHedgesAsync();
+            }
+
             // ── Weekly expiry roll ────────────────────────────────────────────
-            if (_state.Phase == CalendarPhase.Active &&
-                today == _state.CurrentWeeklyExpiry.Date &&
-                now >= _cfg.WeeklyExpiryExitTime)
+            if (_state.Phase == CalendarPhase.Active
+                && today == _state.CurrentWeeklyExpiry.Date
+                && now >= _cfg.WeeklyExpiryExitTime)
             {
                 await RollWeeklyLegsAsync(spotLtp, today);
                 return;
             }
 
-            // ── SL checks on every tick (LTP basis) ──────────────────────────
-            if (!_cfg.EnableBuySLOnCandleClose)
+            // ── SL checks on LTP basis ────────────────────────────────────────
+            if (_state.Phase == CalendarPhase.Active && !_cfg.EnableBuySLOnCandleClose)
                 await CheckAllSLsAsync();
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        // CANDLE CLOSE HANDLER
+        // CANDLE CLOSE
         // ─────────────────────────────────────────────────────────────────────
 
         private async Task OnCandleClosedAsync(Skender.Stock.Indicators.Quote candle)
@@ -126,37 +139,36 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task ExecuteFirstEntryAsync(double spotPrice, DateTime today)
         {
-            _state.Log($"First entry triggered. Spot={spotPrice}");
             _state.FirstEntryDone = true;
-
             double atmStrike = Math.Round(spotPrice / _cfg.StrikeStep) * _cfg.StrikeStep;
             _state.ATMStrike = atmStrike;
-            _state.Log($"ATM Strike = {atmStrike}");
+            _state.Log($"First entry triggered. Spot={spotPrice}, ATM={atmStrike}");
 
             var monthlyExpiry = GetNextMonthlyExpiry(today);
             var weeklyExpiry  = GetNearestWeeklyExpiry(today);
 
             if (monthlyExpiry == default || weeklyExpiry == default)
             {
-                _state.Log("ERROR: Could not resolve expiry dates from option chain. " +
-                           "Ensure option chain is loaded.");
+                _state.Log("ERROR: Could not resolve expiry dates. " +
+                           "Ensure option chain is loaded before starting.");
                 _state.FirstEntryDone = false;
                 return;
             }
 
             _state.MonthlyExpiry        = monthlyExpiry;
             _state.CurrentWeeklyExpiry  = weeklyExpiry;
-            _state.MonthlyExpiryIsToday = (today == monthlyExpiry.Date);
-            _state.Log($"Monthly expiry={monthlyExpiry:dd-MMM-yyyy}, " +
-                       $"Weekly expiry={weeklyExpiry:dd-MMM-yyyy}");
+            _state.MonthlyExpiryIsToday = today == monthlyExpiry.Date;
+            _state.HedgeBought          = false;
+
+            _state.Log($"Monthly={monthlyExpiry:dd-MMM-yy}, Weekly={weeklyExpiry:dd-MMM-yy}");
 
             // ── BUY next-month ATM straddle ───────────────────────────────────
-            var buyCall = ResolveOption(atmStrike, "CE", isWeekly: false);
-            var buyPut  = ResolveOption(atmStrike, "PE", isWeekly: false);
+            var buyCall = ResolveOption(atmStrike, isCall: true,  isWeekly: false);
+            var buyPut  = ResolveOption(atmStrike, isCall: false, isWeekly: false);
 
             if (buyCall == null || buyPut == null)
             {
-                _state.Log("ERROR: Could not find monthly ATM straddle in option chain.");
+                _state.Log("ERROR: Monthly ATM straddle not found in option chain.");
                 _state.FirstEntryDone = false;
                 return;
             }
@@ -164,15 +176,15 @@ namespace Cognexalgo.Core.Strategies
             await PlaceLegAsync(_state.BuyCallLeg, buyCall, "BUY");
             await PlaceLegAsync(_state.BuyPutLeg,  buyPut,  "BUY");
 
-            // ── SELL nearest-weekly ATM straddle ──────────────────────────────
+            // ── SELL nearest-weekly ATM straddle (skip on monthly expiry day) ──
             if (!_state.MonthlyExpiryIsToday)
             {
-                var sellCall = ResolveOption(atmStrike, "CE", isWeekly: true);
-                var sellPut  = ResolveOption(atmStrike, "PE", isWeekly: true);
+                var sellCall = ResolveOption(atmStrike, isCall: true,  isWeekly: true);
+                var sellPut  = ResolveOption(atmStrike, isCall: false, isWeekly: true);
 
                 if (sellCall == null || sellPut == null)
                 {
-                    _state.Log("ERROR: Could not find weekly ATM straddle in option chain.");
+                    _state.Log("ERROR: Weekly ATM straddle not found in option chain.");
                     return;
                 }
 
@@ -184,13 +196,93 @@ namespace Cognexalgo.Core.Strategies
                 _state.SellCallLeg.SLPrice = _state.CombinedSellEntryPrice;
                 _state.SellPutLeg.SLPrice  = _state.CombinedSellEntryPrice;
 
-                _state.Log($"Sell entry: CE={_state.SellCallLeg.EntryPrice:F2}, " +
+                _state.Log($"Sell CE={_state.SellCallLeg.EntryPrice:F2}, " +
                            $"PE={_state.SellPutLeg.EntryPrice:F2}, " +
-                           $"Combined SL={_state.CombinedSellEntryPrice:F2}");
+                           $"CombinedSL={_state.CombinedSellEntryPrice:F2}");
             }
 
             _state.Phase = CalendarPhase.Active;
-            _state.Log("Strategy is now ACTIVE.");
+            _state.Log("Strategy ACTIVE.");
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // HEDGE BUYING
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Buys hedge positions for weekly SELL legs only.
+        /// Called 1 day before weekly expiry and 1 day before monthly expiry.
+        /// Skips hedge if the sell leg has already flipped to BUY.
+        /// CE hedge = sell strike + (offset × strikeStep) strikes above.
+        /// PE hedge = sell strike - (offset × strikeStep) strikes below.
+        /// </summary>
+        private async Task BuyHedgesAsync()
+        {
+            _state.Log($"Buying hedges (offset={_cfg.HedgeStrikeOffset} strikes).");
+            bool anyHedgeBought = false;
+
+            // ── Hedge for Sell Call ───────────────────────────────────────────
+            if (_state.SellCallLeg.Status == "OPEN" &&
+                _state.SellCallLeg.Action == "SELL" &&
+                !_state.HedgeCallLeg.IsHedgeLeg)
+            {
+                double hedgeStrike = _state.SellCallLeg.Strike +
+                    (_cfg.HedgeStrikeOffset * _cfg.StrikeStep);
+
+                var hedgeCallItem = ResolveOptionByStrike(
+                    hedgeStrike, isCall: true,
+                    _state.SellCallLeg.IsWeeklyExpiry);
+
+                if (hedgeCallItem != null)
+                {
+                    _state.HedgeCallLeg = new CalendarLeg { IsHedgeLeg = true };
+                    await PlaceLegAsync(_state.HedgeCallLeg, hedgeCallItem, "BUY");
+                    _state.Log($"Hedge CE bought: {hedgeCallItem.TradingSymbol} " +
+                               $"Strike={hedgeStrike} @ ₹{hedgeCallItem.LTP:F2}");
+                    anyHedgeBought = true;
+                }
+                else
+                {
+                    _state.Log($"WARNING: Hedge CE strike {hedgeStrike} not found in chain.");
+                }
+            }
+            else if (_state.SellCallLeg.Action == "BUY")
+            {
+                _state.Log("Sell CE already flipped to BUY — skipping CE hedge.");
+            }
+
+            // ── Hedge for Sell Put ────────────────────────────────────────────
+            if (_state.SellPutLeg.Status == "OPEN" &&
+                _state.SellPutLeg.Action == "SELL" &&
+                !_state.HedgePutLeg.IsHedgeLeg)
+            {
+                double hedgeStrike = _state.SellPutLeg.Strike -
+                    (_cfg.HedgeStrikeOffset * _cfg.StrikeStep);
+
+                var hedgePutItem = ResolveOptionByStrike(
+                    hedgeStrike, isCall: false,
+                    _state.SellPutLeg.IsWeeklyExpiry);
+
+                if (hedgePutItem != null)
+                {
+                    _state.HedgePutLeg = new CalendarLeg { IsHedgeLeg = true };
+                    await PlaceLegAsync(_state.HedgePutLeg, hedgePutItem, "BUY");
+                    _state.Log($"Hedge PE bought: {hedgePutItem.TradingSymbol} " +
+                               $"Strike={hedgeStrike} @ ₹{hedgePutItem.LTP:F2}");
+                    anyHedgeBought = true;
+                }
+                else
+                {
+                    _state.Log($"WARNING: Hedge PE strike {hedgeStrike} not found in chain.");
+                }
+            }
+            else if (_state.SellPutLeg.Action == "BUY")
+            {
+                _state.Log("Sell PE already flipped to BUY — skipping PE hedge.");
+            }
+
+            if (anyHedgeBought)
+                _state.HedgeBought = true;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -199,84 +291,105 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task CheckAllSLsAsync()
         {
-            await CheckSellLegSLAsync(_state.SellCallLeg);
-            await CheckSellLegSLAsync(_state.SellPutLeg);
+            await CheckSellLegSLAsync(_state.SellCallLeg, _state.HedgeCallLeg);
+            await CheckSellLegSLAsync(_state.SellPutLeg,  _state.HedgePutLeg);
             await CheckFlippedBuyLegSLAsync(_state.SellCallLeg);
             await CheckFlippedBuyLegSLAsync(_state.SellPutLeg);
         }
 
-        /// <summary>Sell leg SL = CombinedSellEntryPrice. If LTP >= SL → exit sell → flip to buy with BuySL%.</summary>
-        private async Task CheckSellLegSLAsync(CalendarLeg leg)
+        /// <summary>
+        /// Sell leg SL = CombinedSellEntryPrice.
+        /// If LTP >= SL:
+        ///   1. Exit sell leg.
+        ///   2. Exit its hedge IMMEDIATELY (same tick).
+        ///   3. Flip to buy with BuySL%.
+        /// </summary>
+        private async Task CheckSellLegSLAsync(CalendarLeg sellLeg, CalendarLeg hedgeLeg)
         {
-            if (leg.Status != "OPEN" || leg.Action != "SELL") return;
-            if (leg.CurrentLTP <= 0 || leg.SLPrice <= 0) return;
-            if (leg.CurrentLTP < leg.SLPrice) return;
+            if (sellLeg.Status != "OPEN" || sellLeg.Action != "SELL") return;
+            if (sellLeg.CurrentLTP <= 0 || sellLeg.SLPrice <= 0) return;
+            if (sellLeg.CurrentLTP < sellLeg.SLPrice) return;
 
-            _state.Log($"SL hit on SELL {leg.OptionType}! " +
-                       $"LTP={leg.CurrentLTP:F2} >= SL={leg.SLPrice:F2}. " +
-                       $"Exiting sell → flipping to BUY.");
+            _state.Log($"SELL SL hit: {sellLeg.OptionType} " +
+                       $"LTP={sellLeg.CurrentLTP:F2} >= SL={sellLeg.SLPrice:F2}");
 
-            await ExitLegAsync(leg, "SL hit");
+            // Step 1: Exit sell leg
+            await ExitSingleLegAsync(sellLeg, "Sell SL hit");
 
-            var chainItem = ResolveOptionBySymbol(leg.TradingSymbol);
-            if (chainItem == null)
+            // Step 2: Exit hedge IMMEDIATELY (same tick, before flip)
+            if (hedgeLeg.Status == "OPEN" && hedgeLeg.IsHedgeLeg)
             {
-                _state.Log($"ERROR: Could not find {leg.TradingSymbol} in chain to flip to buy.");
+                _state.Log($"Exiting hedge {hedgeLeg.OptionType} {hedgeLeg.TradingSymbol} " +
+                           $"immediately with sell leg.");
+                await ExitSingleLegAsync(hedgeLeg, "Sell SL hit — hedge exits with sell");
+                hedgeLeg.IsHedgeLeg = false;
+            }
+
+            // Step 3: Flip to BUY
+            var item = ResolveOptionBySymbol(sellLeg.TradingSymbol);
+            if (item == null)
+            {
+                _state.Log($"ERROR: {sellLeg.TradingSymbol} not found for flip.");
                 return;
             }
 
-            double buyEntry = chainItem.LTP;
+            double buyEntry = item.LTP;
             double buySL    = buyEntry * (1.0 - _cfg.BuySLPercent / 100.0);
 
-            leg.Action          = "BUY";
-            leg.EntryPrice      = buyEntry;
-            leg.CurrentLTP      = buyEntry;
-            leg.SLPrice         = buySL;
-            leg.IsFlippedBuyLeg = true;
-            leg.Status          = "OPEN";
+            sellLeg.Action          = "BUY";
+            sellLeg.EntryPrice      = buyEntry;
+            sellLeg.CurrentLTP      = buyEntry;
+            sellLeg.SLPrice         = buySL;
+            sellLeg.IsFlippedBuyLeg = true;
+            sellLeg.Status          = "OPEN";
 
-            await PlaceLegOrderAsync(leg, "BUY", buyEntry);
-            _state.Log($"Flipped {leg.OptionType} to BUY @ {buyEntry:F2}, BuySL={buySL:F2}");
+            await PlaceLegOrderAsync(sellLeg, "BUY", buyEntry);
+            _state.Log($"Flipped {sellLeg.OptionType} → BUY @ {buyEntry:F2}, " +
+                       $"BuySL={buySL:F2}");
         }
 
-        /// <summary>Flipped buy leg SL = entry × (1 - BuySL%). If LTP ≤ SL → exit buy → flip back to sell.</summary>
+        /// <summary>
+        /// Flipped buy leg SL = entry × (1 - BuySL%).
+        /// If LTP &lt;= SL → exit buy → flip back to sell → recalculate combined SL.
+        /// No hedge action here — hedge was already exited when sell SL hit.
+        /// </summary>
         private async Task CheckFlippedBuyLegSLAsync(CalendarLeg leg)
         {
             if (leg.Status != "OPEN" || !leg.IsFlippedBuyLeg) return;
             if (leg.CurrentLTP <= 0 || leg.SLPrice <= 0) return;
             if (leg.CurrentLTP > leg.SLPrice) return;
 
-            _state.Log($"BuySL hit on flipped BUY {leg.OptionType}! " +
+            _state.Log($"BUY SL hit: {leg.OptionType} " +
                        $"LTP={leg.CurrentLTP:F2} <= SL={leg.SLPrice:F2}. " +
-                       $"Exiting buy → flipping back to SELL.");
+                       $"Flipping back to SELL.");
 
-            await ExitLegAsync(leg, "BuySL hit");
+            await ExitSingleLegAsync(leg, "Buy SL hit");
 
-            var chainItem = ResolveOptionBySymbol(leg.TradingSymbol);
-            if (chainItem == null)
+            var item = ResolveOptionBySymbol(leg.TradingSymbol);
+            if (item == null)
             {
-                _state.Log($"ERROR: Could not find {leg.TradingSymbol} to flip back to SELL.");
+                _state.Log($"ERROR: {leg.TradingSymbol} not found for flip-back.");
                 return;
             }
 
-            double sellEntry = chainItem.LTP;
+            double sellEntry = item.LTP;
             leg.Action          = "SELL";
             leg.EntryPrice      = sellEntry;
             leg.CurrentLTP      = sellEntry;
             leg.IsFlippedBuyLeg = false;
             leg.Status          = "OPEN";
 
-            CalendarLeg otherSellLeg = leg.OptionType == "CE"
+            CalendarLeg otherSell = leg.OptionType == "CE"
                 ? _state.SellPutLeg : _state.SellCallLeg;
 
-            double newCombined = sellEntry + otherSellLeg.EntryPrice;
-            leg.SLPrice                   = newCombined;
-            otherSellLeg.SLPrice          = newCombined;
+            double newCombined          = sellEntry + otherSell.EntryPrice;
+            leg.SLPrice                 = newCombined;
+            otherSell.SLPrice           = newCombined;
             _state.CombinedSellEntryPrice = newCombined;
 
             await PlaceLegOrderAsync(leg, "SELL", sellEntry);
-            _state.Log($"Flipped {leg.OptionType} back to SELL @ {sellEntry:F2}, " +
-                       $"New combined SL={newCombined:F2}");
+            _state.Log($"Flipped {leg.OptionType} → SELL @ {sellEntry:F2}, " +
+                       $"NewCombinedSL={newCombined:F2}");
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -286,42 +399,47 @@ namespace Cognexalgo.Core.Strategies
         private async Task RollWeeklyLegsAsync(double spotPrice, DateTime today)
         {
             _state.Phase = CalendarPhase.WeeklyRollInProgress;
-            _state.Log($"Weekly expiry roll triggered. Spot={spotPrice}");
+            _state.Log($"Weekly roll. Spot={spotPrice}");
 
-            await ExitLegAsync(_state.SellCallLeg, "Weekly expiry roll");
-            await ExitLegAsync(_state.SellPutLeg,  "Weekly expiry roll");
+            // Exit sell legs and their hedges together
+            await ExitSellLegWithHedgeAsync(_state.SellCallLeg, _state.HedgeCallLeg, "Weekly roll");
+            await ExitSellLegWithHedgeAsync(_state.SellPutLeg,  _state.HedgePutLeg,  "Weekly roll");
+
+            // Reset hedge flags for next cycle
+            _state.HedgeBought  = false;
+            _state.HedgeCallLeg = new CalendarLeg();
+            _state.HedgePutLeg  = new CalendarLeg();
 
             var nextWeekly = GetNearestWeeklyExpiry(today.AddDays(1));
             if (nextWeekly == default)
             {
-                _state.Log("ERROR: Could not find next weekly expiry.");
+                _state.Log("ERROR: Next weekly expiry not found.");
                 _state.Phase = CalendarPhase.Active;
                 return;
             }
-
             _state.CurrentWeeklyExpiry = nextWeekly;
-            _state.Log($"Next weekly expiry = {nextWeekly:dd-MMM-yyyy}");
 
             double newATM = Math.Round(spotPrice / _cfg.StrikeStep) * _cfg.StrikeStep;
 
-            bool isMonthlyExpiryDay = (today == _state.MonthlyExpiry.Date) ||
-                                       (nextWeekly.Date == _state.MonthlyExpiry.Date);
+            bool isMonthlyExpiryDay =
+                today == _state.MonthlyExpiry.Date ||
+                nextWeekly.Date == _state.MonthlyExpiry.Date;
 
-            if (isMonthlyExpiryDay && Math.Abs(newATM - _state.BuyCallLeg.Strike) < 1.0)
+            if (isMonthlyExpiryDay &&
+                Math.Abs(newATM - _state.BuyCallLeg.Strike) < 1.0)
             {
-                _state.Log($"Monthly expiry: Buy strike ({_state.BuyCallLeg.Strike}) == " +
-                           $"new weekly ATM ({newATM}). Skipping sell legs. " +
-                           $"Holding buy legs to expiry.");
+                _state.Log($"Monthly expiry: buy strike == new ATM ({newATM}). " +
+                           "Skipping sell legs. Holding buys to expiry.");
                 _state.Phase = CalendarPhase.MonthlyExpiryDay;
                 return;
             }
 
-            var newSellCall = ResolveOption(newATM, "CE", isWeekly: true);
-            var newSellPut  = ResolveOption(newATM, "PE", isWeekly: true);
+            var newSellCall = ResolveOption(newATM, isCall: true,  isWeekly: true);
+            var newSellPut  = ResolveOption(newATM, isCall: false, isWeekly: true);
 
             if (newSellCall == null || newSellPut == null)
             {
-                _state.Log("ERROR: Could not find new weekly ATM straddle.");
+                _state.Log("ERROR: New weekly ATM straddle not found.");
                 _state.Phase = CalendarPhase.Active;
                 return;
             }
@@ -338,10 +456,10 @@ namespace Cognexalgo.Core.Strategies
             _state.SellCallLeg.SLPrice = _state.CombinedSellEntryPrice;
             _state.SellPutLeg.SLPrice  = _state.CombinedSellEntryPrice;
 
-            _state.Log($"Weekly roll complete. New ATM={newATM}, " +
+            _state.Log($"Roll complete. NewATM={newATM}, " +
                        $"CE={_state.SellCallLeg.EntryPrice:F2}, " +
                        $"PE={_state.SellPutLeg.EntryPrice:F2}, " +
-                       $"New combined SL={_state.CombinedSellEntryPrice:F2}");
+                       $"CombinedSL={_state.CombinedSellEntryPrice:F2}");
 
             _state.Phase = CalendarPhase.Active;
         }
@@ -350,24 +468,21 @@ namespace Cognexalgo.Core.Strategies
         // MAX PROFIT / MAX LOSS
         // ─────────────────────────────────────────────────────────────────────
 
-        private async Task<bool> CheckMaxProfitLoss()
+        private async Task<bool> CheckMaxProfitLossAsync()
         {
-            double totalPnL = _state.TotalPnL;
-
-            if (totalPnL >= _cfg.MaxProfit)
+            double pnl = _state.TotalPnL;
+            if (pnl >= _cfg.MaxProfit)
             {
-                _state.Log($"MAX PROFIT hit: ₹{totalPnL:F2} >= ₹{_cfg.MaxProfit:F2}. Exiting all.");
+                _state.Log($"MAX PROFIT ₹{pnl:F2} hit. Exiting all.");
                 await ExitAllAndCompleteAsync("Max Profit");
                 return true;
             }
-
-            if (totalPnL <= -Math.Abs(_cfg.MaxLoss))
+            if (pnl <= -Math.Abs(_cfg.MaxLoss))
             {
-                _state.Log($"MAX LOSS hit: ₹{totalPnL:F2} <= -₹{_cfg.MaxLoss:F2}. Exiting all.");
+                _state.Log($"MAX LOSS ₹{pnl:F2} hit. Exiting all.");
                 await ExitAllAndCompleteAsync("Max Loss");
                 return true;
             }
-
             return false;
         }
 
@@ -377,24 +492,38 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task ExitAllAndCompleteAsync(string reason)
         {
-            _state.Log($"Exiting all legs. Reason: {reason}");
-            await ExitLegAsync(_state.BuyCallLeg,  reason);
-            await ExitLegAsync(_state.BuyPutLeg,   reason);
-            await ExitLegAsync(_state.SellCallLeg, reason);
-            await ExitLegAsync(_state.SellPutLeg,  reason);
+            _state.Log($"Exiting all legs + hedges: {reason}");
+
+            await ExitSellLegWithHedgeAsync(_state.SellCallLeg, _state.HedgeCallLeg, reason);
+            await ExitSellLegWithHedgeAsync(_state.SellPutLeg,  _state.HedgePutLeg,  reason);
+            await ExitSingleLegAsync(_state.BuyCallLeg, reason);
+            await ExitSingleLegAsync(_state.BuyPutLeg,  reason);
+
             _state.Phase = CalendarPhase.Completed;
             IsActive     = false;
-            _state.Log($"Strategy COMPLETED. Total P&L = ₹{_state.TotalPnL:F2}");
+            _state.Log($"Strategy COMPLETED. P&L=₹{_state.TotalPnL:F2}");
         }
 
-        private async Task ExitLegAsync(CalendarLeg leg, string reason)
+        /// <summary>Exits a sell leg AND its corresponding hedge together.</summary>
+        private async Task ExitSellLegWithHedgeAsync(
+            CalendarLeg sellLeg, CalendarLeg hedgeLeg, string reason)
+        {
+            await ExitSingleLegAsync(sellLeg, reason);
+
+            if (hedgeLeg.Status == "OPEN" && hedgeLeg.IsHedgeLeg)
+            {
+                await ExitSingleLegAsync(hedgeLeg, $"{reason} — hedge exits with sell");
+                hedgeLeg.IsHedgeLeg = false;
+            }
+        }
+
+        /// <summary>Exits a single leg at current LTP, records realized PnL.</summary>
+        private async Task ExitSingleLegAsync(CalendarLeg leg, string reason)
         {
             if (leg.Status != "OPEN" || string.IsNullOrEmpty(leg.TradingSymbol)) return;
 
             string exitAction = leg.Action == "BUY" ? "SELL" : "BUY";
             double exitPrice  = leg.CurrentLTP > 0 ? leg.CurrentLTP : leg.EntryPrice;
-
-            await PlaceLegOrderAsync(leg, exitAction, exitPrice);
 
             double pnl = leg.Action == "BUY"
                 ? (exitPrice - leg.EntryPrice) * _cfg.TotalQty
@@ -402,9 +531,11 @@ namespace Cognexalgo.Core.Strategies
 
             leg.RealizedPnL         += pnl;
             _state.TotalRealizedPnL += pnl;
-            leg.Status = "EXITED";
+            leg.Status               = "EXITED";
+
+            await PlaceLegOrderAsync(leg, exitAction, exitPrice);
             _state.Log($"Exited {leg.Action} {leg.OptionType} {leg.TradingSymbol} " +
-                       $"@ {exitPrice:F2}. P&L=₹{pnl:F2}. Reason={reason}");
+                       $"@ {exitPrice:F2} P&L=₹{pnl:F2} [{reason}]");
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -413,7 +544,7 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task PlaceLegAsync(CalendarLeg leg, OptionChainItem item, string action)
         {
-            leg.TradingSymbol  = item.TradingSymbol;   // alias → item.Symbol
+            leg.TradingSymbol  = item.TradingSymbol;
             leg.Token          = item.Token ?? "";
             leg.OptionType     = item.IsCall ? "CE" : "PE";
             leg.Action         = action;
@@ -425,8 +556,10 @@ namespace Cognexalgo.Core.Strategies
             leg.Status         = "OPEN";
 
             await PlaceLegOrderAsync(leg, action, item.LTP);
-            _state.Log($"Placed {action} {leg.OptionType} {leg.TradingSymbol} " +
-                       $"Strike={leg.Strike} Expiry={leg.ExpiryDate:dd-MMM} @ ₹{leg.EntryPrice:F2}");
+            _state.Log($"{action} {leg.OptionType} {leg.TradingSymbol} " +
+                       $"Strike={leg.Strike} Expiry={leg.ExpiryDate:dd-MMM} " +
+                       $"@ ₹{leg.EntryPrice:F2}" +
+                       (leg.IsHedgeLeg ? " [HEDGE]" : ""));
         }
 
         private async Task PlaceLegOrderAsync(CalendarLeg leg, string action, double price)
@@ -434,20 +567,18 @@ namespace Cognexalgo.Core.Strategies
             try
             {
                 var sc = new StrategyConfig { Id = 0, Name = _cfg.Name };
-                await _engine.ExecuteOrderAsync(
-                    sc,
-                    leg.TradingSymbol,
-                    action,
-                    leg.Token,
-                    price);
+                await _engine.ExecuteOrderAsync(sc, leg.TradingSymbol, action, leg.Token, price);
 
-                if (!string.IsNullOrEmpty(leg.Token) && _engine.SmartStream?.IsConnected == true)
+                if (!string.IsNullOrEmpty(leg.Token) &&
+                    _engine.SmartStream?.IsConnected == true)
+                {
                     _ = _engine.SmartStream.SubscribeAsync(
-                        new System.Collections.Generic.List<string> { leg.Token }, "NFO");
+                        new List<string> { leg.Token }, "NFO");
+                }
             }
             catch (Exception ex)
             {
-                _state.Log($"ERROR placing order for {leg.TradingSymbol}: {ex.Message}");
+                _state.Log($"Order error {leg.TradingSymbol}: {ex.Message}");
             }
         }
 
@@ -457,52 +588,54 @@ namespace Cognexalgo.Core.Strategies
 
         private void UpdateLegLTPs(TickerData ticker)
         {
-            UpdateLegLTP(_state.BuyCallLeg,  ticker);
-            UpdateLegLTP(_state.BuyPutLeg,   ticker);
-            UpdateLegLTP(_state.SellCallLeg, ticker);
-            UpdateLegLTP(_state.SellPutLeg,  ticker);
+            UpdateOneLegLTP(_state.BuyCallLeg,   ticker);
+            UpdateOneLegLTP(_state.BuyPutLeg,    ticker);
+            UpdateOneLegLTP(_state.SellCallLeg,  ticker);
+            UpdateOneLegLTP(_state.SellPutLeg,   ticker);
+            UpdateOneLegLTP(_state.HedgeCallLeg, ticker);
+            UpdateOneLegLTP(_state.HedgePutLeg,  ticker);
             UpdateUnrealizedPnL();
         }
 
-        private void UpdateLegLTP(CalendarLeg leg, TickerData ticker)
+        private void UpdateOneLegLTP(CalendarLeg leg, TickerData ticker)
         {
             if (leg.Status != "OPEN" || string.IsNullOrEmpty(leg.Token)) return;
-
             if (ticker.Options != null &&
                 ticker.Options.TryGetValue(leg.Token, out var info) && info.Ltp > 0)
-            {
                 leg.CurrentLTP = info.Ltp;
-            }
         }
 
         private void UpdateUnrealizedPnL()
         {
-            double unrealized = 0;
+            double total = 0;
             foreach (var leg in new[] {
-                _state.BuyCallLeg, _state.BuyPutLeg,
-                _state.SellCallLeg, _state.SellPutLeg })
+                _state.BuyCallLeg,  _state.BuyPutLeg,
+                _state.SellCallLeg, _state.SellPutLeg,
+                _state.HedgeCallLeg, _state.HedgePutLeg })
             {
                 if (leg.Status == "OPEN" && leg.EntryPrice > 0 && leg.CurrentLTP > 0)
                 {
-                    double legPnl = leg.Action == "BUY"
+                    total += leg.Action == "BUY"
                         ? (leg.CurrentLTP - leg.EntryPrice) * _cfg.TotalQty
                         : (leg.EntryPrice - leg.CurrentLTP) * _cfg.TotalQty;
-                    unrealized += legPnl;
                 }
             }
-            _state.TotalUnrealizedPnL = unrealized;
+            _state.TotalUnrealizedPnL = total;
         }
 
         // ─────────────────────────────────────────────────────────────────────
         // OPTION CHAIN HELPERS
         // ─────────────────────────────────────────────────────────────────────
 
-        private OptionChainItem? ResolveOption(double strike, string optionType, bool isWeekly)
+        private OptionChainItem? ResolveOption(double strike, bool isCall, bool isWeekly)
         {
             var chain = OptionChain;
-            if (chain == null || chain.Count == 0) return null;
-
-            bool isCall = optionType == "CE";
+            if (chain == null || chain.Count == 0)
+            {
+                _state.Log($"Option chain empty for {_cfg.Symbol}. " +
+                           "Refresh chain before starting strategy.");
+                return null;
+            }
             return chain
                 .Where(c => c.IsCall == isCall
                          && Math.Abs(c.Strike - strike) < 1.0
@@ -512,35 +645,43 @@ namespace Cognexalgo.Core.Strategies
                 .FirstOrDefault();
         }
 
-        private OptionChainItem? ResolveOptionBySymbol(string tradingSymbol)
+        /// <summary>Resolves option by exact strike for hedge buying.</summary>
+        private OptionChainItem? ResolveOptionByStrike(
+            double strike, bool isCall, bool isWeekly)
         {
-            return OptionChain?.FirstOrDefault(c =>
-                c.TradingSymbol == tradingSymbol && c.LTP > 0);
+            var chain = OptionChain;
+            if (chain == null) return null;
+            return chain
+                .Where(c => c.IsCall == isCall
+                         && Math.Abs(c.Strike - strike) < 1.0
+                         && c.IsWeeklyExpiry == isWeekly
+                         && c.LTP > 0)
+                .OrderBy(c => c.DaysToExpiry)
+                .FirstOrDefault();
         }
 
-        private DateTime GetNearestWeeklyExpiry(DateTime from)
-        {
-            return OptionChain?
+        private OptionChainItem? ResolveOptionBySymbol(string tradingSymbol) =>
+            OptionChain?.FirstOrDefault(c =>
+                c.TradingSymbol == tradingSymbol && c.LTP > 0);
+
+        private DateTime GetNearestWeeklyExpiry(DateTime from) =>
+            OptionChain?
                 .Where(c => c.IsWeeklyExpiry && c.ExpiryDate.Date >= from.Date)
                 .Select(c => c.ExpiryDate.Date)
                 .Distinct()
                 .OrderBy(d => d)
                 .FirstOrDefault() ?? default;
-        }
 
-        private DateTime GetNextMonthlyExpiry(DateTime from)
-        {
-            return OptionChain?
+        private DateTime GetNextMonthlyExpiry(DateTime from) =>
+            OptionChain?
                 .Where(c => !c.IsWeeklyExpiry && c.ExpiryDate.Date >= from.Date)
                 .Select(c => c.ExpiryDate.Date)
                 .Distinct()
                 .OrderBy(d => d)
                 .FirstOrDefault() ?? default;
-        }
 
-        private double GetSpotLtp(TickerData ticker, string symbol)
-        {
-            return symbol switch
+        private static double GetSpotLtp(TickerData ticker, string symbol) =>
+            symbol switch
             {
                 "BANKNIFTY"  => ticker.BankNifty?.Ltp  ?? 0,
                 "FINNIFTY"   => ticker.FinNifty?.Ltp   ?? 0,
@@ -548,6 +689,5 @@ namespace Cognexalgo.Core.Strategies
                 "SENSEX"     => ticker.Sensex?.Ltp      ?? 0,
                 _            => ticker.Nifty?.Ltp        ?? 0
             };
-        }
     }
 }
