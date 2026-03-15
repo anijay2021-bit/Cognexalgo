@@ -23,7 +23,21 @@ x86/
 *.db-shm
 *.db-wal
 database/logs/
-build_*.txt
+
+# Build logs and temp output files
+*.log
+*.txt
+!README.txt
+!**/README.txt
+
+# Publish / installer artifacts
+publish_output/
+publish_x64/
+publish_x86/
+InstallerOutput/
+
+# Runtime logs
+logs/
 
 # Secrets (never commit real credentials)
 appsettings.Development.json

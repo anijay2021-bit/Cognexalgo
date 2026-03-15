@@ -1,1 +1,0 @@
-   1:7>C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\AlgoTrader\AlgoTrader.UI\Forms\MainForm.cs(666,1): error CS1022: Type or namespace definition, or end-of-file expected [C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\AlgoTrader\AlgoTrader.UI\AlgoTrader.UI.csproj]

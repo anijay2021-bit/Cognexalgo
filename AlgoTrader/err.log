@@ -1,8 +1,0 @@
-MSBuild version 17.8.49+7806cbf7b for .NET
-c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\AlgoTrader\AlgoTrader.OMS\HoldingsService.cs(52,26): error CS1061: 'Position' does not contain a definition for 'UnrealizedPnL' and no accessible extension method 'UnrealizedPnL' accepting a first argument of type 'Position' could be found (are you missing a using directive or an assembly reference?) [c:\Users\anijay\.gemini\antigravity\scratch\COGNEX\AlgoTrader\AlgoTrader.OMS\AlgoTrader.OMS.csproj]
-
-Build FAILED.
-    22 Warning(s)
-    1 Error(s)
-
-Time Elapsed 00:00:05.73
