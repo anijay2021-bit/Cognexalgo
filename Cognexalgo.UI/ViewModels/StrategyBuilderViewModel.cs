@@ -712,6 +712,8 @@ namespace Cognexalgo.UI.ViewModels
         {
             if (string.IsNullOrWhiteSpace(StrategyName)) return;
 
+            StrategyName = SanitizeStrategyName(StrategyName);
+
             // Null Check for Legs (Hybrid Only)
             if (SelectedStrategyType == "Hybrid" && (HybridLegs == null || !HybridLegs.Any()))
             {
@@ -861,6 +863,20 @@ namespace Cognexalgo.UI.ViewModels
 
             await _engine.StrategyRepository.SaveHybridStrategyAsync(config, "User");
             _onSave?.Invoke();
+        }
+
+        private static string SanitizeStrategyName(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return "Unnamed Strategy";
+
+            input = input.Trim();
+            input = char.ToUpper(input[0]) + input.Substring(1);
+
+            if (input.Length > 50)
+                input = input.Substring(0, 50);
+
+            return input;
         }
 
         private string GenerateRuleDescription(Condition condition, string action)

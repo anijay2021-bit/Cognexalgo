@@ -79,6 +79,8 @@ namespace Cognexalgo.UI.ViewModels
         {
             try
             {
+                StrategyName = SanitizeStrategyName(StrategyName);
+
                 if (!TimeSpan.TryParseExact(
                         FirstEntryTime, @"hh\:mm", null, out var entryTs))
                     entryTs = new TimeSpan(9, 30, 0);
@@ -179,6 +181,20 @@ namespace Cognexalgo.UI.ViewModels
             var win = new Views.CalendarPerformanceDashboardWindow { DataContext = vm };
             win.Owner = System.Windows.Application.Current.MainWindow;
             win.Show();
+        }
+
+        private static string SanitizeStrategyName(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return "Unnamed Strategy";
+
+            input = input.Trim();
+            input = char.ToUpper(input[0]) + input.Substring(1);
+
+            if (input.Length > 50)
+                input = input.Substring(0, 50);
+
+            return input;
         }
 
         // ── State refresh (every 1 second) ────────────────────────────────────
