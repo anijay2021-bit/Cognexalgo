@@ -279,8 +279,9 @@
             <TabItem Style="{StaticResource M3Tab}" Header="⊞  Dashboard">
                 <Grid Margin="20">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="310"/>
+                        <ColumnDefinition Width="2*" MinWidth="300"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="1*" MinWidth="250"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,16,0">
@@ -304,7 +305,10 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </StackPanel>
-                            <syncfusion:SfChart Grid.Row="1" Background="Transparent">
+                            <syncfusion:SfChart Grid.Row="1" Background="Transparent"
+                                               Margin="0"
+                                               HorizontalAlignment="Stretch"
+                                               VerticalAlignment="Stretch">
                                 <syncfusion:SfChart.PrimaryAxis>
                                     <syncfusion:DateTimeAxis ShowGridLines="False" AxisLineStyle="{x:Null}" LabelFormat="HH:mm"/>
                                 </syncfusion:SfChart.PrimaryAxis>
@@ -318,7 +322,15 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="1" Style="{StaticResource Card}">
+                    <GridSplitter Grid.Column="1"
+                                  Width="4"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch"
+                                  Background="#DEE2EA"
+                                  ShowsPreview="True"
+                                  ResizeBehavior="PreviousAndNext"/>
+
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -331,7 +343,7 @@
                                 AutoGenerateColumns="False" HeaderRowHeight="30" RowHeight="40"
                                 Background="Transparent" BorderThickness="0">
                                 <syncfusion:SfDataGrid.Columns>
-                                    <syncfusion:GridTextColumn HeaderText="Name"    MappingName="Name"   Width="160"/>
+                                    <syncfusion:GridTextColumn HeaderText="Name"    MappingName="Name"   ColumnSizer="Star"/>
                                     <syncfusion:GridTextColumn HeaderText="P&amp;L" MappingName="Pnl"   Width="100" TextAlignment="Right"/>
                                     <syncfusion:GridTextColumn HeaderText="Status"  MappingName="Status" Width="80"/>
                                 </syncfusion:SfDataGrid.Columns>

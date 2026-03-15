@@ -526,3 +526,21 @@
     Severity: FATAL
     SqlState: XX000
     MessageText: Address not in tenant allow_list: {183, 83, 225, 135}
+15-03-2026 16:35:20: Login Transition Failed: System.Windows.Markup.XamlParseException: 'Provide value on 'System.Windows.Baml2006.TypeConverterMarkupExtension' threw an exception.' Line number '346' and line position '85'.
+ ---> System.ArgumentException: * is not a valid value for Double. (Parameter 'value')
+ ---> System.FormatException: The input string '*' was not in a correct format.
+   at System.Number.ThrowFormatException[TChar](ReadOnlySpan`1 value)
+   at System.ComponentModel.DoubleConverter.FromString(String value, NumberFormatInfo formatInfo)
+   at System.ComponentModel.BaseNumberConverter.ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, Object value)
+   --- End of inner exception stack trace ---
+   at System.ComponentModel.BaseNumberConverter.ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, Object value)
+   at MS.Internal.Xaml.Runtime.ClrObjectRuntime.CallProvideValue(MarkupExtension me, IServiceProvider serviceProvider)
+   --- End of inner exception stack trace ---
+   at System.Windows.Markup.XamlReader.RewrapException(Exception e, IXamlLineInfo lineInfo, Uri baseUri)
+   at System.Windows.Markup.WpfXamlLoader.Load(XamlReader xamlReader, IXamlObjectWriterFactory writerFactory, Boolean skipJournaledProperties, Object rootObject, XamlObjectWriterSettings settings, Uri baseUri)
+   at System.Windows.Markup.WpfXamlLoader.LoadBaml(XamlReader xamlReader, Boolean skipJournaledProperties, Object rootObject, XamlAccessLevel accessLevel, Uri baseUri)
+   at System.Windows.Markup.XamlReader.LoadBaml(Stream stream, ParserContext parserContext, Object parent, Boolean closeStream)
+   at System.Windows.Application.LoadComponent(Object component, Uri resourceLocator)
+   at Cognexalgo.UI.MainWindow.InitializeComponent() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\MainWindow.xaml:line 1
+   at Cognexalgo.UI.MainWindow..ctor() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\MainWindow.xaml.cs:line 9
+   at Cognexalgo.UI.App.OnLoginSuccess() in C:\Users\anijay\.gemini\antigravity\scratch\COGNEX\Cognexalgo.UI\App.xaml.cs:line 105
