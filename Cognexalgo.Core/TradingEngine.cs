@@ -455,6 +455,15 @@ namespace Cognexalgo.Core
         {
             _calendarStrategies.Add(strategy);
             Logger?.Log("Engine", $"Calendar strategy '{strategy.Name}' registered.");
+
+            // Re-subscribe open leg tokens when resuming from saved state
+            var openTokens = strategy.GetOpenLegTokens();
+            if (openTokens.Count > 0 && SmartStream?.IsConnected == true)
+            {
+                _ = SmartStream.SubscribeAsync(openTokens, "NFO");
+                Logger?.Log("Engine",
+                    $"Re-subscribed {openTokens.Count} tokens for resumed strategy '{strategy.Name}'.");
+            }
         }
 
         /// <summary>Returns the first active CalendarStrategy, or null.</summary>

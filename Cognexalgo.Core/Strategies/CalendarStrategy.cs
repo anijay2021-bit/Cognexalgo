@@ -29,10 +29,11 @@ namespace Cognexalgo.Core.Strategies
     /// </summary>
     public class CalendarStrategy : StrategyBase
     {
-        private readonly CalendarStrategyConfig _cfg;
-        private readonly CalendarStrategyState  _state = new();
-        private readonly CandleAggregator       _aggregator;
+        private readonly CalendarStrategyConfig    _cfg;
+        private          CalendarStrategyState     _state = new();
+        private readonly CandleAggregator          _aggregator;
         private readonly List<Skender.Stock.Indicators.Quote> _candles = new();
+        private readonly ICalendarStateRepository? _repo;
 
         private List<OptionChainItem>? OptionChain =>
             _cfg.Symbol switch
@@ -46,11 +47,13 @@ namespace Cognexalgo.Core.Strategies
 
         public CalendarStrategyState State => _state;
 
-        public CalendarStrategy(TradingEngine engine, CalendarStrategyConfig config)
+        public CalendarStrategy(TradingEngine engine, CalendarStrategyConfig config,
+                                ICalendarStateRepository? repo = null)
             : base(engine, "Calendar")
         {
-            _cfg = config;
-            Name = config.Name;
+            _cfg  = config;
+            _repo = repo;
+            Name  = config.Name;
 
             _aggregator = new CandleAggregator(_cfg.Timeframe);
             _aggregator.OnCandleClosed += candle =>
@@ -59,6 +62,63 @@ namespace Cognexalgo.Core.Strategies
                 if (_candles.Count > 200) _candles.RemoveAt(0);
                 _ = OnCandleClosedAsync(candle);
             };
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // PERSISTENCE HELPERS
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Replaces the internal state with a previously persisted snapshot.
+        /// Call this BEFORE the strategy is registered with the engine.
+        /// </summary>
+        public void LoadState(CalendarStrategyState savedState)
+        {
+            _state = savedState;
+            IsActive = true;
+            _state.Log("Strategy resumed from saved state.");
+        }
+
+        /// <summary>Returns tokens for all currently-OPEN legs (used to re-subscribe after resume).</summary>
+        public List<string> GetOpenLegTokens()
+        {
+            var tokens = new List<string>();
+            foreach (var leg in new[] {
+                _state.BuyCallLeg,  _state.BuyPutLeg,
+                _state.SellCallLeg, _state.SellPutLeg,
+                _state.HedgeCallLeg, _state.HedgePutLeg })
+            {
+                if (leg.Status == "OPEN" && !string.IsNullOrEmpty(leg.Token))
+                    tokens.Add(leg.Token);
+            }
+            return tokens;
+        }
+
+        private void SaveState()
+        {
+            try { _repo?.Save(_cfg, _state); }
+            catch (Exception ex) { _state.Log($"WARNING: State save failed: {ex.Message}"); }
+        }
+
+        private void RecordEvent(string eventType, string legDesc,
+            double entryPrice = 0, double exitPrice = 0, double pnl = 0,
+            bool wasHedged = false, double hedgeCost = 0)
+        {
+            double prev = _state.PerformanceLog.Count > 0
+                ? _state.PerformanceLog[_state.PerformanceLog.Count - 1].CumulativePnL
+                : 0;
+            _state.PerformanceLog.Add(new CalendarPerformanceRecord
+            {
+                Date            = DateTime.Now,
+                EventType       = eventType,
+                LegDescription  = legDesc,
+                EntryPrice      = entryPrice,
+                ExitPrice       = exitPrice,
+                PnL             = pnl,
+                CumulativePnL   = prev + pnl,
+                WasHedged       = wasHedged,
+                HedgeCost       = hedgeCost
+            });
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -203,6 +263,10 @@ namespace Cognexalgo.Core.Strategies
 
             _state.Phase = CalendarPhase.Active;
             _state.Log("Strategy ACTIVE.");
+            RecordEvent("ENTRY",
+                $"ATM={_state.ATMStrike} Monthly={_state.MonthlyExpiry:dd-MMM} Weekly={_state.CurrentWeeklyExpiry:dd-MMM}",
+                entryPrice: _state.CombinedSellEntryPrice);
+            SaveState();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -282,7 +346,19 @@ namespace Cognexalgo.Core.Strategies
             }
 
             if (anyHedgeBought)
+            {
                 _state.HedgeBought = true;
+                double callCost = _state.HedgeCallLeg.IsHedgeLeg
+                    ? _state.HedgeCallLeg.EntryPrice * _cfg.TotalQty : 0;
+                double putCost  = _state.HedgePutLeg.IsHedgeLeg
+                    ? _state.HedgePutLeg.EntryPrice  * _cfg.TotalQty : 0;
+                RecordEvent("HEDGE_BUY",
+                    $"CE hedge @ {_state.HedgeCallLeg.TradingSymbol}  |  " +
+                    $"PE hedge @ {_state.HedgePutLeg.TradingSymbol}",
+                    pnl: -(callCost + putCost),
+                    hedgeCost: callCost + putCost);
+                SaveState();
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -346,6 +422,12 @@ namespace Cognexalgo.Core.Strategies
             await PlaceLegOrderAsync(sellLeg, "BUY", buyEntry);
             _state.Log($"Flipped {sellLeg.OptionType} → BUY @ {buyEntry:F2}, " +
                        $"BuySL={buySL:F2}");
+            RecordEvent("FLIP_BUY",
+                $"SL hit on {sellLeg.OptionType} {sellLeg.TradingSymbol}",
+                entryPrice: sellLeg.SLPrice, exitPrice: buyEntry,
+                pnl: (sellLeg.EntryPrice - sellLeg.SLPrice) * _cfg.TotalQty,
+                wasHedged: _state.HedgeBought);
+            SaveState();
         }
 
         /// <summary>
@@ -390,6 +472,12 @@ namespace Cognexalgo.Core.Strategies
             await PlaceLegOrderAsync(leg, "SELL", sellEntry);
             _state.Log($"Flipped {leg.OptionType} → SELL @ {sellEntry:F2}, " +
                        $"NewCombinedSL={newCombined:F2}");
+            RecordEvent("FLIP_SELL",
+                $"Buy SL hit on {leg.OptionType} {leg.TradingSymbol} → flipped back to SELL",
+                entryPrice: leg.EntryPrice, exitPrice: leg.SLPrice,
+                pnl: (leg.SLPrice - leg.EntryPrice) * _cfg.TotalQty,
+                wasHedged: _state.HedgeBought);
+            SaveState();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -431,6 +519,7 @@ namespace Cognexalgo.Core.Strategies
                 _state.Log($"Monthly expiry: buy strike == new ATM ({newATM}). " +
                            "Skipping sell legs. Holding buys to expiry.");
                 _state.Phase = CalendarPhase.MonthlyExpiryDay;
+                SaveState();
                 return;
             }
 
@@ -462,6 +551,10 @@ namespace Cognexalgo.Core.Strategies
                        $"CombinedSL={_state.CombinedSellEntryPrice:F2}");
 
             _state.Phase = CalendarPhase.Active;
+            RecordEvent("ROLL",
+                $"Weekly roll → ATM={newATM} CE={_state.SellCallLeg.EntryPrice:N2} PE={_state.SellPutLeg.EntryPrice:N2}",
+                entryPrice: _state.CombinedSellEntryPrice);
+            SaveState();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -502,6 +595,10 @@ namespace Cognexalgo.Core.Strategies
             _state.Phase = CalendarPhase.Completed;
             IsActive     = false;
             _state.Log($"Strategy COMPLETED. P&L=₹{_state.TotalPnL:F2}");
+            RecordEvent("EXIT",
+                $"Strategy completed — {reason}",
+                pnl: _state.TotalRealizedPnL);
+            try { _repo?.Delete(_cfg.Name); } catch { /* best-effort */ }
         }
 
         /// <summary>Exits a sell leg AND its corresponding hedge together.</summary>

@@ -882,6 +882,29 @@ namespace Cognexalgo.UI.ViewModels
             win.Show();
         }
 
+        // Open Payoff Builder window
+        [RelayCommand]
+        public void OpenPayoffBuilder()
+        {
+            var vm = new PayoffBuilderViewModel(config =>
+            {
+                Strategies.Add(config);
+                System.Windows.MessageBox.Show(
+                    $"Strategy '{config.Name}' added.\nGo to the Strategies tab to deploy.",
+                    "Added to Strategies",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+            });
+            vm.SpotPrice = LtpNifty > 0 ? LtpNifty : 22000;
+            vm.LoadTemplateCommand.Execute(null);
+            var win = new Views.PayoffBuilderWindow
+            {
+                DataContext = vm,
+                Owner       = Application.Current.MainWindow
+            };
+            win.Show();
+        }
+
         // F3: Open Performance Report window
         [RelayCommand]
         public void OpenReports()

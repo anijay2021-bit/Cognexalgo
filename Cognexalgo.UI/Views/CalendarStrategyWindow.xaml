@@ -175,7 +175,12 @@
                 <Button Content="■  Stop Strategy"
                         Command="{Binding StopStrategyCommand}"
                         Style="{StaticResource DangerButtonStyle}"
-                        Width="160" Height="34"/>
+                        Width="160" Height="34" Margin="0,0,10,0"/>
+                <Button Content="📊  Performance"
+                        Command="{Binding OpenPerformanceDashboardCommand}"
+                        Background="#1A2744" BorderBrush="#2D5A8E"
+                        Foreground="#64B5F6" FontWeight="SemiBold"
+                        Width="150" Height="34" Cursor="Hand"/>
             </StackPanel>
 
             <!-- ── Status Bar (5 boxes) ── -->

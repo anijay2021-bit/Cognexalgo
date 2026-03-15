@@ -47,6 +47,9 @@ namespace Cognexalgo.Core.Models
         // ── Event Log ─────────────────────────────────────────────────────────
         public List<string> EventLog { get; set; } = new();
 
+        // ── Performance Log (structured records for dashboard) ────────────────
+        public List<CalendarPerformanceRecord> PerformanceLog { get; set; } = new();
+
         public void Log(string msg)
         {
             string entry = $"[{DateTime.Now:HH:mm:ss}] {msg}";

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using Cognexalgo.Core;
 using Cognexalgo.Core.Models;
+using Cognexalgo.Core.Services;
 using Cognexalgo.Core.Strategies;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,8 +17,9 @@ namespace Cognexalgo.UI.ViewModels
     /// </summary>
     public partial class CalendarStrategyViewModel : ObservableObject
     {
-        private readonly TradingEngine _engine;
-        private CalendarStrategy? _running;
+        private readonly TradingEngine            _engine;
+        private readonly CalendarStateRepository  _repo = new();
+        private CalendarStrategy?                 _running;
         private readonly System.Windows.Threading.DispatcherTimer _timer;
 
         // ── Config inputs ─────────────────────────────────────────────────────
@@ -102,15 +104,47 @@ namespace Cognexalgo.UI.ViewModels
                     HedgeStrikeOffset        = HedgeStrikeOffset
                 };
 
-                _running = new CalendarStrategy(_engine, cfg);
-                _engine.RegisterCalendarStrategy(_running);
+                bool resume = false;
+                if (_repo.Exists(cfg.Name))
+                {
+                    var dlg = MessageBox.Show(
+                        $"A saved session exists for '{cfg.Name}'.\n\n" +
+                        "YES  — Resume previous session\n" +
+                        "NO   — Start fresh (clears saved state)",
+                        "Resume Previous Session?",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    resume = dlg == MessageBoxResult.Yes;
+                }
 
-                IsRunning     = true;
-                StatusMessage = $"Strategy '{cfg.Name}' started. " +
-                                $"Entry at {cfg.FirstEntryTime:hh\\:mm}. " +
-                                (cfg.EnableHedgeBuying
-                                    ? $"Hedge enabled (+{cfg.HedgeStrikeOffset} strikes)."
-                                    : "Hedge disabled.");
+                _running = new CalendarStrategy(_engine, cfg, _repo);
+
+                if (resume)
+                {
+                    var (_, savedState) = _repo.Load(cfg.Name);
+                    if (savedState != null)
+                    {
+                        _running.LoadState(savedState);
+                        StatusMessage = $"Strategy '{cfg.Name}' resumed from saved state.";
+                    }
+                    else
+                    {
+                        StatusMessage = $"Strategy '{cfg.Name}' started fresh (saved state unreadable).";
+                    }
+                }
+                else
+                {
+                    if (_repo.Exists(cfg.Name))
+                        _repo.Delete(cfg.Name);
+                    StatusMessage = $"Strategy '{cfg.Name}' started. " +
+                                    $"Entry at {cfg.FirstEntryTime:hh\\:mm}. " +
+                                    (cfg.EnableHedgeBuying
+                                        ? $"Hedge enabled (+{cfg.HedgeStrikeOffset} strikes)."
+                                        : "Hedge disabled.");
+                }
+
+                _engine.RegisterCalendarStrategy(_running);
+                IsRunning = true;
                 _timer.Start();
             }
             catch (Exception ex)
@@ -127,6 +161,24 @@ namespace Cognexalgo.UI.ViewModels
             _timer.Stop();
             IsRunning     = false;
             StatusMessage = "Strategy stopped manually.";
+        }
+
+        [RelayCommand]
+        public void OpenPerformanceDashboard()
+        {
+            if (_running == null)
+            {
+                System.Windows.MessageBox.Show(
+                    "Start the strategy first to view performance data.",
+                    "No Active Strategy", System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            var vm  = new CalendarPerformanceDashboardViewModel(_running);
+            var win = new Views.CalendarPerformanceDashboardWindow { DataContext = vm };
+            win.Owner = System.Windows.Application.Current.MainWindow;
+            win.Show();
         }
 
         // ── State refresh (every 1 second) ────────────────────────────────────

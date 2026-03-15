@@ -336,11 +336,12 @@
                                     <syncfusion:GridTextColumn HeaderText="Status"  MappingName="Status" Width="80"/>
                                 </syncfusion:SfDataGrid.Columns>
                             </syncfusion:SfDataGrid>
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
-                                <Button Content="+ New Strategy" Style="{StaticResource FilledBtn}" Command="{Binding AddStrategyCommand}" Padding="14,7" FontSize="12"/>
-                                <Button Content="📊 Reports" Style="{StaticResource TonalBtn}" Command="{Binding OpenReportsCommand}" Margin="8,0,0,0" Padding="14,7" FontSize="12"/>
-                                <Button Content="📅 Calendar Strategy" Style="{StaticResource TonalBtn}" Command="{Binding OpenCalendarStrategyCommand}" Margin="8,0,0,0" Padding="14,7" FontSize="12"/>
-                            </StackPanel>
+                            <WrapPanel Grid.Row="2" Margin="0,12,0,0" Orientation="Horizontal">
+                                <Button Content="+ New Strategy"  Style="{StaticResource FilledBtn}" Command="{Binding AddStrategyCommand}"           Padding="10,6" FontSize="11" Margin="0,4,6,0"/>
+                                <Button Content="📊 Reports"      Style="{StaticResource TonalBtn}"  Command="{Binding OpenReportsCommand}"            Padding="10,6" FontSize="11" Margin="0,4,6,0"/>
+                                <Button Content="📅 Calendar"     Style="{StaticResource TonalBtn}"  Command="{Binding OpenCalendarStrategyCommand}"   Padding="10,6" FontSize="11" Margin="0,4,6,0"/>
+                                <Button Content="📐 Payoff"       Style="{StaticResource TonalBtn}"  Command="{Binding OpenPayoffBuilderCommand}"      Padding="10,6" FontSize="11" Margin="0,4,0,0"/>
+                            </WrapPanel>
                         </Grid>
                     </Border>
                 </Grid>
