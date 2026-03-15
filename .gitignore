@@ -40,6 +40,7 @@ InstallerOutput/
 logs/
 
 # Secrets (never commit real credentials)
+appsettings.json
 appsettings.Development.json
 appsettings.Local.json
 
