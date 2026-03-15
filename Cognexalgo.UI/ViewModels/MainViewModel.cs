@@ -636,6 +636,13 @@ namespace Cognexalgo.UI.ViewModels
             // Let's use the new method I'll ensure exists or exist: DeleteHybridStrategyAsync.
             // Previously I tried to call DeleteAsync(strategy.Id).
             
+            var result = MessageBox.Show(
+                $"Delete strategy '{strategy.Name}'?\nThis cannot be undone.",
+                "Confirm Delete",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (result != MessageBoxResult.Yes) return;
+
             await _engine.StrategyRepository.DeleteHybridStrategyAsync(strategy.Id);
             await LoadStrategies();
             Log($"Deleted Strategy: {strategy.Name}");
