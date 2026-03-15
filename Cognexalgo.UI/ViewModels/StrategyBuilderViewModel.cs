@@ -259,6 +259,43 @@ namespace Cognexalgo.UI.ViewModels
                 AvailableOptionStrategies.Add(s);
         }
 
+        partial void OnSelectedOptionStrategyChanged(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return;
+            LoadOptionTemplate(value);
+        }
+
+        private void LoadOptionTemplate(string templateName)
+        {
+            var template = StrategyRepository.GetTemplate(templateName);
+            if (template == null) return;
+
+            SelectedStrategyType = "Hybrid";
+            HybridLegs.Clear();
+
+            foreach (var formula in template.Legs)
+            {
+                var offset = formula.StrikeOffset;
+                var atmOffset = offset == 0
+                    ? "ATM"
+                    : $"ATM{(offset > 0 ? "+" : "")}{offset}";
+
+                var leg = new Cognexalgo.Core.Models.StrategyLeg
+                {
+                    Mode         = Cognexalgo.Core.Models.StrikeSelectionMode.ATMPoint,
+                    ATMOffset    = atmOffset,
+                    OptionType   = formula.Type == "CE"   ? Cognexalgo.Core.Models.OptionType.Call : Cognexalgo.Core.Models.OptionType.Put,
+                    Action       = formula.Action == "BUY" ? Cognexalgo.Core.Models.ActionType.Buy  : Cognexalgo.Core.Models.ActionType.Sell,
+                    Index        = SelectedIndex,
+                    TotalLots    = TotalLots,
+                    ProductType  = SelectedProductType,
+                    ExpiryType   = SelectedExpiryType.ToString(),
+                    ExpiryOffset = 0
+                };
+                HybridLegs.Add(leg);
+            }
+        }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsRuleBuilderVisible))]
         [NotifyPropertyChangedFor(nameof(IsCalendarVisible))]

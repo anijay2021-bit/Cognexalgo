@@ -902,7 +902,20 @@ namespace Cognexalgo.UI.ViewModels
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Information);
             });
-            vm.SpotPrice = LtpNifty > 0 ? LtpNifty : 22000;
+            // Pass spot price for the currently selected index
+            vm.SelectedIndex = SelectedOptionIndex;
+            vm.SpotPrice = SelectedOptionIndex switch
+            {
+                "BANKNIFTY"  => LtpBankNifty  > 0 ? LtpBankNifty  : 48000,
+                "FINNIFTY"   => LtpFinnifty   > 0 ? LtpFinnifty   : 23500,
+                "MIDCPNIFTY" => LtpMidcpNifty > 0 ? LtpMidcpNifty : 12000,
+                "SENSEX"     => LtpSensex     > 0 ? LtpSensex     : 79000,
+                _            => LtpNifty      > 0 ? LtpNifty      : 22000
+            };
+
+            // Seed option chain so premiums populate on first load
+            vm.SetOptionChain(OptionChain);
+
             vm.LoadTemplateCommand.Execute(null);
             var win = new Views.PayoffBuilderWindow
             {
