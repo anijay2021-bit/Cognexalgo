@@ -113,39 +113,45 @@ namespace Cognexalgo.Core.Services
                     }
                 }
 
-                using (var client = new HttpClient())
+                // Only download if cache was not loaded
+                if (json == null)
                 {
-                    client.Timeout = TimeSpan.FromSeconds(120);
+                    using (var client = new HttpClient())
+                    {
+                        client.Timeout = TimeSpan.FromSeconds(120);
 
-                    Console.WriteLine($"[TokenService] Attempting GET: {SCRIP_MASTER_URL}");
-                    var response = await client.GetAsync(SCRIP_MASTER_URL);
+                        Console.WriteLine($"[TokenService] Attempting GET: {SCRIP_MASTER_URL}");
+                        var response = await client.GetAsync(SCRIP_MASTER_URL);
 
-                    Console.WriteLine($"[TokenService] Response: HTTP {(int)response.StatusCode}");
-                    Console.WriteLine($"[TokenService] Content-Type: {response.Content.Headers.ContentType}");
-                    long contentLength = response.Content.Headers.ContentLength ?? -1;
-                    Console.WriteLine($"[TokenService] Content-Length: {contentLength:N0} bytes");
+                        Console.WriteLine($"[TokenService] Response: HTTP {(int)response.StatusCode}");
+                        Console.WriteLine($"[TokenService] Content-Type: {response.Content.Headers.ContentType}");
+                        long contentLength = response.Content.Headers.ContentLength ?? -1;
+                        Console.WriteLine($"[TokenService] Content-Length: {contentLength:N0} bytes");
 
-                    if (!response.IsSuccessStatusCode)
-                        throw new Exception(
-                            $"AngelOne returned HTTP {(int)response.StatusCode} " +
-                            $"({response.ReasonPhrase}) for Scrip Master URL. " +
-                            $"URL: {SCRIP_MASTER_URL}");
+                        if (!response.IsSuccessStatusCode)
+                            throw new Exception(
+                                $"AngelOne returned HTTP {(int)response.StatusCode} " +
+                                $"({response.ReasonPhrase}) for Scrip Master URL. " +
+                                $"URL: {SCRIP_MASTER_URL}");
 
-                    json = await response.Content.ReadAsStringAsync();
+                        json = await response.Content.ReadAsStringAsync();
 
-                    if (string.IsNullOrWhiteSpace(json) || json.Length < 1000)
-                        throw new Exception(
-                            $"Scrip Master response too small ({json?.Length ?? 0} bytes). " +
-                            $"AngelOne may be down or URL may have changed.");
+                        if (string.IsNullOrWhiteSpace(json) || json.Length < 1000)
+                            throw new Exception(
+                                $"Scrip Master response too small ({json?.Length ?? 0} bytes). " +
+                                $"AngelOne may be down or URL may have changed.");
 
-                    // Quick JSON validation — throws JsonReaderException if corrupt
-                    JsonConvert.DeserializeObject(json);
+                        // Quick JSON validation — throws JsonReaderException if corrupt
+                        JsonConvert.DeserializeObject(json);
 
-                    // Only save if valid
-                    await System.IO.File.WriteAllTextAsync(cachePath, json);
-                    Console.WriteLine(
-                        $"[TokenService] Scrip Master saved: {json.Length:N0} bytes to {cachePath}");
-                        
+                        // Only save if valid
+                        await System.IO.File.WriteAllTextAsync(cachePath, json);
+                        Console.WriteLine(
+                            $"[TokenService] Scrip Master saved: {json.Length:N0} bytes to {cachePath}");
+                    }
+                }
+
+                {
                         var list = JsonConvert.DeserializeObject<List<ScripItem>>(json);
                         
                         Console.WriteLine($"Deserialized {list?.Count ?? 0} items from Scrip Master");

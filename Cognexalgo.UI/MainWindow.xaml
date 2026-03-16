@@ -547,7 +547,7 @@
                             BorderBrush="{StaticResource Outline}" BorderThickness="0,0,0,1">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Index  " Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
-                            <ComboBox Width="140" SelectedItem="{Binding SelectedOptionIndex}" Margin="0,0,14,0">
+                            <ComboBox Width="140" SelectedValue="{Binding SelectedOptionIndex}" SelectedValuePath="Content" Margin="0,0,14,0">
                                 <ComboBoxItem>NIFTY</ComboBoxItem>
                                 <ComboBoxItem>BANKNIFTY</ComboBoxItem>
                                 <ComboBoxItem>FINNIFTY</ComboBoxItem>
