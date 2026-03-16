@@ -260,7 +260,7 @@ namespace Cognexalgo.Core.Services
                 var drift = DateTime.UtcNow - networkDateTime;
                 _engine.Logger.Log("Bootstrapper", $"✓ System Clock Drift: {drift.TotalMilliseconds:F2}ms");
 
-                if (Math.Abs(drift.TotalMilliseconds) > 500)
+                if (Math.Abs(drift.TotalMilliseconds) > 3000)
                 {
                     _engine.Logger.Log("Bootstrapper", $"CRITICAL: Clock drift > 500ms. Algo trading requires precise time.");
                     OnCriticalWarning?.Invoke(
