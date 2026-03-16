@@ -29,14 +29,13 @@ namespace Cognexalgo.Core.Models
         [JsonProperty("updatetime")]
         public string UpdateTime { get; set; } // API returns string, we might need to parse it
 
-        public DateTime Timestamp 
-        { 
-            get 
-            {
-                if (DateTime.TryParse(UpdateTime, out DateTime dt)) return dt;
-                return DateTime.Now;
-            }
-            set { } // Setter needed for serialization if needed, or ignore
+        private DateTime _timestamp;
+        public DateTime Timestamp
+        {
+            get => _timestamp != default
+                       ? _timestamp
+                       : (DateTime.TryParse(UpdateTime, out DateTime dt) ? dt : DateTime.Now);
+            set => _timestamp = value;
         }
 
         [JsonProperty("producttype")]

@@ -28,10 +28,10 @@ namespace Cognexalgo.Core.Repositories
                 await connection.OpenAsync();
                 var command = connection.CreateCommand();
                 command.CommandText = @"
-                    INSERT INTO Orders (OrderId, StrategyId, Symbol, TransactionType, Qty, Price, Status, Timestamp, StrategyName)
-                    VALUES ($orderId, $strategyId, $symbol, $type, $qty, $price, $status, $timestamp, $stratName)
+                    INSERT INTO Orders (OrderId, StrategyId, Symbol, TransactionType, Qty, Price, Status, Timestamp, StrategyName, Token)
+                    VALUES ($orderId, $strategyId, $symbol, $type, $qty, $price, $status, $timestamp, $stratName, $token)
                 ";
-                
+
                 command.Parameters.AddWithValue("$orderId", order.OrderId);
                 command.Parameters.AddWithValue("$strategyId", order.StrategyId);
                 command.Parameters.AddWithValue("$symbol", order.Symbol);
@@ -41,6 +41,7 @@ namespace Cognexalgo.Core.Repositories
                 command.Parameters.AddWithValue("$status", order.Status);
                 command.Parameters.AddWithValue("$timestamp", order.Timestamp);
                 command.Parameters.AddWithValue("$stratName", order.StrategyName ?? "");
+                command.Parameters.AddWithValue("$token", order.Token ?? "");
 
                 await command.ExecuteNonQueryAsync();
             }
@@ -64,7 +65,7 @@ namespace Cognexalgo.Core.Repositories
             {
                 await connection.OpenAsync();
                 var command = connection.CreateCommand();
-                command.CommandText = "SELECT OrderId, StrategyId, StrategyName, Symbol, TransactionType, Qty, Price, Status, Timestamp FROM Orders ORDER BY Timestamp DESC";
+                command.CommandText = "SELECT OrderId, StrategyId, StrategyName, Symbol, TransactionType, Qty, Price, Status, Timestamp, Token FROM Orders ORDER BY Timestamp DESC";
                 using (var reader = await command.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
@@ -79,7 +80,8 @@ namespace Cognexalgo.Core.Repositories
                             Qty = reader.GetInt32(5),
                             Price = reader.GetDouble(6),
                             Status = reader.GetString(7),
-                            Timestamp = reader.GetDateTime(8)
+                            Timestamp = reader.GetDateTime(8),
+                            Token = reader.IsDBNull(9) ? "" : reader.GetString(9)
                         };
                         result.Add(o);
                     }

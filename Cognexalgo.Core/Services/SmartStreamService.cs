@@ -32,6 +32,7 @@ namespace Cognexalgo.Core.Services
 
         private readonly ConcurrentDictionary<string, double> _lastLtps = new();
         private List<string> _subscribedTokens = new();
+        private readonly Dictionary<string, string> _tokenExchangeMap = new();
 
         public bool IsConnected => _ws != null && _ws.State == WebSocketState.Open;
 
@@ -77,6 +78,13 @@ namespace Cognexalgo.Core.Services
         public async Task SubscribeAsync(List<string> tokens, string exchange = "NSE")
         {
             if (!IsConnected) return;
+
+            // Remember which exchange each token belongs to (needed for reconnect)
+            lock (_tokenExchangeMap)
+            {
+                foreach (var t in tokens)
+                    _tokenExchangeMap[t] = exchange;
+            }
 
             // Angel One SmartStream Subscription JSON
             // Note: 'params' is a C# reserved keyword, so we use a Dictionary
@@ -167,11 +175,22 @@ namespace Cognexalgo.Core.Services
                     await _ws.ConnectAsync(new Uri(_wsUrl), token);
                     OnStatusChanged?.Invoke($"SmartStream reconnected (attempt {attempt}).");
 
-                    // Re-subscribe to previously subscribed tokens
+                    // Re-subscribe to previously subscribed tokens, grouped by original exchange
                     List<string> tokensToResubscribe;
                     lock (_subscribedTokens) { tokensToResubscribe = new List<string>(_subscribedTokens); }
                     if (tokensToResubscribe.Count > 0)
-                        await SubscribeAsync(tokensToResubscribe, "NSE");
+                    {
+                        Dictionary<string, string> exchangeSnapshot;
+                        lock (_tokenExchangeMap) { exchangeSnapshot = new Dictionary<string, string>(_tokenExchangeMap); }
+
+                        var byExchange = tokensToResubscribe
+                            .GroupBy(t => exchangeSnapshot.GetValueOrDefault(t, "NSE"));
+                        foreach (var grp in byExchange)
+                        {
+                            await SubscribeAsync(grp.ToList(), grp.Key);
+                            Console.WriteLine($"[SmartStream] Resubscribed {grp.Count()} {grp.Key} tokens");
+                        }
+                    }
 
                     // Resume receive loop
                     _ = ReceiveLoopAsync(token);
