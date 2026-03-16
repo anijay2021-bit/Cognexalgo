@@ -28,6 +28,19 @@ namespace Cognexalgo.Core.Database
             {
                 connection.Open();
 
+                // Migration: add Token column to Orders if it doesn't exist yet
+                try
+                {
+                    var migrate = connection.CreateCommand();
+                    migrate.CommandText = "ALTER TABLE Orders ADD COLUMN Token TEXT DEFAULT ''";
+                    migrate.ExecuteNonQuery();
+                    Console.WriteLine("[DB] Added Token column to Orders table.");
+                }
+                catch
+                {
+                    // Column already exists — ignore
+                }
+
                 var command = connection.CreateCommand();
                 command.CommandText = @"
                     CREATE TABLE IF NOT EXISTS Strategies (
@@ -49,7 +62,8 @@ namespace Cognexalgo.Core.Database
                         Price REAL NOT NULL,
                         Status TEXT NOT NULL,
                         Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        StrategyName TEXT -- Denormalized for easy querying
+                        StrategyName TEXT, -- Denormalized for easy querying
+                        Token TEXT DEFAULT ''
                     );
 
                     CREATE TABLE IF NOT EXISTS Positions (
