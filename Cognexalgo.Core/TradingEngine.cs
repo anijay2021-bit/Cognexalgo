@@ -577,10 +577,9 @@ namespace Cognexalgo.Core
                 _clientId  = clientCode;
                 ClientCode = clientCode;
 
-                // CRITICAL FIX: Properly await LoadMasterAsync to prevent race condition
-                // Previously used fire-and-forget (_ = ...) which caused searches to run before loading completed
-                Logger?.Log("Engine", "Loading Scrip Master...");
-                await TokenService.LoadMasterAsync();
+                // Smart load: fresh download if date-stamp is not today, else load from cache.
+                Logger?.Log("Engine", "Loading Scrip Master (smart)...");
+                await TokenService.LoadScripMasterSmartAsync();
                 Logger?.Log("Engine", $"✓ Scrip Master loaded. Total symbols: {TokenService.GetSymbolCount()}");
 
                 // DataService already initialized with Api reference, so no need to recreate

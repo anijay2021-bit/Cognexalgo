@@ -552,7 +552,12 @@
                                 <ComboBoxItem>BANKNIFTY</ComboBoxItem>
                                 <ComboBoxItem>FINNIFTY</ComboBoxItem>
                             </ComboBox>
-                            <Button Content="Load Chain" Style="{StaticResource FilledBtn}" Command="{Binding FetchOptionChainCommand}" Margin="0,0,24,0"/>
+                            <Button Content="Load Chain" Style="{StaticResource FilledBtn}" Command="{Binding FetchOptionChainCommand}" Margin="0,0,8,0"/>
+                            <Button Content="🔄 Refresh Instruments"
+                                    Command="{Binding RefreshScripMasterCommand}"
+                                    Background="#E67E22" Foreground="White" FontWeight="SemiBold"
+                                    Padding="12,6" Margin="0,0,24,0"
+                                    ToolTip="Download fresh instrument list from AngelOne.&#x0a;Required every day — especially after weekly expiry.&#x0a;Click this if option chain shows empty."/>
                             <TextBlock Text="Spot  " Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding SpotPrice, StringFormat=₹{0:N2}}" Foreground="{StaticResource Primary}" FontSize="15" VerticalAlignment="Center"/>
                         </StackPanel>

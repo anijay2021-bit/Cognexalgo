@@ -541,6 +541,21 @@ namespace Cognexalgo.UI.ViewModels
                 // Start Auto-Refresh
                 _autoRefreshTimer.Start();
                 Log("Auto-Refresh Started (3s Interval)");
+
+                // Fix 7: Show Scrip Master age in System Log on every login
+                string dateFile = System.IO.Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "scrip_master_date.txt");
+                if (System.IO.File.Exists(dateFile))
+                {
+                    string savedDate = System.IO.File.ReadAllText(dateFile).Trim();
+                    bool isToday = savedDate == DateTime.Today.ToString("yyyy-MM-dd");
+                    Log($"[Scrip Master] Last downloaded: {savedDate} " +
+                        $"{(isToday ? "✓ Fresh" : "⚠ STALE — will refresh on next chain load")}");
+                }
+                else
+                {
+                    Log("[Scrip Master] No cache date found — will download on next chain load.");
+                }
             }
             catch (Exception ex)
             {
@@ -1042,8 +1057,29 @@ namespace Cognexalgo.UI.ViewModels
                 _isFetchingOptionChain = true;
                 var idx = string.IsNullOrEmpty(index) ? SelectedOptionIndex : index;
 
+                Log($"[OptionChain] === Starting for {idx} ===");
+                Log($"[OptionChain] Engine running: {_engine?.IsRunning}");
+                Log($"[OptionChain] JWT present: {!string.IsNullOrEmpty(_engine?.Api?.JwtToken)}");
+                Log($"[OptionChain] DataService null: {_engine?.DataService == null}");
+
+                // Auto-refresh Scrip Master if it is stale (new day / post-expiry)
+                bool stale = await _engine.TokenService.IsScripMasterStale();
+                if (stale)
+                {
+                    Log("⚠ Scrip Master is from a previous day — downloading fresh copy...", "WARN");
+                    await _engine.TokenService.LoadScripMasterSmartAsync();
+                    Log("✓ Scrip Master refreshed. Loading option chain...");
+                }
+
                 var chain = await _engine.DataService.BuildOptionChainAsync(idx, "WEEKLY");
-                if (chain == null || chain.Count == 0) return;
+
+                Log($"[OptionChain] Raw chain count: {chain?.Count ?? 0}");
+
+                if (chain == null || chain.Count == 0)
+                {
+                    Log($"[OptionChain] ⚠️ Empty chain — check [DataService] entries above for root cause", "WARN");
+                    return;
+                }
 
                 // Use already-streaming live LTP for spot (zero API cost); fall back to REST call
                 double spot = idx switch
@@ -1084,6 +1120,8 @@ namespace Cognexalgo.UI.ViewModels
                 });
 
                 SpotPrice = spot;
+                Log($"[OptionChain] Spot price used: {spot:N2}");
+                Log($"[OptionChain] Final OptionChain count: {OptionChain.Count}");
                 Log($"✓ Option chain: {OptionChain.Count} strikes with market IV & Greeks for {idx}.", "SUCCESS");
 
                 // Cache option chain for V2 strategy strike resolution (all 5 indices)
@@ -1468,6 +1506,36 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand] public void ClearLog() => Logs.Clear();
         [RelayCommand] public void AddStrategy() => CreateStrategy();
         [RelayCommand] public async Task RefreshStrategies() => await LoadStrategies();
+
+        /// <summary>
+        /// Force-downloads a fresh Scrip Master from AngelOne and shows next expiry dates.
+        /// Use this when the option chain is empty after weekly expiry or on a new day.
+        /// </summary>
+        [RelayCommand]
+        public async Task RefreshScripMaster()
+        {
+            if (_engine?.TokenService == null) return;
+            try
+            {
+                Log("⟳ Manually refreshing Scrip Master from AngelOne...");
+                await _engine.TokenService.DownloadAndLoadScripMasterAsync();
+                await _engine.TokenService.SaveScripMasterDate();
+
+                var niftyExpiry     = _engine.TokenService.GetNextExpiry("NIFTY");
+                var bankExpiry      = _engine.TokenService.GetNextExpiry("BANKNIFTY");
+                var finniftyExpiry  = _engine.TokenService.GetNextExpiry("FINNIFTY");
+                Log($"  NIFTY next expiry:     {niftyExpiry:dd-MMM-yyyy}");
+                Log($"  BANKNIFTY next expiry: {bankExpiry:dd-MMM-yyyy}");
+                Log($"  FINNIFTY next expiry:  {finniftyExpiry:dd-MMM-yyyy}");
+                Log($"  Total symbols loaded:  {_engine.TokenService.GetSymbolCount():N0}");
+
+                Log("✓ Scrip Master refreshed. You can now load the option chain.", "SUCCESS");
+            }
+            catch (Exception ex)
+            {
+                Log($"✗ Scrip Master refresh failed: {ex.Message}", "ERROR");
+            }
+        }
 
         [RelayCommand]
         public async Task<bool> ExitPosition(Position position)

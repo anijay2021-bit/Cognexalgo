@@ -20,6 +20,63 @@ namespace Cognexalgo.Core.Services
         private const string SCRIP_MASTER_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json";
         private bool _hasLoggedSamples = false; // Track if we've logged sample symbols
 
+        private static readonly string ScripMasterPath =
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "OpenAPIScripMaster.json");
+        private static readonly string ScripMasterDatePath =
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scrip_master_date.txt");
+
+        // ── Staleness helpers ────────────────────────────────────────────────────
+
+        public async Task<bool> IsScripMasterStale()
+        {
+            if (!System.IO.File.Exists(ScripMasterPath)) return true;
+            if (!System.IO.File.Exists(ScripMasterDatePath)) return true;
+
+            string savedDate = (await System.IO.File.ReadAllTextAsync(ScripMasterDatePath)).Trim();
+            bool isOldDate = savedDate != DateTime.Today.ToString("yyyy-MM-dd");
+            if (isOldDate)
+                Console.WriteLine($"[TokenService] Scrip Master is from {savedDate}, today is {DateTime.Today:yyyy-MM-dd} — STALE");
+            else
+                Console.WriteLine("[TokenService] Scrip Master is fresh (downloaded today)");
+            return isOldDate;
+        }
+
+        public async Task SaveScripMasterDate()
+        {
+            await System.IO.File.WriteAllTextAsync(ScripMasterDatePath, DateTime.Today.ToString("yyyy-MM-dd"));
+        }
+
+        /// <summary>Force-downloads a fresh Scrip Master, ignoring any local cache.</summary>
+        public async Task DownloadAndLoadScripMasterAsync()
+        {
+            // Remove stale cache so LoadMasterAsync always re-downloads
+            if (System.IO.File.Exists(ScripMasterPath))
+                System.IO.File.Delete(ScripMasterPath);
+            await LoadMasterAsync();
+        }
+
+        /// <summary>
+        /// Smart load: downloads fresh if the saved date is not today;
+        /// otherwise loads from today's on-disk cache (fast path).
+        /// </summary>
+        public async Task LoadScripMasterSmartAsync()
+        {
+            bool stale = await IsScripMasterStale();
+            if (stale)
+            {
+                Console.WriteLine("[TokenService] Downloading fresh Scrip Master...");
+                await DownloadAndLoadScripMasterAsync();
+                await SaveScripMasterDate();
+                Console.WriteLine("[TokenService] ✓ Fresh Scrip Master loaded and cached.");
+            }
+            else
+            {
+                Console.WriteLine("[TokenService] Loading Scrip Master from today's cache...");
+                await LoadMasterAsync();
+                Console.WriteLine("[TokenService] ✓ Scrip Master loaded from cache.");
+            }
+        }
+
         public async Task LoadMasterAsync()
         {
             await Task.Run(async () => 

@@ -341,6 +341,7 @@ namespace Cognexalgo.Core.Services
         {
             try
             {
+                Console.WriteLine($"[DataService] BuildOptionChain called: {index}, JWT={!string.IsNullOrEmpty(_api?.JwtToken)}");
                 _logger?.Log("DataService", $"Building option chain for {index} {expiryType} expiry");
 
                 // [UPDATED] Use authoritative expiry from TokenService (Scrip Master)
@@ -439,8 +440,10 @@ namespace Cognexalgo.Core.Services
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[DataService] OPTION CHAIN ERROR: {ex.Message}");
+                Console.WriteLine($"[DataService] STACK: {ex.StackTrace}");
                 _logger?.Log("DataService", $"ERROR: Building option chain: {ex.Message}");
-                // Fallback
+                _logger?.Log("DataService", $"STACK: {ex.StackTrace}");
                 if (_api.JwtToken == null) return new List<OptionChainItem>();
                 throw new Exception($"Failed to build option chain for {index}: {ex.Message}", ex);
             }
