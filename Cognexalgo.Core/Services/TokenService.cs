@@ -47,12 +47,27 @@ namespace Cognexalgo.Core.Services
         }
 
         /// <summary>Force-downloads a fresh Scrip Master, ignoring any local cache.</summary>
-        public async Task DownloadAndLoadScripMasterAsync()
+        public async Task<bool> DownloadAndLoadScripMasterAsync()
         {
             // Remove stale cache so LoadMasterAsync always re-downloads
             if (System.IO.File.Exists(ScripMasterPath))
                 System.IO.File.Delete(ScripMasterPath);
-            await LoadMasterAsync();
+            try
+            {
+                await LoadMasterAsync();
+                int count = GetSymbolCount();
+                if (count == 0)
+                    throw new Exception(
+                        "Scrip Master downloaded but contains 0 symbols. " +
+                        "File may be empty or format may have changed.");
+                Console.WriteLine($"[TokenService] ✓ Scrip Master loaded: {count:N0} symbols");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TokenService] ✗ Scrip Master FAILED: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>
@@ -65,9 +80,12 @@ namespace Cognexalgo.Core.Services
             if (stale)
             {
                 Console.WriteLine("[TokenService] Downloading fresh Scrip Master...");
-                await DownloadAndLoadScripMasterAsync();
-                await SaveScripMasterDate();
-                Console.WriteLine("[TokenService] ✓ Fresh Scrip Master loaded and cached.");
+                bool success = await DownloadAndLoadScripMasterAsync();
+                if (success)
+                {
+                    await SaveScripMasterDate();
+                    Console.WriteLine("[TokenService] ✓ Fresh Scrip Master loaded and cached.");
+                }
             }
             else
             {
@@ -97,19 +115,36 @@ namespace Cognexalgo.Core.Services
 
                 using (var client = new HttpClient())
                 {
-                    try
-                    {
-                        if (string.IsNullOrEmpty(json))
-                        {
-                            Console.WriteLine("Downloading Scrip Master...");
-                            var response = await client.GetAsync(SCRIP_MASTER_URL);
-                            json = await response.Content.ReadAsStringAsync();
-                            
-                            Console.WriteLine($"Downloaded {json.Length} bytes of JSON data");
-                            
-                            // Save to Cache
-                            await System.IO.File.WriteAllTextAsync(cachePath, json);
-                        }
+                    client.Timeout = TimeSpan.FromSeconds(120);
+
+                    Console.WriteLine($"[TokenService] Attempting GET: {SCRIP_MASTER_URL}");
+                    var response = await client.GetAsync(SCRIP_MASTER_URL);
+
+                    Console.WriteLine($"[TokenService] Response: HTTP {(int)response.StatusCode}");
+                    Console.WriteLine($"[TokenService] Content-Type: {response.Content.Headers.ContentType}");
+                    long contentLength = response.Content.Headers.ContentLength ?? -1;
+                    Console.WriteLine($"[TokenService] Content-Length: {contentLength:N0} bytes");
+
+                    if (!response.IsSuccessStatusCode)
+                        throw new Exception(
+                            $"AngelOne returned HTTP {(int)response.StatusCode} " +
+                            $"({response.ReasonPhrase}) for Scrip Master URL. " +
+                            $"URL: {SCRIP_MASTER_URL}");
+
+                    json = await response.Content.ReadAsStringAsync();
+
+                    if (string.IsNullOrWhiteSpace(json) || json.Length < 1000)
+                        throw new Exception(
+                            $"Scrip Master response too small ({json?.Length ?? 0} bytes). " +
+                            $"AngelOne may be down or URL may have changed.");
+
+                    // Quick JSON validation — throws JsonReaderException if corrupt
+                    JsonConvert.DeserializeObject(json);
+
+                    // Only save if valid
+                    await System.IO.File.WriteAllTextAsync(cachePath, json);
+                    Console.WriteLine(
+                        $"[TokenService] Scrip Master saved: {json.Length:N0} bytes to {cachePath}");
                         
                         var list = JsonConvert.DeserializeObject<List<ScripItem>>(json);
                         
@@ -223,12 +258,6 @@ namespace Cognexalgo.Core.Services
                         foreach (var s in niftyIndex)
                             Console.WriteLine($"  {s}");
                         Console.WriteLine("=== END SAMPLE ===");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"ERROR loading Scrip Master: {ex.Message}");
-                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                    }
                 }
             });
         }

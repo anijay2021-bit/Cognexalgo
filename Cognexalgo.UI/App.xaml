@@ -10,6 +10,7 @@
             </ResourceDictionary.MergedDictionaries>
             
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+            <converters:PnlToBrushConverter x:Key="PnlToBrushConverter"/>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <converters:RadioButtonConverter x:Key="RadioButtonConverter"/>
             <converters:OptionTypeToColorConverter x:Key="OptionTypeToColorConverter"/>

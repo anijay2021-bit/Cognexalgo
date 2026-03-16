@@ -1066,9 +1066,20 @@ namespace Cognexalgo.UI.ViewModels
                 bool stale = await _engine.TokenService.IsScripMasterStale();
                 if (stale)
                 {
-                    Log("⚠ Scrip Master is from a previous day — downloading fresh copy...", "WARN");
-                    await _engine.TokenService.LoadScripMasterSmartAsync();
-                    Log("✓ Scrip Master refreshed. Loading option chain...");
+                    Log("⚠ Scrip Master is stale — refreshing before chain load...", "WARN");
+                    try
+                    {
+                        await _engine.TokenService.LoadScripMasterSmartAsync();
+                        int smCount = _engine.TokenService.GetSymbolCount();
+                        Log($"✓ Scrip Master ready: {smCount:N0} symbols.");
+                    }
+                    catch (Exception smEx)
+                    {
+                        Log($"✗ Scrip Master refresh failed: {smEx.Message}", "ERROR");
+                        Log("Cannot load option chain without Scrip Master. " +
+                            "Click '🔄 Refresh Instruments' and check your internet connection.", "ERROR");
+                        return;
+                    }
                 }
 
                 var chain = await _engine.DataService.BuildOptionChainAsync(idx, "WEEKLY");
@@ -1517,23 +1528,37 @@ namespace Cognexalgo.UI.ViewModels
             if (_engine?.TokenService == null) return;
             try
             {
-                Log("⟳ Manually refreshing Scrip Master from AngelOne...");
+                Log("⟳ Downloading fresh Scrip Master from AngelOne...");
                 await _engine.TokenService.DownloadAndLoadScripMasterAsync();
                 await _engine.TokenService.SaveScripMasterDate();
 
-                var niftyExpiry     = _engine.TokenService.GetNextExpiry("NIFTY");
-                var bankExpiry      = _engine.TokenService.GetNextExpiry("BANKNIFTY");
-                var finniftyExpiry  = _engine.TokenService.GetNextExpiry("FINNIFTY");
+                int count = _engine.TokenService.GetSymbolCount();
+                Log($"✓ Scrip Master loaded: {count:N0} symbols.", "SUCCESS");
+
+                var niftyExpiry    = _engine.TokenService.GetNextExpiry("NIFTY");
+                var bankExpiry     = _engine.TokenService.GetNextExpiry("BANKNIFTY");
+                var finniftyExpiry = _engine.TokenService.GetNextExpiry("FINNIFTY");
                 Log($"  NIFTY next expiry:     {niftyExpiry:dd-MMM-yyyy}");
                 Log($"  BANKNIFTY next expiry: {bankExpiry:dd-MMM-yyyy}");
                 Log($"  FINNIFTY next expiry:  {finniftyExpiry:dd-MMM-yyyy}");
-                Log($"  Total symbols loaded:  {_engine.TokenService.GetSymbolCount():N0}");
 
-                Log("✓ Scrip Master refreshed. You can now load the option chain.", "SUCCESS");
+                Log("Auto-loading NIFTY option chain...");
+                await FetchOptionChain("NIFTY");
             }
             catch (Exception ex)
             {
-                Log($"✗ Scrip Master refresh failed: {ex.Message}", "ERROR");
+                Log($"✗ Scrip Master download FAILED: {ex.Message}", "ERROR");
+                System.Windows.MessageBox.Show(
+                    $"Failed to download Scrip Master from AngelOne.\n\n" +
+                    $"Error: {ex.Message}\n\n" +
+                    $"Possible causes:\n" +
+                    $"• Not connected to internet\n" +
+                    $"• AngelOne API is down\n" +
+                    $"• JWT token expired — try reconnecting\n" +
+                    $"• Scrip Master URL has changed",
+                    "Scrip Master Download Failed",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
             }
         }
 
