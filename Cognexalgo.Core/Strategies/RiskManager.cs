@@ -18,6 +18,7 @@ namespace Cognexalgo.Core.Strategies
         private readonly RuleEvaluator _evaluator;
 
         public bool IsPositionOpen { get; private set; } = false;
+        public string EnteredSymbol { get; private set; } = "";
         public double EntryPrice { get; private set; } = 0;
         public double TargetPrice { get; private set; } = 0;
         public double SlPrice { get; private set; } = 0;
@@ -35,9 +36,10 @@ namespace Cognexalgo.Core.Strategies
             _evaluator = new RuleEvaluator();
         }
 
-        public void InitializeEntry(double entryPrice, EvaluationContext context)
+        public void InitializeEntry(double entryPrice, EvaluationContext context, string enteredSymbol = "")
         {
             IsPositionOpen = true;
+            EnteredSymbol = enteredSymbol;
             EntryPrice = entryPrice;
             HighestPrice = entryPrice;
             _breakevenTriggered = false;
@@ -54,6 +56,7 @@ namespace Cognexalgo.Core.Strategies
         public void Reset()
         {
             IsPositionOpen = false;
+            EnteredSymbol = "";
             EntryPrice = 0;
             HighestPrice = 0;
             _breakevenTriggered = false;
@@ -198,13 +201,16 @@ namespace Cognexalgo.Core.Strategies
         private async Task ExecuteFullExit(double ltp, string reason)
         {
             Console.WriteLine($"[RiskManager] Full Exit: {reason} @ {ltp}");
-            
+
             // Record performance for the engine to broadcast
             double potentialProfit = HighestPrice - EntryPrice;
             double protectedProfit = SlPrice - EntryPrice;
-            
-            await _engine.ExecuteOrderAsync(CreateDummyConfig(), _symbol, "EXIT", 0, ltp, potentialProfit, protectedProfit);
+
+            // Use the actual option symbol entered (not the underlying index)
+            string exitSymbol = !string.IsNullOrEmpty(EnteredSymbol) ? EnteredSymbol : _symbol;
+            await _engine.ExecuteOrderAsync(CreateDummyConfig(), exitSymbol, "EXIT", 0, ltp, potentialProfit, protectedProfit);
             IsPositionOpen = false;
+            EnteredSymbol = "";
         }
 
         private StrategyConfig CreateDummyConfig()

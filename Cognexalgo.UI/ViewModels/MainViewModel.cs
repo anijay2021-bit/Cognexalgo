@@ -1265,10 +1265,14 @@ namespace Cognexalgo.UI.ViewModels
                         var tokensToSubscribe = new System.Collections.Generic.List<string>();
                         foreach (var p in mockPositions.Where(p => p.ParsedStrike > 0))
                         {
-                            // Try option chain first (most reliable token source for NFO options)
+                            // Priority: saved order token > option chain token > TokenService lookup
+                            var savedToken = orders
+                                .FirstOrDefault(o => o.Symbol == p.TradingSymbol && !string.IsNullOrEmpty(o.Token))
+                                ?.Token;
                             var chainItem = _v2?.CachedNiftyChain?
                                 .FirstOrDefault(c => c.Symbol == p.TradingSymbol);
-                            var tok = chainItem?.Token
+                            var tok = savedToken
+                                   ?? chainItem?.Token
                                    ?? _engine.TokenService?.GetToken(p.TradingSymbol);
                             if (!string.IsNullOrEmpty(tok))
                             {

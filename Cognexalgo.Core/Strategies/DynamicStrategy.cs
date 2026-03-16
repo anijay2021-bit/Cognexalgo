@@ -18,9 +18,9 @@ namespace Cognexalgo.Core.Strategies
         private readonly CandleAggregator _aggregator;
         private readonly List<Skender.Stock.Indicators.Quote> _history = new List<Skender.Stock.Indicators.Quote>();
 
-        // One-shot guard: once we enter and then exit, never re-enter in the same session.
-        // Prevents continuous entry signals when entry conditions remain true after exit.
-        private bool _hasEnteredOnce = false;
+        // Crossover state: tracks whether price was above EMA on previous tick.
+        // Entry fires only when this state changes (crossover), not on every tick.
+        private bool _wasAboveEMA = false;
 
         public DynamicStrategy(TradingEngine engine, string jsonConfig) 
             : base(engine, "Dynamic")
@@ -120,9 +120,9 @@ namespace Cognexalgo.Core.Strategies
             {
                 await _riskManager.CheckExits(ltp, _context);
             }
-            else if (!_hasEnteredOnce)
+            else
             {
-                // 3. Evaluate Entries on EVERY TICK (only before first entry)
+                // 3. Evaluate Entries on EVERY TICK (crossover guard inside prevents repeat fires)
                 // We construct a temporary context that includes the historically closed
                 // candles PLUS the currently forming synthetic candle at this exact tick.
                 var syntheticCandle = new Skender.Stock.Indicators.Quote 
@@ -147,6 +147,27 @@ namespace Cognexalgo.Core.Strategies
         {
             if (_config.EntryRules == null || !_config.EntryRules.Any()) return;
 
+            // EMA crossover detection — only fire on state change, not every tick
+            double ema21 = CalculateEMA21(_history);
+            if (ema21 <= 0) return;
+
+            bool isAboveEMA   = currentPrice > ema21;
+            bool crossedAbove = isAboveEMA  && !_wasAboveEMA;
+            bool crossedBelow = !isAboveEMA && _wasAboveEMA;
+            _wasAboveEMA = isAboveEMA;
+
+            if (!crossedAbove && !crossedBelow) return; // No crossover this tick
+
+            if (_riskManager.IsPositionOpen)
+            {
+                _engine.Logger?.Log("Strategy",
+                    $"[{Name}] Signal ignored — position already open. Exit current position first.");
+                return;
+            }
+
+            // Determine option type from crossover direction
+            string optionType = crossedAbove ? "CE" : "PE";
+
             foreach (var rule in _config.EntryRules)
             {
                 bool isMatch = _evaluator.Evaluate(rule, context, Name,
@@ -154,10 +175,6 @@ namespace Cognexalgo.Core.Strategies
 
                 if (isMatch)
                 {
-                    // Determine option type from rule action (CE = bullish, PE = bearish, BUY defaults to CE)
-                    bool isBullish = rule.Action.Contains("CE") || rule.Action == "BUY";
-                    string optionType = isBullish ? "CE" : "PE";
-
                     // Resolve ATM option from cached option chain
                     var atmResult = ResolveATMOption(currentPrice, optionType);
                     if (atmResult == null)
@@ -186,7 +203,6 @@ namespace Cognexalgo.Core.Strategies
                         Reason       = $"EMA crossover → {optionType}"
                     });
 
-                    _hasEnteredOnce = true; // Set BEFORE await to prevent duplicate entries
                     // Execute order with option symbol + token + current LTP as fill price
                     await _engine.ExecuteOrderAsync(
                         new StrategyConfig { Id = 0, Name = Name },
@@ -195,10 +211,18 @@ namespace Cognexalgo.Core.Strategies
                         optionToken,
                         optionLtp);
 
-                    _riskManager.InitializeEntry(optionLtp, context);
+                    _riskManager.InitializeEntry(optionLtp, context, optionSymbol);
                     break;
                 }
             }
+        }
+
+        private double CalculateEMA21(List<Skender.Stock.Indicators.Quote> history)
+        {
+            if (history == null || history.Count < 21) return 0;
+            var results = Skender.Stock.Indicators.Indicator.GetEma(history, 21).ToList();
+            var last = results.LastOrDefault(r => r.Ema.HasValue);
+            return last?.Ema ?? 0;
         }
 
         private Cognexalgo.Core.Models.OptionChainItem? ResolveATMOption(double spotPrice, string optionType)
