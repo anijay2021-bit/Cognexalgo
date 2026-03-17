@@ -1250,7 +1250,15 @@ namespace Cognexalgo.UI.ViewModels
                                 SellAvgPrice  = sellAvg,
                                 AvgNetPrice   = buyQtyTotal > 0 ? buyAvg : sellAvg,
                                 Pnl           = realizedPnl,
-                                Status        = netQty != 0 ? "OPEN" : "CLOSED"
+                                Status        = netQty != 0 ? "OPEN" : "CLOSED",
+                                Exchange      = (g.Key.StartsWith("NIFTY") ||
+                                                 g.Key.StartsWith("BANKNIFTY") ||
+                                                 g.Key.StartsWith("FINNIFTY") ||
+                                                 g.Key.StartsWith("MIDCPNIFTY") ||
+                                                 g.Key.StartsWith("SENSEX"))
+                                                 ? (g.Key.Length > 10 ? "NFO" : "NSE")
+                                                 : "NSE",
+                                ProductType   = "MIS"
                             });
                         }
 
@@ -1595,65 +1603,105 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task<bool> ExitPosition(Position position)
         {
-            if (_engine.Api == null)
-            {
-                Log("Error: Not connected to broker API");
-                return false;
-            }
+            if (position == null) return false;
+
+            Log($"[Exit] {position.TradingSymbol} " +
+                $"NetQty={position.NetQty} " +
+                $"Mode={(_engine.IsPaperTrading ? "PAPER" : "LIVE")}");
 
             try
             {
-                Log($"Exiting position: {position.TradingSymbol}, Qty: {position.NetQty}");
-
-                // Determine the opposite transaction type
-                string transactionType;
-                int qty = Math.Abs(int.Parse(position.NetQty));
-
-                if (int.Parse(position.NetQty) > 0)
+                // BUG 3 FIX — parse NetQty safely ("50.0" → double → abs int)
+                if (!double.TryParse(position.NetQty,
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double netQtyDouble) || netQtyDouble == 0)
                 {
-                    // Long position - need to SELL to exit
-                    transactionType = "SELL";
-                }
-                else
-                {
-                    // Short position - need to BUY to exit
-                    transactionType = "BUY";
+                    Log($"[Exit] Skipped — NetQty is zero or invalid: '{position.NetQty}'", "WARN");
+                    return false;
                 }
 
-                // Place market order to exit
-                string orderId = await _engine.Api.PlaceOrderAsync(
-                    symbol: position.TradingSymbol,
-                    token: position.SymbolToken,
-                    transactionType: transactionType,
-                    qty: qty,
-                    price: 0, // Market order
-                    variety: "NORMAL",
-                    productType: position.ProductType,
-                    exchange: position.Exchange
-                );
+                int qty = (int)Math.Abs(netQtyDouble);
+                string exitAction = netQtyDouble > 0 ? "SELL" : "BUY";
 
-                if (!string.IsNullOrEmpty(orderId))
+                // BUG 4 FIX — defaults for paper positions that have null Exchange/ProductType
+                string exchange    = position.Exchange
+                                     ?? (position.ParsedStrike > 0 ? "NFO" : "NSE");
+                string productType = position.ProductType ?? "MIS";
+                string token       = position.SymbolToken ?? "";
+
+                Log($"[Exit] Placing {exitAction} {qty} {position.TradingSymbol} @ MARKET");
+
+                // BUG 2 FIX — separate paper and live paths
+                if (_engine.IsPaperTrading)
                 {
-                    Log($"✓ Exit order placed successfully. Order ID: {orderId}", "SUCCESS");
-                    
-                    // Update position status
-                    position.Status = "EXITED";
-                    
-                    // Refresh positions after a short delay
-                    await Task.Delay(1000);
+                    // Paper exit — resolve fill price from live LTP or entry price
+                    double exitPrice = position.Ltp > 0
+                                       ? position.Ltp
+                                       : (netQtyDouble > 0 ? position.BuyAvgPrice : position.SellAvgPrice);
+                    if (exitPrice <= 0) exitPrice = position.AvgNetPrice;
+
+                    var exitOrder = new Order
+                    {
+                        Symbol          = position.TradingSymbol,
+                        Token           = token,
+                        TransactionType = exitAction,
+                        Qty             = qty,
+                        Price           = exitPrice,
+                        ProductType     = productType,
+                        Status          = "complete",
+                        Timestamp       = DateTime.Now,
+                        StrategyName    = "Manual Exit"
+                    };
+
+                    await _engine.OrderRepository.AddAsync(exitOrder);
+
+                    position.Status = "CLOSED";
+                    position.NetQty = "0";
+
+                    Log($"✓ [PAPER] Exit order saved: {exitAction} {qty} {position.TradingSymbol} @ ₹{exitPrice:F2}", "SUCCESS");
+
+                    await Task.Delay(500);
                     await FetchPositions();
-                    
                     return true;
                 }
                 else
                 {
-                    Log($"✗ Failed to place exit order for {position.TradingSymbol}", "ERROR");
-                    return false;
+                    // Live exit — call broker API
+                    if (_engine.Api == null)
+                    {
+                        Log("[Exit] Not connected to broker API.", "ERROR");
+                        return false;
+                    }
+
+                    string orderId = await _engine.Api.PlaceOrderAsync(
+                        symbol:          position.TradingSymbol,
+                        token:           token,
+                        transactionType: exitAction,
+                        qty:             qty,
+                        price:           0,
+                        variety:         "NORMAL",
+                        productType:     productType,
+                        exchange:        exchange);
+
+                    if (!string.IsNullOrEmpty(orderId))
+                    {
+                        Log($"✓ Exit order placed: {orderId}", "SUCCESS");
+                        position.Status = "EXITED";
+                        await Task.Delay(1000);
+                        await FetchPositions();
+                        return true;
+                    }
+                    else
+                    {
+                        Log($"✗ Exit order failed for {position.TradingSymbol}", "ERROR");
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Log($"Error exiting position: {ex.Message}", "ERROR");
+                Log($"[Exit] Error: {ex.Message}", "ERROR");
                 return false;
             }
         }
