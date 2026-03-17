@@ -25,7 +25,7 @@ namespace Cognexalgo.Core.Infrastructure
             // ─── Database ─────────────────────────────────────────
             if (!string.IsNullOrEmpty(supabaseConnectionString) && !useSqliteFallback)
             {
-                services.AddDbContext<AppDbContext>(options =>
+                services.AddDbContextFactory<AppDbContext>(options =>
                     options.UseNpgsql(supabaseConnectionString, npgsqlOptions =>
                     {
                         npgsqlOptions.EnableRetryOnFailure(3);
@@ -37,7 +37,7 @@ namespace Cognexalgo.Core.Infrastructure
                 // SQLite fallback for offline/dev
                 var dbPath = System.IO.Path.Combine(
                     System.AppDomain.CurrentDomain.BaseDirectory, "cognex_v2.db");
-                services.AddDbContext<AppDbContext>(options =>
+                services.AddDbContextFactory<AppDbContext>(options =>
                     options.UseSqlite($"Data Source={dbPath}"));
             }
 

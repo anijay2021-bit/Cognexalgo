@@ -19,11 +19,11 @@ namespace Cognexalgo.Core.Infrastructure.Services
 
     public class StrategyIdGenerator : IStrategyIdGenerator
     {
-        private readonly AppDbContext _db;
+        private readonly IDbContextFactory<AppDbContext> _factory;
 
-        public StrategyIdGenerator(AppDbContext db)
+        public StrategyIdGenerator(IDbContextFactory<AppDbContext> factory)
         {
-            _db = db;
+            _factory = factory;
         }
 
         public async Task<string> GenerateAsync(StrategyType type)
@@ -31,9 +31,9 @@ namespace Cognexalgo.Core.Infrastructure.Services
             string dateStr = DateTime.Now.ToString("yyyyMMdd");
             string typeCode = type.ToString(); // STRD, STNG, CNDL, CSTM, PRBL, SCPT
 
-            // Count today's strategies to generate the sequence number
             string prefix = $"STR-{dateStr}-";
-            int todayCount = await _db.Strategies
+            await using var db = await _factory.CreateDbContextAsync();
+            int todayCount = await db.Strategies
                 .CountAsync(s => s.StrategyId.StartsWith(prefix));
 
             int seq = todayCount + 1;
@@ -53,22 +53,21 @@ namespace Cognexalgo.Core.Infrastructure.Services
 
     public class OrderIdGenerator : IOrderIdGenerator
     {
-        private readonly AppDbContext _db;
+        private readonly IDbContextFactory<AppDbContext> _factory;
 
-        public OrderIdGenerator(AppDbContext db)
+        public OrderIdGenerator(IDbContextFactory<AppDbContext> factory)
         {
-            _db = db;
+            _factory = factory;
         }
 
         public async Task<string> GenerateAsync(string strategyId, int legNumber)
         {
-            // Condense strategy ID: remove dashes
             string condensedStratId = strategyId.Replace("-", "");
             string timeStr = DateTime.Now.ToString("HHmmss");
             string prefix = $"ORD-{condensedStratId}-L{legNumber}-{timeStr}-";
 
-            // Count orders with same prefix for sequence
-            int count = await _db.Orders
+            await using var db = await _factory.CreateDbContextAsync();
+            int count = await db.Orders
                 .CountAsync(o => o.OrderId.StartsWith(prefix));
 
             int seq = count + 1;

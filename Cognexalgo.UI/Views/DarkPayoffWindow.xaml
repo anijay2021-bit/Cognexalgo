@@ -1,0 +1,472 @@
+<Window x:Class="Cognexalgo.UI.Views.DarkPayoffWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Cognexalgo.UI.Views"
+        mc:Ignorable="d"
+        Title="◈  Options Strategy Builder"
+        Height="760" Width="1300"
+        MinHeight="600" MinWidth="900"
+        Background="#0F1923"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FontFamily="Segoe UI Variable Text">
+
+    <Window.Resources>
+
+        <!-- ── Brushes ── -->
+        <SolidColorBrush x:Key="BrBase"   Color="#0F1923"/>
+        <SolidColorBrush x:Key="BrSide"   Color="#1B2738"/>
+        <SolidColorBrush x:Key="BrCard"   Color="#1E2D3E"/>
+        <SolidColorBrush x:Key="BrHover"  Color="#243347"/>
+        <SolidColorBrush x:Key="BrBorder" Color="#2D3F57"/>
+        <SolidColorBrush x:Key="BrTeal"   Color="#00C9A7"/>
+        <SolidColorBrush x:Key="BrRed"    Color="#FF6B6B"/>
+        <SolidColorBrush x:Key="BrGold"   Color="#FFD166"/>
+        <SolidColorBrush x:Key="BrPurple" Color="#A78BFA"/>
+        <SolidColorBrush x:Key="BrText"   Color="#E8ECF0"/>
+        <SolidColorBrush x:Key="BrMuted"  Color="#7B8FA6"/>
+        <SolidColorBrush x:Key="BrGreen"  Color="#4CAF83"/>
+
+        <!-- ── Label style ── -->
+        <Style x:Key="Cap" TargetType="TextBlock">
+            <Setter Property="Foreground"  Value="#7B8FA6"/>
+            <Setter Property="FontSize"    Value="9"/>
+            <Setter Property="FontWeight"  Value="SemiBold"/>
+        </Style>
+
+        <!-- ── ListBoxItem dark ── -->
+        <Style x:Key="SideItem" TargetType="ListBoxItem">
+            <Setter Property="Background"     Value="Transparent"/>
+            <Setter Property="Foreground"     Value="#C8D4E0"/>
+            <Setter Property="FontSize"       Value="12"/>
+            <Setter Property="Padding"        Value="12,7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"         Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="Transparent"
+                                BorderBrush="#1E2D3E" BorderThickness="0,0,0,1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#243347"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── ListBox dark ── -->
+        <Style x:Key="SideList" TargetType="ListBox">
+            <Setter Property="Background"   Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource SideItem}"/>
+        </Style>
+
+        <!-- ── ComboBox dark ── -->
+        <Style x:Key="DkCombo" TargetType="ComboBox">
+            <Setter Property="Background"   Value="#243347"/>
+            <Setter Property="Foreground"   Value="#E8ECF0"/>
+            <Setter Property="BorderBrush"  Value="#2D3F57"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"      Value="7,4"/>
+            <Setter Property="Height"       Value="30"/>
+        </Style>
+
+        <!-- ── TextBox dark ── -->
+        <Style x:Key="DkInput" TargetType="TextBox">
+            <Setter Property="Background"    Value="#243347"/>
+            <Setter Property="Foreground"    Value="#E8ECF0"/>
+            <Setter Property="BorderBrush"   Value="#2D3F57"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"       Value="7,4"/>
+            <Setter Property="Height"        Value="30"/>
+            <Setter Property="CaretBrush"    Value="#00C9A7"/>
+            <Setter Property="SelectionBrush" Value="#006B5E"/>
+        </Style>
+
+        <!-- ── Metric card border ── -->
+        <Style x:Key="MetricCard" TargetType="Border">
+            <Setter Property="Background"       Value="#1E2D3E"/>
+            <Setter Property="BorderBrush"      Value="#2D3F57"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="CornerRadius"     Value="6"/>
+            <Setter Property="Padding"          Value="14,8"/>
+            <Setter Property="Margin"           Value="0,0,8,0"/>
+            <Setter Property="MinWidth"         Value="115"/>
+        </Style>
+
+        <!-- ── Button base ── -->
+        <ControlTemplate x:Key="RoundBtn" TargetType="Button">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.82"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Opacity" Value="0.65"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="BtnTeal" TargetType="Button">
+            <Setter Property="Background"       Value="#006B5E"/>
+            <Setter Property="Foreground"       Value="#E8ECF0"/>
+            <Setter Property="BorderBrush"      Value="#00C9A7"/>
+            <Setter Property="BorderThickness"  Value="1"/>
+            <Setter Property="Padding"          Value="16,8"/>
+            <Setter Property="FontSize"         Value="12"/>
+            <Setter Property="FontWeight"       Value="SemiBold"/>
+            <Setter Property="Cursor"           Value="Hand"/>
+            <Setter Property="Template"         Value="{StaticResource RoundBtn}"/>
+        </Style>
+
+        <Style x:Key="BtnRed" TargetType="Button" BasedOn="{StaticResource BtnTeal}">
+            <Setter Property="Background"  Value="#7A2424"/>
+            <Setter Property="BorderBrush" Value="#FF6B6B"/>
+        </Style>
+
+        <Style x:Key="BtnGhost" TargetType="Button" BasedOn="{StaticResource BtnTeal}">
+            <Setter Property="Background"  Value="#1B2738"/>
+            <Setter Property="BorderBrush" Value="#2D3F57"/>
+        </Style>
+
+        <!-- ── DataGrid global overrides (scoped to this window) ── -->
+        <Style TargetType="DataGrid">
+            <Setter Property="Background"              Value="#1E2D3E"/>
+            <Setter Property="Foreground"              Value="#E8ECF0"/>
+            <Setter Property="BorderBrush"             Value="#2D3F57"/>
+            <Setter Property="BorderThickness"         Value="0"/>
+            <Setter Property="RowBackground"           Value="#1E2D3E"/>
+            <Setter Property="AlternatingRowBackground" Value="#243347"/>
+            <Setter Property="GridLinesVisibility"     Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#2D3F57"/>
+            <Setter Property="VerticalGridLinesBrush"  Value="Transparent"/>
+            <Setter Property="CanUserAddRows"          Value="False"/>
+            <Setter Property="CanUserDeleteRows"       Value="False"/>
+            <Setter Property="SelectionUnit"           Value="FullRow"/>
+            <Setter Property="HeadersVisibility"       Value="Column"/>
+            <Setter Property="SelectionMode"           Value="Single"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background"       Value="#1B2738"/>
+            <Setter Property="Foreground"       Value="#7B8FA6"/>
+            <Setter Property="FontSize"         Value="9"/>
+            <Setter Property="FontWeight"       Value="SemiBold"/>
+            <Setter Property="Padding"          Value="8,6"/>
+            <Setter Property="BorderBrush"      Value="#2D3F57"/>
+            <Setter Property="BorderThickness"  Value="0,0,1,1"/>
+            <Setter Property="SeparatorVisibility" Value="Collapsed"/>
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Background"    Value="Transparent"/>
+            <Setter Property="Foreground"    Value="#E8ECF0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#E8ECF0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="DataGridRow">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#2D3F57"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#2D3F57"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="265"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ════════════ LEFT PANEL ════════════ -->
+        <Border Grid.Column="0" Background="#1B2738"
+                BorderBrush="#2D3F57" BorderThickness="0,0,1,0">
+            <DockPanel>
+
+                <!-- Header -->
+                <Border DockPanel.Dock="Top" Padding="16,14,16,12"
+                        BorderBrush="#2D3F57" BorderThickness="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="◈  STRATEGY BUILDER"
+                                   Foreground="#00C9A7" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock Text="Click a template or build custom legs"
+                                   Foreground="#7B8FA6" FontSize="10" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Settings: Index / Spot / Lots -->
+                <Border DockPanel.Dock="Top" Padding="12,10"
+                        BorderBrush="#2D3F57" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="52"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="7"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="7"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Index"
+                                   Style="{StaticResource Cap}" VerticalAlignment="Center"/>
+                        <ComboBox  Grid.Row="0" Grid.Column="1" Style="{StaticResource DkCombo}"
+                                   ItemsSource="{Binding Indices}"
+                                   SelectedItem="{Binding SelectedIndex, Mode=TwoWay}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Spot"
+                                   Style="{StaticResource Cap}" VerticalAlignment="Center"/>
+                        <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource DkInput}"
+                                   Text="{Binding SpotPrice, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Lots"
+                                   Style="{StaticResource Cap}" VerticalAlignment="Center"/>
+                        <TextBox   Grid.Row="4" Grid.Column="1" Style="{StaticResource DkInput}"
+                                   Text="{Binding Lots, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
+                </Border>
+
+                <!-- ATM chip -->
+                <Border DockPanel.Dock="Top" Padding="12,6"
+                        BorderBrush="#2D3F57" BorderThickness="0,0,0,1">
+                    <TextBlock Text="{Binding AtmDisplay}"
+                               Foreground="#00C9A7" FontSize="11" FontWeight="SemiBold"/>
+                </Border>
+
+                <!-- Strategy categories -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                    <StackPanel>
+
+                        <TextBlock Text="NEUTRAL" Margin="14,12,12,3"
+                                   Foreground="#7B8FA6" FontSize="9" FontWeight="Bold"/>
+                        <ListBox x:Name="NeutralList" Style="{StaticResource SideList}"
+                                 ItemsSource="{Binding NeutralStrategies}"
+                                 SelectionChanged="OnStrategySelected"/>
+
+                        <TextBlock Text="BULLISH" Margin="14,12,12,3"
+                                   Foreground="#4CAF83" FontSize="9" FontWeight="Bold"/>
+                        <ListBox x:Name="BullishList" Style="{StaticResource SideList}"
+                                 ItemsSource="{Binding BullishStrategies}"
+                                 SelectionChanged="OnStrategySelected"/>
+
+                        <TextBlock Text="BEARISH" Margin="14,12,12,3"
+                                   Foreground="#FF6B6B" FontSize="9" FontWeight="Bold"/>
+                        <ListBox x:Name="BearishList" Style="{StaticResource SideList}"
+                                 ItemsSource="{Binding BearishStrategies}"
+                                 SelectionChanged="OnStrategySelected"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+            </DockPanel>
+        </Border>
+
+        <!-- ════════════ RIGHT PANEL ════════════ -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- 0: Metrics -->
+                <RowDefinition Height="160"/>   <!-- 1: Legs grid -->
+                <RowDefinition Height="*"/>     <!-- 2: Chart -->
+                <RowDefinition Height="Auto"/>  <!-- 3: Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- ── 0: METRICS ROW ── -->
+            <Border Grid.Row="0" Padding="14,10"
+                    BorderBrush="#2D3F57" BorderThickness="0,0,0,1">
+                <StackPanel Orientation="Horizontal">
+
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="MAX PROFIT" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding MaxProfitDisplay}"
+                                       Foreground="#00C9A7" FontSize="16" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="MAX LOSS" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding MaxLossDisplay}"
+                                       Foreground="#FF6B6B" FontSize="16" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCard}" MinWidth="160">
+                        <StackPanel>
+                            <TextBlock Text="BREAKEVEN" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding BreakevenDisplay}"
+                                       Foreground="#FFD166" FontSize="16" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="NET CREDIT" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding NetCreditDisplay}"
+                                       Foreground="#E8ECF0" FontSize="16" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource MetricCard}">
+                        <StackPanel>
+                            <TextBlock Text="P.O.P" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding PopDisplay}"
+                                       Foreground="#A78BFA" FontSize="16" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Strategy name chip -->
+                    <Border VerticalAlignment="Center" Margin="8,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="ACTIVE STRATEGY" Style="{StaticResource Cap}"/>
+                            <TextBlock Text="{Binding StrategyName}"
+                                       Foreground="#E8ECF0" FontSize="13" FontWeight="SemiBold"
+                                       Margin="0,3,0,0" MaxWidth="240" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ── 1: LEGS GRID ── -->
+            <Border Grid.Row="1" Margin="12,8,12,4"
+                    BorderBrush="#2D3F57" BorderThickness="1" CornerRadius="5">
+                <DataGrid x:Name="LegsGrid"
+                          ItemsSource="{Binding Legs}"
+                          SelectedItem="{Binding SelectedLeg, Mode=TwoWay}"
+                          AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+
+                        <!-- Action -->
+                        <DataGridComboBoxColumn Header="ACTION" Width="82"
+                            SelectedItemBinding="{Binding Action, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            ItemsSource="{x:Static local:DarkPayoffWindow.ActionOptions}"/>
+
+                        <!-- Option Type -->
+                        <DataGridComboBoxColumn Header="TYPE" Width="68"
+                            SelectedItemBinding="{Binding OptionType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            ItemsSource="{x:Static local:DarkPayoffWindow.TypeOptions}"/>
+
+                        <!-- Strike -->
+                        <DataGridTextColumn Header="STRIKE" Width="88"
+                                            Binding="{Binding Strike, StringFormat=N0}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"       Value="#E8ECF0"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding"          Value="4,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Premium -->
+                        <DataGridTextColumn Header="PREMIUM ₹" Width="92"
+                                            Binding="{Binding Premium, StringFormat=N2}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"       Value="#00C9A7"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding"          Value="4,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Lots -->
+                        <DataGridTextColumn Header="LOTS" Width="58"
+                                            Binding="{Binding Lots}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"       Value="#E8ECF0"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding"          Value="4,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Index -->
+                        <DataGridTextColumn Header="INDEX" Width="90"
+                                            Binding="{Binding Index}" IsReadOnly="True">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"       Value="#7B8FA6"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding"          Value="4,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Remove -->
+                        <DataGridTemplateColumn Header="" Width="42" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="✕" Cursor="Hand"
+                                            Background="Transparent" Foreground="#FF6B6B"
+                                            BorderThickness="0" FontSize="13" FontWeight="Bold"
+                                            Command="{Binding DataContext.RemoveLegCommand,
+                                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- ── 2: SCOTTPLOT CHART (headless render → WPF Image) ── -->
+            <Border Grid.Row="2" Margin="12,4,12,4"
+                    BorderBrush="#2D3F57" BorderThickness="1" CornerRadius="5"
+                    Background="#1B2738" ClipToBounds="True"
+                    SizeChanged="OnChartSizeChanged">
+                <Image x:Name="ChartImage" Stretch="Fill"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </Border>
+
+            <!-- ── 3: ACTION BUTTONS ── -->
+            <Border Grid.Row="3" Padding="12,9"
+                    BorderBrush="#2D3F57" BorderThickness="0,1,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="▶  Deploy Paper"   Style="{StaticResource BtnTeal}"
+                            Command="{Binding DeployPaperCommand}"      Margin="0,0,8,0"/>
+                    <Button Content="⚡  Deploy Live"    Style="{StaticResource BtnRed}"
+                            Command="{Binding DeployLiveCommand}"       Margin="0,0,8,0"/>
+                    <Button Content="＋  Add Leg"        Style="{StaticResource BtnGhost}"
+                            Command="{Binding AddLegCommand}"           Margin="0,0,8,0"/>
+                    <Button Content="↻  Recalculate"    Style="{StaticResource BtnGhost}"
+                            Command="{Binding CalculatePayoffCommand}"  Margin="0,0,8,0"/>
+                    <Button Content="◻  Clear"          Style="{StaticResource BtnGhost}"
+                            Command="{Binding ClearLegsCommand}"/>
+                </StackPanel>
+            </Border>
+
+        </Grid>
+    </Grid>
+</Window>

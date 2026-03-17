@@ -932,10 +932,9 @@ namespace Cognexalgo.UI.ViewModels
             vm.SetOptionChain(OptionChain);
 
             vm.LoadTemplateCommand.Execute(null);
-            var win = new Views.PayoffBuilderWindow
+            var win = new Views.DarkPayoffWindow(vm)
             {
-                DataContext = vm,
-                Owner       = Application.Current.MainWindow
+                Owner = Application.Current.MainWindow
             };
             win.Show();
         }
