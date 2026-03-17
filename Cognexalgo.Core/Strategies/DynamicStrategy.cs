@@ -112,6 +112,17 @@ namespace Cognexalgo.Core.Strategies
             double ltp = GetLtp(ticker, _config.Symbol);
             if (ltp <= 0) return;
 
+            // ── DIAGNOSTIC LOGGING ──────────────────────────────────────────────
+            double _diagEma = CalculateEMA21(_history);
+            Console.WriteLine(
+                $"[{Name}] Tick received: {ltp:F0} " +
+                $"EMA21={_diagEma:F2} " +
+                $"History={_history.Count} " +
+                $"IsAbove={ltp > _diagEma} " +
+                $"WasAbove={_wasAboveEMA} " +
+                $"PositionOpen={_riskManager?.IsPositionOpen}");
+            // ────────────────────────────────────────────────────────────────────
+
             // 1. Feed Aggregator (Forms 1-min, 5-min candles etc.)
             _aggregator.AddTick(DateTime.Now, (decimal)ltp);
 
