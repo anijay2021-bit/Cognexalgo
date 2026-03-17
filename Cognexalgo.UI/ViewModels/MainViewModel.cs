@@ -423,6 +423,33 @@ namespace Cognexalgo.UI.ViewModels
                     }
                 }
 
+                // FIX 3: Keep CachedNiftyChain LTPs fresh from SmartStream ticks
+                // so DynamicStrategy.ResolveATMOption always returns current prices.
+                if (data.Options?.Count > 0)
+                {
+                    var chains = new[]
+                    {
+                        _v2?.CachedNiftyChain,
+                        _v2?.CachedBankNiftyChain,
+                        _v2?.CachedFinniftyChain,
+                        _v2?.CachedMidcpniftyChain,
+                        _v2?.CachedSensexChain
+                    };
+                    foreach (var chain in chains)
+                    {
+                        if (chain == null) continue;
+                        foreach (var item in chain)
+                        {
+                            if (!string.IsNullOrEmpty(item.Token) &&
+                                data.Options.TryGetValue(item.Token, out var optInfo) &&
+                                optInfo.Ltp > 0)
+                            {
+                                item.LTP = optInfo.Ltp;
+                            }
+                        }
+                    }
+                }
+
                 // ─── Intraday P&L sparkline sample (every 30 s) ──────────
                 if ((DateTime.Now - _lastPnlSample).TotalSeconds >= 30)
                 {

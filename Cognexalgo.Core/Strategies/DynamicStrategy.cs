@@ -19,21 +19,26 @@ namespace Cognexalgo.Core.Strategies
         private readonly List<Skender.Stock.Indicators.Quote> _history = new List<Skender.Stock.Indicators.Quote>();
 
         // Crossover state: tracks whether price was above EMA on previous tick.
-        // Entry fires only when this state changes (crossover), not on every tick.
         private bool _wasAboveEMA = false;
 
-        // FIX 2: Skip the very first tick after deploy — just set initial EMA state.
+        // Skip very first tick after deploy — just set initial EMA state.
         private bool _isFirstTick = true;
 
-        // FIX 5: Heartbeat log every 60 seconds so user knows strategy is alive.
+        // Heartbeat log every 60 seconds.
         private DateTime _lastStatusLog = DateTime.MinValue;
+
+        // FIX 2: Cache the last TickerData so option LTP can be looked up at entry/exit time.
+        private TickerData? _lastTickerData;
+
+        // FIX 4: Track the open option token/symbol so exit path uses option LTP, not spot.
+        private string _currentOptionToken  = string.Empty;
+        private string _currentOptionSymbol = string.Empty;
 
         public DynamicStrategy(TradingEngine engine, string jsonConfig)
             : base(engine, "Dynamic")
         {
             try
             {
-                // [FIX] Handle cases where the JSON might be double-stringified or malformed
                 _config = JsonConvert.DeserializeObject<DynamicStrategyConfig>(jsonConfig);
 
                 if (_config != null)
@@ -41,12 +46,10 @@ namespace Cognexalgo.Core.Strategies
                     Name = _config.StrategyName ?? "Unnamed_Dynamic";
                     engine.Logger?.Log("Strategy", $"Loaded Dynamic Strategy: {Name} for {_config.Symbol} with {_config.EntryRules.Count} Entry Rules");
 
-                    // [NEW] Resilient Rules Deserialization
                     HandleStringifiedRules();
 
                     if (string.IsNullOrEmpty(_config.StrategyName))
                     {
-                        // Generate a fallback name only if it's truly missing
                         Name = $"Strategy_{_config.Symbol}_{DateTime.Now.Ticks}";
                         engine.Logger?.Log("Strategy", $"[WARNING] StrategyName missing in config. Assigned fallback: {Name}");
                     }
@@ -72,7 +75,6 @@ namespace Cognexalgo.Core.Strategies
             {
                 _riskManager = new RiskManager(engine, _config.StrategyName, _config.Symbol, _config.TotalLots, _config.ExitSettings, _config.ExitRules);
 
-                // FIX 4: ParseTimeframe now uses digit-extraction — "15min" → 15, not 5.
                 int timeframe = ParseTimeframe(_config.Timeframe);
                 _aggregator = new CandleAggregator(timeframe);
                 _aggregator.OnCandleClosed += (candle) => _ = OnCandleClosedAsync(candle);
@@ -87,7 +89,6 @@ namespace Cognexalgo.Core.Strategies
             if (_config.ExitRules == null) _config.ExitRules = new List<Rule>();
         }
 
-        // FIX 1 + FIX 2: Initialize history with logging + _wasAboveEMA seeding.
         public async Task InitializeAsync(List<Skender.Stock.Indicators.Quote> history)
         {
             if (history != null && history.Any())
@@ -131,7 +132,7 @@ namespace Cognexalgo.Core.Strategies
                 }
             }
 
-            // FIX 2: Seed _wasAboveEMA from last close so cold-start doesn't fire a false signal.
+            // Seed _wasAboveEMA from last close so cold-start doesn't fire a false signal.
             if (_history.Count >= 21)
             {
                 double initialEma = CalculateEMA21(_history);
@@ -149,11 +150,10 @@ namespace Cognexalgo.Core.Strategies
             await Task.CompletedTask;
         }
 
-        // FIX 4: Parse timeframe by extracting numeric part — "15min" → 15 (was broken: returned 5).
+        // FIX 4: ParseTimeframe — digit extraction prevents "15min"→5 bug.
         private int ParseTimeframe(string timeframe)
         {
             if (string.IsNullOrEmpty(timeframe)) return 1;
-
             string numericPart = new string(timeframe.Where(char.IsDigit).ToArray());
             if (int.TryParse(numericPart, out int minutes))
             {
@@ -176,6 +176,9 @@ namespace Cognexalgo.Core.Strategies
         {
             if (!IsActive || _config == null) return;
 
+            // FIX 2: Store latest ticker so option LTP lookups can use it at entry/exit.
+            _lastTickerData = ticker;
+
             double ltp = GetLtp(ticker, _config.Symbol);
             if (ltp <= 0) return;
 
@@ -190,17 +193,19 @@ namespace Cognexalgo.Core.Strategies
                 $"PositionOpen={_riskManager?.IsPositionOpen}");
             // ────────────────────────────────────────────────────────────────────
 
-            // 1. Feed Aggregator (Forms 1-min, 5-min candles etc.)
+            // 1. Feed Aggregator
             _aggregator.AddTick(DateTime.Now, (decimal)ltp);
 
-            // 2. Evaluate Exits on EVERY TICK (Price-based SL/Target)
+            // 2. Exits or Entries
             if (_riskManager.IsPositionOpen)
             {
-                await _riskManager.CheckExits(ltp, _context);
+                // FIX 4: Use live option LTP for exit checks, not underlying spot.
+                double optLtp = GetOptionLtp();
+                await _riskManager.CheckExits(optLtp > 0 ? optLtp : ltp, _context);
             }
             else
             {
-                // FIX 5: Heartbeat log every 60s — confirms strategy is alive and watching.
+                // Heartbeat log every 60s.
                 if ((DateTime.Now - _lastStatusLog).TotalSeconds >= 60)
                 {
                     _lastStatusLog = DateTime.Now;
@@ -211,7 +216,6 @@ namespace Cognexalgo.Core.Strategies
                         $"State={(_wasAboveEMA ? "ABOVE" : "BELOW")} EMA");
                 }
 
-                // 3. Evaluate Entries on EVERY TICK (crossover guard inside prevents repeat fires)
                 var syntheticCandle = new Skender.Stock.Indicators.Quote
                 {
                     Date   = DateTime.Now,
@@ -224,21 +228,44 @@ namespace Cognexalgo.Core.Strategies
 
                 var liveHistory = new List<Skender.Stock.Indicators.Quote>(_history);
                 liveHistory.Add(syntheticCandle);
-
                 var liveContext = new EvaluationContext(liveHistory);
                 await EvaluateEntryRulesAsync(liveContext, ltp);
             }
+        }
+
+        // FIX 4: Resolve current open option's live LTP for exit monitoring.
+        private double GetOptionLtp()
+        {
+            if (string.IsNullOrEmpty(_currentOptionToken)) return 0;
+
+            // 1. SmartStream live feed
+            double optLtp = _engine.SmartStream?.GetLastLtp(_currentOptionToken) ?? 0;
+            if (optLtp > 0) return optLtp;
+
+            // 2. Last ticker data Options dictionary
+            if (_lastTickerData != null &&
+                _lastTickerData.Options.TryGetValue(_currentOptionToken, out var info) &&
+                info.Ltp > 0)
+                return info.Ltp;
+
+            // 3. Cached chain (kept fresh by MainViewModel.OnTick)
+            if (!string.IsNullOrEmpty(_currentOptionSymbol))
+            {
+                var chain = _engine.V2?.CachedNiftyChain;
+                var item = chain?.FirstOrDefault(c => c.Symbol == _currentOptionSymbol);
+                if (item != null && item.LTP > 0) return item.LTP;
+            }
+
+            return 0;
         }
 
         private async Task EvaluateEntryRulesAsync(EvaluationContext context, double currentPrice)
         {
             if (_config.EntryRules == null || !_config.EntryRules.Any()) return;
 
-            // EMA crossover detection — only fire on state change, not every tick
             double ema21 = CalculateEMA21(_history);
             if (ema21 <= 0)
             {
-                // FIX 1: Log when EMA cannot be computed so silent failures are visible.
                 if (_history.Count < 21)
                     _engine.Logger?.Log("Strategy",
                         $"[{Name}] Waiting for candles: {_history.Count}/21 needed for EMA21.");
@@ -250,7 +277,7 @@ namespace Cognexalgo.Core.Strategies
             bool crossedBelow = !isAboveEMA && _wasAboveEMA;
             _wasAboveEMA = isAboveEMA;
 
-            // FIX 2: Skip the very first tick — just capture the initial state.
+            // Skip very first tick — just capture initial state.
             if (_isFirstTick)
             {
                 _isFirstTick = false;
@@ -260,7 +287,7 @@ namespace Cognexalgo.Core.Strategies
                 return;
             }
 
-            if (!crossedAbove && !crossedBelow) return; // No crossover this tick
+            if (!crossedAbove && !crossedBelow) return;
 
             _engine.Logger?.Log("Strategy",
                 $"[{Name}] EMA crossover detected! " +
@@ -274,7 +301,6 @@ namespace Cognexalgo.Core.Strategies
                 return;
             }
 
-            // Determine option type from crossover direction
             string optionType = crossedAbove ? "CE" : "PE";
 
             foreach (var rule in _config.EntryRules)
@@ -284,7 +310,6 @@ namespace Cognexalgo.Core.Strategies
 
                 if (isMatch)
                 {
-                    // FIX 3: Resolve ATM option — if chain empty, reset state so signal re-fires.
                     var atmResult = ResolveATMOption(currentPrice, optionType);
                     if (atmResult == null)
                     {
@@ -301,18 +326,57 @@ namespace Cognexalgo.Core.Strategies
                             $"CachedChain is {(chainRef == null ? "NULL" : "EMPTY")}. " +
                             $"Signal SAVED — will retry on next crossover. " +
                             $"ACTION REQUIRED: Click 'Refresh Option Chain' then redeploy strategy.");
-
-                        // Reset so the next genuine crossover fires again instead of being silently skipped.
                         _wasAboveEMA = !isAboveEMA;
                         return;
                     }
 
                     string optionSymbol = atmResult.Symbol;
                     string optionToken  = atmResult.Token ?? "";
-                    double optionLtp    = atmResult.LTP;
+
+                    // FIX 1: Subscribe to SmartStream and get live LTP, not stale chain snapshot.
+                    if (!string.IsNullOrEmpty(optionToken) &&
+                        _engine.SmartStream?.IsConnected == true)
+                    {
+                        await _engine.SmartStream.SubscribeAsync(
+                            new List<string> { optionToken }, "NFO");
+                        // Brief wait for first tick to arrive on this token
+                        await Task.Delay(500);
+                    }
+
+                    // 1. Try SmartStream live feed
+                    double optionLtp = !string.IsNullOrEmpty(optionToken)
+                        ? _engine.SmartStream?.GetLastLtp(optionToken) ?? 0
+                        : 0;
+
+                    // 2. Fallback: ticker data Options dictionary
+                    if (optionLtp <= 0 && _lastTickerData != null &&
+                        !string.IsNullOrEmpty(optionToken) &&
+                        _lastTickerData.Options.TryGetValue(optionToken, out var tickInfo) &&
+                        tickInfo.Ltp > 0)
+                    {
+                        optionLtp = tickInfo.Ltp;
+                    }
+
+                    // 3. Fallback: chain LTP (kept fresh by MainViewModel chain refresh)
+                    if (optionLtp <= 0)
+                    {
+                        optionLtp = atmResult.LTP;
+                        _engine.Logger?.Log("Strategy",
+                            $"[{Name}] ⚠ Using chain LTP ₹{optionLtp:F2} for {optionSymbol} " +
+                            $"— SmartStream has no live price yet. Actual fill may differ.");
+                    }
+                    else
+                    {
+                        _engine.Logger?.Log("Strategy",
+                            $"[{Name}] ✓ Live LTP from SmartStream: ₹{optionLtp:F2} for {optionSymbol}");
+                    }
+
+                    // Store open position identifiers for exit LTP resolution.
+                    _currentOptionToken  = optionToken;
+                    _currentOptionSymbol = optionSymbol;
 
                     _engine.Logger?.Log("Strategy",
-                        $"[{Name}] Entry: BUY {optionSymbol} @ ₹{optionLtp} | Spot={currentPrice}");
+                        $"[{Name}] Entry: BUY {optionSymbol} @ ₹{optionLtp:F2} | Spot={currentPrice:F2}");
 
                     BroadcastSignal(new Signal
                     {
