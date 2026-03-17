@@ -97,6 +97,20 @@ namespace Cognexalgo.Core.Services
                 _engine.Logger.Log("Bootstrapper", $"Schema Check Warning: {ex.Message}");
             }
             
+            // Data migration: fix "Calender" typo in stored strategy names
+            try
+            {
+                await _engine.MetadataContext.Database.ExecuteSqlRawAsync(@"
+                    UPDATE ""hybrid_strategies""
+                    SET ""Name"" = REPLACE(""Name"", 'Calender', 'Calendar')
+                    WHERE ""Name"" LIKE '%Calender%'
+                ");
+            }
+            catch (Exception ex)
+            {
+                _engine.Logger.Log("Bootstrapper", $"Calendar name migration warning: {ex.Message}");
+            }
+
             // Pre-load Active Strategies into Engine Memory
             // This ensures the UI (StrategiesViewModel) can display them immediately
             var activeStrategies = await _engine.StrategyRepository.GetAllActiveAsync();

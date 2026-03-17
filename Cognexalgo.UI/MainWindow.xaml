@@ -386,7 +386,7 @@
                             <syncfusion:GridTextColumn HeaderText="P&amp;L"   MappingName="Pnl"                Width="120" TextAlignment="Right" DisplayBinding="{Binding Pnl, StringFormat=₹{0:N0}}"/>
                             <syncfusion:GridTextColumn HeaderText="LTP"        MappingName="Ltp"                Width="100" TextAlignment="Right" DisplayBinding="{Binding Ltp, StringFormat=N2}"/>
                             <syncfusion:GridTextColumn HeaderText="Entry"      MappingName="EntryTime"          Width="90"  DisplayBinding="{Binding EntryTime, StringFormat=HH:mm:ss}"/>
-                            <syncfusion:GridTemplateColumn HeaderText="Actions" MappingName="Actions"           Width="280">
+                            <syncfusion:GridTemplateColumn HeaderText="Actions" MappingName="Actions"           Width="300">
                                 <syncfusion:GridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
@@ -424,6 +424,7 @@
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding IsDeployed, Converter={StaticResource InverseBooleanConverter}}"
                                                     FontSize="11" Padding="8,4" Margin="4,0,0,0"
+                                                    Height="28" MinWidth="70"
                                                     ToolTip="Stop the strategy before deleting">
                                                 <Button.Style>
                                                     <Style TargetType="Button">

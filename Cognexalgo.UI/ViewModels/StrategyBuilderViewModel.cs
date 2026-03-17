@@ -747,7 +747,10 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task SaveStrategy()
         {
-            if (string.IsNullOrWhiteSpace(StrategyName)) return;
+            if (string.IsNullOrWhiteSpace(StrategyName))
+            {
+                StrategyName = $"{SelectedStrategyType.Replace(" ", "")}_{DateTime.Now:HHmmss}";
+            }
 
             StrategyName = SanitizeStrategyName(StrategyName);
 
