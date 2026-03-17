@@ -647,6 +647,7 @@ namespace Cognexalgo.Core
                         strategy.OnSignalGenerated += (s) => OnSignalReceived?.Invoke(s);
                         _activeStrategies.Add(strategy);
                         Logger.Log("Engine", $"Successfully loaded DynamicStrategy: {config.Name}");
+                        Logger.Log("Engine", $"V1 tick loop now has {_activeStrategies.Count} DynamicStrategy/Hybrid strategies.");
                     }
                     else if (config.StrategyType == "HYBRID")
                     {
