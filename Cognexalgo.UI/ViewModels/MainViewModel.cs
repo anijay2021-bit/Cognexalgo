@@ -486,9 +486,6 @@ namespace Cognexalgo.UI.ViewModels
 
                 // FIX 3: Keep CachedNiftyChain LTPs fresh from SmartStream ticks
                 // so DynamicStrategy.ResolveATMOption always returns current prices.
-                // COGNEX-DEBUG
-                System.Diagnostics.Debug.WriteLine($"[OnTick] Options keys: {string.Join(",", data.Options?.Keys?.Take(5) ?? Enumerable.Empty<string>())}");
-                System.Diagnostics.Debug.WriteLine($"[OnTick] Chain tokens: {string.Join(",", OptionChain?.Take(5).Select(x => x.Token) ?? Enumerable.Empty<string>())}");
                 if (data.Options?.Count > 0)
                 {
                     var chains = new[]
@@ -509,6 +506,23 @@ namespace Cognexalgo.UI.ViewModels
                                 optInfo.Ltp > 0)
                             {
                                 item.LTP = optInfo.Ltp;
+                            }
+                        }
+                    }
+
+                    // COGNEX-CHANGE: Wire live ticks to UI OptionChain collection.
+                    // OptionChainItem now implements INotifyPropertyChanged so the
+                    // LTP setter raises PropertyChanged — WPF binding refreshes automatically.
+                    // No extra Dispatcher.Invoke needed; we are already on the UI thread.
+                    if (OptionChain?.Count > 0)
+                    {
+                        foreach (var item in OptionChain)
+                        {
+                            if (!string.IsNullOrEmpty(item.Token) &&
+                                data.Options.TryGetValue(item.Token, out var optionTick) &&
+                                optionTick.Ltp > 0)
+                            {
+                                item.LTP = optionTick.Ltp;
                             }
                         }
                     }
