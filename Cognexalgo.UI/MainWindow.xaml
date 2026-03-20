@@ -495,7 +495,25 @@
                     <syncfusion:SfDataGrid.Columns>
                         <syncfusion:GridTextColumn HeaderText="Symbol"     MappingName="TradingSymbol"  Width="170"/>
                         <syncfusion:GridTextColumn HeaderText="Net Qty"    MappingName="NetQty"         Width="80"  TextAlignment="Right"/>
-                        <syncfusion:GridTextColumn HeaderText="P&amp;L"   MappingName="Pnl"            Width="120" TextAlignment="Right" DisplayBinding="{Binding Pnl, StringFormat=₹{0:N0}}"/>
+                        <syncfusion:GridTemplateColumn HeaderText="P&amp;L" MappingName="Pnl" Width="120">
+                            <syncfusion:GridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Pnl, StringFormat=₹\{0:N0\}}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" Padding="8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource Positive}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Pnl, Converter={StaticResource IsNegativeConverter}}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource Negative}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </syncfusion:GridTemplateColumn.CellTemplate>
+                        </syncfusion:GridTemplateColumn>
                         <syncfusion:GridTextColumn HeaderText="Status"     MappingName="Status"         Width="100"/>
                         <syncfusion:GridTextColumn HeaderText="LTP"        MappingName="Ltp"            Width="100" TextAlignment="Right" DisplayBinding="{Binding Ltp, StringFormat=N2}"/>
                         <syncfusion:GridTextColumn HeaderText="Entry"      MappingName="AvgNetPrice"    Width="100" TextAlignment="Right" DisplayBinding="{Binding AvgNetPrice, StringFormat=N2}"/>

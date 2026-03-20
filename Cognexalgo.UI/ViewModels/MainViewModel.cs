@@ -347,7 +347,10 @@ namespace Cognexalgo.UI.ViewModels
                 if (data.Sensex != null) LtpSensex = data.Sensex.Ltp;
 
                 // Update Global PnL
-                TotalMtm = _engine.GetTotalPnL();
+                // FIX 5: in paper mode, sum all positions (open unrealized + closed realized)
+                TotalMtm = _engine.IsPaperTrading && Positions.Count > 0
+                    ? Positions.Sum(p => p.Pnl)
+                    : _engine.GetTotalPnL();
 
                 // Update Strategy LTPs from global ticker
                 foreach (var strategy in Strategies)
@@ -364,8 +367,17 @@ namespace Cognexalgo.UI.ViewModels
                 {
                     foreach (var pos in Positions)
                     {
-                        if (!double.TryParse(pos.NetQty, out double netQty) || netQty == 0)
-                            continue; // closed position — skip
+                        if (!double.TryParse(pos.NetQty, out double netQty))
+                            continue;
+
+                        // Closed position — P&L is set by FetchPositions; do not overwrite.
+                        // Recalculate from avg prices only if Pnl is unexpectedly zero.
+                        if (netQty == 0)
+                        {
+                            if (pos.Pnl == 0 && pos.BuyAvgPrice > 0 && pos.SellAvgPrice > 0)
+                                pos.Pnl = pos.SellAvgPrice - pos.BuyAvgPrice;
+                            continue;
+                        }
 
                         double ltp;
                         if (pos.ParsedStrike > 0)
@@ -1238,9 +1250,14 @@ namespace Cognexalgo.UI.ViewModels
                             double sellTotal    = g.Where(o => o.TransactionType == "SELL").Sum(o => o.Qty * o.Price);
                             double buyAvg       = buyQtyTotal  > 0 ? buyTotal  / buyQtyTotal  : 0;
                             double sellAvg      = sellQtyTotal > 0 ? sellTotal / sellQtyTotal : 0;
-                            double closedQty    = Math.Min(buyQtyTotal, sellQtyTotal);
-                            double realizedPnl  = closedQty > 0 ? (sellAvg - buyAvg) * closedQty : 0;
+                            // FIX 3: direct sell-proceeds minus buy-cost — works for all strategies
+                            double realizedPnl  = sellTotal - buyTotal;
                             double netQty       = buyQtyTotal - sellQtyTotal;
+
+                            _engine.Logger?.Log("UI",
+                                $"[Positions] {g.Key}: " +
+                                $"BuyCost=₹{buyTotal:F2} SellValue=₹{sellTotal:F2} " +
+                                $"NetQty={netQty} P&L=₹{realizedPnl:F2}");
 
                             mockPositions.Add(new Position
                             {
