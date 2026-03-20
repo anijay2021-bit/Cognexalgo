@@ -133,6 +133,10 @@ namespace Cognexalgo.UI.ViewModels
         private bool _isFetchingPositions = false;
         private bool _isFetchingOrders = false;
 
+        // COGNEX-CHANGE Part 1/2: tracks all tokens subscribed for the active chain
+        // so they can be cleared and replaced when SelectedOptionIndex switches.
+        private readonly HashSet<string> _subscribedChainTokens = new();
+
         public MainViewModel(TradingEngine engine)
         {
             // Initialize Engine
@@ -154,6 +158,11 @@ namespace Cognexalgo.UI.ViewModels
             _autoRefreshTimer = new System.Windows.Threading.DispatcherTimer();
             _autoRefreshTimer.Interval = TimeSpan.FromSeconds(3);
             _autoRefreshTimer.Tick += AutoRefreshTimer_Tick;
+
+            // COGNEX-CHANGE Part 3: Greeks recalc timer — 30s, zero API calls
+            _greeksTimer = new System.Windows.Threading.DispatcherTimer();
+            _greeksTimer.Interval = TimeSpan.FromSeconds(30);
+            _greeksTimer.Tick += GreeksTimer_Tick;
 
             // Subscribe to Engine Events
             if (_engine.Logger != null)
@@ -276,6 +285,8 @@ namespace Cognexalgo.UI.ViewModels
         }
 
         private System.Windows.Threading.DispatcherTimer _autoRefreshTimer;
+        // COGNEX-CHANGE Part 3: Greeks recalc timer (no API calls, 30s interval)
+        private System.Windows.Threading.DispatcherTimer _greeksTimer;
 
         private void AutoRefreshTimer_Tick(object sender, EventArgs e)
         {
@@ -285,6 +296,44 @@ namespace Cognexalgo.UI.ViewModels
                  _ = FetchOrders();
                  // _ = FetchOptionChain(SelectedOptionIndex); // Temporarily removed
              }
+        }
+
+        // COGNEX-CHANGE Part 3: recalculate IV + Greeks every 30s using cached LTPs, no API calls
+        private void GreeksTimer_Tick(object sender, EventArgs e)
+        {
+            if (OptionChain.Count == 0) return;
+
+            double spot = SelectedOptionIndex switch
+            {
+                "BANKNIFTY"  => LtpBankNifty,
+                "FINNIFTY"   => LtpFinnifty,
+                "MIDCPNIFTY" => LtpMidcpNifty,
+                _            => LtpNifty
+            };
+            if (spot <= 0) return; // spot not yet ticked — skip this cycle
+
+            const double r = 0.067;
+
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var item in OptionChain)
+                {
+                    if (item.LTP <= 0) continue; // token not yet ticked — skip
+
+                    double dte    = Math.Max(0.5, item.DaysToExpiry);
+                    bool   isCall = item.IsCall;
+
+                    double iv = _greeksService.CalculateIV(item.LTP, spot, item.Strike, dte, r, isCall);
+                    if (iv < 0.01) iv = 0.15;
+
+                    var g      = _greeksService.CalculateGreeks(spot, item.Strike, dte, r, iv, isCall);
+                    item.IV    = Math.Round(iv * 100, 2);
+                    item.Delta = g.Delta;
+                    item.Theta = g.Theta;
+                    item.Vega  = g.Vega;
+                    item.Gamma = g.Gamma;
+                }
+            });
         }
 
         private async Task LoadStrategies()
@@ -579,7 +628,9 @@ namespace Cognexalgo.UI.ViewModels
 
                 // Start Auto-Refresh
                 _autoRefreshTimer.Start();
-                Log("Auto-Refresh Started (3s Interval)");
+                // COGNEX-CHANGE Part 3: start Greeks timer together with auto-refresh
+                _greeksTimer.Start();
+                Log("Auto-Refresh Started (3s Interval, Greeks 30s Interval)");
 
                 // Fix 7: Show Scrip Master age in System Log on every login
                 string dateFile = System.IO.Path.Combine(
@@ -996,6 +1047,8 @@ namespace Cognexalgo.UI.ViewModels
             await _engine.Ticker.DisconnectAsync();
             
             _autoRefreshTimer.Stop();
+            // COGNEX-CHANGE Part 3: stop Greeks timer together with auto-refresh
+            _greeksTimer.Stop();
             Log("Auto-Refresh Stopped.");
             
             Status = "Stopped";
@@ -1167,6 +1220,25 @@ namespace Cognexalgo.UI.ViewModels
                         OptionChain.Add(item);
                     }
                 });
+
+                // COGNEX-CHANGE Part 2: drop stale subscriptions before subscribing new chain tokens
+                _subscribedChainTokens.Clear();
+
+                // COGNEX-CHANGE Part 1: subscribe every strike token so SmartStream ticks update LTP
+                if (_engine.SmartStream?.IsConnected == true)
+                {
+                    var chainTokens = OptionChain
+                        .Where(i => !string.IsNullOrEmpty(i.Token))
+                        .Select(i => i.Token)
+                        .Distinct()
+                        .ToList();
+                    if (chainTokens.Count > 0)
+                    {
+                        _ = _engine.SmartStream.SubscribeAsync(chainTokens, "NFO");
+                        foreach (var t in chainTokens) _subscribedChainTokens.Add(t);
+                        Log($"[OptionChain] Subscribed {chainTokens.Count} tokens to SmartStream.");
+                    }
+                }
 
                 SpotPrice = spot;
                 Log($"[OptionChain] Spot price used: {spot:N2}");
