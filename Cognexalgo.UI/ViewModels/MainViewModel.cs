@@ -486,6 +486,9 @@ namespace Cognexalgo.UI.ViewModels
 
                 // FIX 3: Keep CachedNiftyChain LTPs fresh from SmartStream ticks
                 // so DynamicStrategy.ResolveATMOption always returns current prices.
+                // COGNEX-DEBUG
+                System.Diagnostics.Debug.WriteLine($"[OnTick] Options keys: {string.Join(",", data.Options?.Keys?.Take(5) ?? Enumerable.Empty<string>())}");
+                System.Diagnostics.Debug.WriteLine($"[OnTick] Chain tokens: {string.Join(",", OptionChain?.Take(5).Select(x => x.Token) ?? Enumerable.Empty<string>())}");
                 if (data.Options?.Count > 0)
                 {
                     var chains = new[]
