@@ -15,7 +15,7 @@ namespace Cognexalgo.Core.Strategies
         public TimeSpan ExitTime { get; set; } = new TimeSpan(15, 15, 0);
         
         private bool _isPositionOpen = false;
-        private HybridStrategySettings _settings;
+        private HybridStrategySettings? _settings;
         
         private readonly RuleEvaluator _evaluator;
         private EvaluationContext _context;
@@ -113,7 +113,7 @@ namespace Cognexalgo.Core.Strategies
 
         public override async Task OnTickAsync(TickerData ticker)
         {
-            if (!IsActive) return;
+            if (!IsActive || _settings is null) return;
 
             var now = DateTime.Now.TimeOfDay;
             
@@ -221,6 +221,7 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task<int> SelectStrike(StrategyLeg leg, TickerData ticker)
         {
+            if (_settings is null) return 0;
             double underlyingLtp = (Symbol == "NIFTY") ? ticker.Nifty.Ltp : ticker.BankNifty.Ltp;
             
             if (_settings.SelectionType == StrikeSelectionType.PremiumMatch)
@@ -250,6 +251,7 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task MonitorAdjustments(TickerData ticker)
         {
+            if (_settings is null) return;
             // Only applicable for Straddles (2 Legs Open)
             var openLegs = Legs.Where(l => l.Status == "OPEN").ToList();
             if (openLegs.Count < 2) return;
@@ -278,6 +280,7 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task ExecuteAdjustment(StrategyLeg leg1, StrategyLeg leg2)
         {
+            if (_settings is null) return;
             if (_settings.Action == AdjustmentAction.ShiftWhole)
             {
                 // Close Both
@@ -326,7 +329,13 @@ namespace Cognexalgo.Core.Strategies
         private async Task SquareOffLeg(StrategyLeg leg, string reason)
         {
             Console.WriteLine($"[Hybrid] Squaring off Leg {leg.SymbolToken} due to {reason}");
-            
+
+            if (string.IsNullOrEmpty(leg.SymbolToken))
+            {
+                Console.WriteLine($"[Hybrid] SquareOffLeg skipped — SymbolToken is null/empty for leg {leg.Action}");
+                return;
+            }
+
             // Create Opposite Order
             string action = leg.Action == ActionType.Buy ? "SELL" : "BUY";
             await _engine.ExecuteOrderAsync(new StrategyConfig { Id=0, Name="Hybrid" }, leg.SymbolToken, action);

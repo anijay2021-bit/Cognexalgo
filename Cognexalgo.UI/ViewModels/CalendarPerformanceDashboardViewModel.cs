@@ -72,6 +72,7 @@ namespace Cognexalgo.UI.ViewModels
                 };
 
                 if (dlg.ShowDialog() != true) return;
+                if (_strategy is null) return;
 
                 var records = _strategy.State.PerformanceLog;
                 var metrics = _svc.CalculateMetrics(records);

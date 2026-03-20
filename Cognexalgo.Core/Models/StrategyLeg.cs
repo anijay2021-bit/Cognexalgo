@@ -109,7 +109,7 @@ namespace Cognexalgo.Core.Models
         
         // Calculated at execution (populated by GetTargetStrike)
         public int CalculatedStrike { get; set; }
-        public string SymbolToken { get; set; }
+        public string? SymbolToken { get; set; }
         public double SelectedPremium { get; set; }
         /// <summary>Angel One option trading symbol e.g. "NIFTY25MAR21000CE". Set at entry from OptionChainItem.Symbol.</summary>
         public string TradingSymbol { get; set; } = string.Empty;

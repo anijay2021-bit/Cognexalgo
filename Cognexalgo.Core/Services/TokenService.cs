@@ -509,7 +509,7 @@ namespace Cognexalgo.Core.Services
             return expiryDate.ToString("ddMMMyy").ToUpper();
         }
 
-        public async Task<(string token, string symbol)> GetAtmOptionAsync(string index, string optionType, AngelOneDataService dataService)
+        public async Task<(string? token, string? symbol)> GetAtmOptionAsync(string index, string optionType, AngelOneDataService dataService)
         {
             try 
             {

@@ -490,9 +490,9 @@ namespace Cognexalgo.Core
                         {
                             Stop();
                         }
-                        else if (command.Action == "SQUARE_OFF") 
+                        else if (command.Action == "SQUARE_OFF")
                         {
-                             SquareOffAll();
+                             await SquareOffAll();
                              Stop();
                         }
                     }

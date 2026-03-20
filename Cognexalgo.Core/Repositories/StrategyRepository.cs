@@ -63,9 +63,9 @@ namespace Cognexalgo.Core.Repositories
             return null;
         }
 
-        public async Task AddAsync(StrategyConfig strategy) { }
-        public async Task UpdateAsync(StrategyConfig strategy) { }
-        public async Task DeleteAsync(int id) { }
+        public Task AddAsync(StrategyConfig strategy) => Task.CompletedTask;
+        public Task UpdateAsync(StrategyConfig strategy) => Task.CompletedTask;
+        public Task DeleteAsync(int id) => Task.CompletedTask;
         public async Task UpdateStatusAsync(int id, bool isActive) 
         {
              var entity = await _context.HybridStrategies.FindAsync(id);

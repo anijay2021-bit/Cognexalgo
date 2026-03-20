@@ -19,10 +19,10 @@ namespace Cognexalgo.Core.Strategies
         { 
         }
 
-        public override async Task OnTickAsync(TickerData ticker)
+        public override Task OnTickAsync(TickerData ticker)
         {
-            if (!IsActive) return;
-            if (_history.Count < 2) return; // Need at least 2 for some checks, but don't block on 200
+            if (!IsActive) return Task.CompletedTask;
+            if (_history.Count < 2) return Task.CompletedTask; // Need at least 2 for some checks, but don't block on 200
             if (_history.Count < TrendEmaPeriod)
             {
                 // Just log once a minute or so instead of every tick to avoid spam
@@ -34,16 +34,17 @@ namespace Cognexalgo.Core.Strategies
             var fastEma = _history.GetEma(FastEmaPeriod).LastOrDefault()?.Ema;
             var trendEma = _history.GetEma(TrendEmaPeriod).LastOrDefault()?.Ema;
 
-            if (fastEma == null || trendEma == null) return;
+            if (fastEma == null || trendEma == null) return Task.CompletedTask;
 
             // Logic: Bullish if Price > 200 EMA AND Price > 9 EMA
             bool isBullish = (double)lastCandle.Close > (double)trendEma && (double)lastCandle.Close > (double)fastEma;
-            
+
             if (isBullish)
             {
                // Debug.WriteLine("Bullish Trend Detected");
                // Place Order Logic
             }
+            return Task.CompletedTask;
         }
         
          public void AddCandle(DateTime time, decimal open, decimal high, decimal low, decimal close, decimal volume)

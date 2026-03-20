@@ -11,7 +11,7 @@ namespace Cognexalgo.Core.Strategies
 {
     public class DynamicStrategy : StrategyBase
     {
-        private readonly DynamicStrategyConfig _config;
+        private readonly DynamicStrategyConfig? _config;
         private readonly RuleEvaluator _evaluator;
         private readonly EvaluationContext _context;
         private readonly RiskManager _riskManager;
@@ -85,6 +85,7 @@ namespace Cognexalgo.Core.Strategies
 
         private void HandleStringifiedRules()
         {
+            if (_config is null) return;
             if (_config.EntryRules == null) _config.EntryRules = new List<Rule>();
             if (_config.ExitRules == null) _config.ExitRules = new List<Rule>();
         }
@@ -261,7 +262,7 @@ namespace Cognexalgo.Core.Strategies
 
         private async Task EvaluateEntryRulesAsync(EvaluationContext context, double currentPrice)
         {
-            if (_config.EntryRules == null || !_config.EntryRules.Any()) return;
+            if (_config is null || _config.EntryRules == null || !_config.EntryRules.Any()) return;
 
             double ema21 = CalculateEMA21(_history);
             if (ema21 <= 0)
@@ -411,6 +412,7 @@ namespace Cognexalgo.Core.Strategies
 
         private Cognexalgo.Core.Models.OptionChainItem? ResolveATMOption(double spotPrice, string optionType)
         {
+            if (_config is null) return null;
             double step      = _config.Symbol == "BANKNIFTY" ? 100.0 : 50.0;
             double atmStrike = Math.Round(spotPrice / step) * step;
             bool   isCall    = optionType == "CE";

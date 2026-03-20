@@ -1,0 +1,672 @@
+<UserControl x:Class="Cognexalgo.UI.Views.VCP.VCPSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Cognexalgo.UI.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:VCPSettingsViewModel, IsDesignTimeCreatable=False}"
+             Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+
+        <!-- ── Toggle Switch style (pill-style checkbox) ─────────────── -->
+        <Style TargetType="CheckBox" x:Key="ToggleSwitchStyle">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- Track -->
+                            <Border x:Name="Track" Width="42" Height="22" CornerRadius="11"
+                                    Background="{StaticResource BorderBrush}" Padding="2,2">
+                                <Canvas Width="38" Height="18">
+                                    <!-- Thumb -->
+                                    <Ellipse x:Name="Thumb" Width="18" Height="18" Fill="White">
+                                        <Ellipse.Effect>
+                                            <DropShadowEffect BlurRadius="3" ShadowDepth="1"
+                                                              Color="Black" Opacity="0.20"/>
+                                        </Ellipse.Effect>
+                                    </Ellipse>
+                                </Canvas>
+                            </Border>
+                            <!-- Label -->
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track"  Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter TargetName="Thumb"  Property="Canvas.Left" Value="20"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.50"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Section card with colored left accent ──────────────────── -->
+        <Style TargetType="Border" x:Key="SectionAccentStyle">
+            <Setter Property="Background"      Value="{StaticResource CardBrush}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius"    Value="6"/>
+            <Setter Property="Margin"          Value="0,0,0,12"/>
+            <Setter Property="Effect"          Value="{StaticResource CardShadow}"/>
+        </Style>
+
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="20,16">
+
+            <!-- ══════════════════════════════════════════════════════════
+                 PAGE HEADER
+            ══════════════════════════════════════════════════════════ -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <TextBlock Text="VCP Strategy Settings"
+                           Style="{StaticResource HeaderTextStyle}"
+                           VerticalAlignment="Bottom"/>
+                <Border Background="{StaticResource PrimaryBrush}" CornerRadius="10"
+                        Padding="8,2" Margin="12,0,0,2" VerticalAlignment="Bottom">
+                    <TextBlock Text="VCP Engine" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                </Border>
+            </StackPanel>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 1 — Trading Mode & Status
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4"/>    <!-- accent strip -->
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}"
+                            CornerRadius="6,0,0,6"/>
+                    <StackPanel Grid.Column="1" Margin="16,14,16,14">
+                        <TextBlock Text="Trading Mode &amp; Status" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <!-- Paper / Live toggle -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Trading Mode" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Paper Trade simulates orders with no real capital. Live Trade routes real orders to Angel One."/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Paper" Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <CheckBox IsChecked="{Binding IsLiveMode, Mode=TwoWay}"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          ToolTip="Toggle between Paper Trade (simulation) and Live Trade (real orders)."/>
+                                <TextBlock Text="Live" Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12" VerticalAlignment="Center" Margin="8,0,16,0"/>
+                                <TextBlock Text="{Binding TradingModeDisplay}"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextMainBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Live warning banner — bound to LiveWarningVisible -->
+                        <Border Visibility="{Binding LiveWarningVisible}"
+                                Background="#FEF2F2" BorderBrush="#FECACA"
+                                BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,10">
+                            <TextBlock Text="⚠️ LIVE TRADING ACTIVE — Real money at risk"
+                                       Foreground="{StaticResource DangerBrush}"
+                                       FontSize="12" FontWeight="Bold"/>
+                        </Border>
+
+                        <!-- Start / Stop buttons + status indicator -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Engine Status" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="▶ Start VCP Engine"
+                                        Style="{StaticResource ActionPushButtonStyle}"
+                                        Command="{Binding StartStrategyCommand}"
+                                        IsEnabled="{Binding IsStrategyStopped}"
+                                        Padding="14,7" Margin="0,0,8,0"
+                                        ToolTip="Start the VCP scanning and trading loop using current settings."/>
+                                <Button Content="⏹ Stop VCP Engine"
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Command="{Binding StopStrategyCommand}"
+                                        IsEnabled="{Binding IsStrategyRunning}"
+                                        Padding="14,7" Margin="0,0,16,0"
+                                        ToolTip="Gracefully stop the strategy. Open positions will be squared off per exit rules."/>
+                                <!-- Status dot + label -->
+                                <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0"
+                                         Fill="{Binding StatusColor}"/>
+                                <TextBlock Text="{Binding StatusText}"
+                                           Foreground="{Binding StatusColor}"
+                                           FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 2 — Timeframe
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource AccentBrush}" CornerRadius="6,0,0,6"/>
+                    <StackPanel Grid.Column="1" Margin="16,14,16,14">
+                        <TextBlock Text="Timeframe" Style="{StaticResource SectionHeaderStyle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="220"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Chart Timeframe" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Daily: scans EOD candles only. 15-Min: intraday scan. Both: runs daily and intraday simultaneously."/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Timeframes}"
+                                      SelectedItem="{Binding SelectedTimeframe, Mode=TwoWay}"
+                                      Style="{StaticResource DarkComboBoxStyle}"
+                                      Height="32"
+                                      ToolTip="Daily: scans EOD candles only. 15-Min: intraday scan. Both: runs daily and intraday simultaneously."/>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 3 — Risk Management
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource WarningBrush}" CornerRadius="6,0,0,6"/>
+                    <StackPanel Grid.Column="1" Margin="16,14,16,14">
+                        <TextBlock Text="Risk Management" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <!-- Max Concurrent Trades -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Max Concurrent Trades" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Maximum number of VCP option trades open at the same time. Allowed range: 1–4."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding MaxConcurrentTrades, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Allowed range: 1–4. Prevents over-exposure when multiple patterns trigger simultaneously."/>
+                            <TextBlock Grid.Column="2" Text="(1 – 4)" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- Risk Per Trade -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Risk Per Trade (₹)" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Capital risked per trade in rupees. Used to auto-calculate lot size when Auto Lot Sizing is ON."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding RiskAmountPerTrade, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Minimum ₹100. Used when Auto Lot Sizing is enabled to size positions by risk."/>
+                            <TextBlock Grid.Column="2" Text="₹100 – ₹50 000" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- Auto Lot Sizing -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Auto Lot Sizing" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="When ON, lot size is computed from Risk Per Trade ÷ (Entry − Stop Loss) × Lot Size. When OFF, Fixed Lots is used."/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding UseAutoLotSizing, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Content="Auto-calculate lots from risk amount"
+                                      Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                      ToolTip="When ON, lot size is computed from Risk Per Trade ÷ (Entry − Stop Loss) × Lot Size."/>
+                        </Grid>
+
+                        <!-- Fixed Lots (visible when Auto=OFF) — bound to ManualLotVisible -->
+                        <Grid Visibility="{Binding ManualLotVisible}" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Fixed Lots Per Trade" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Number of option lots traded per signal when Auto Lot Sizing is OFF. Default: 1."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding FixedLotsPerTrade, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Fixed lots per trade (used when Auto Lot Sizing is OFF)."/>
+                            <TextBlock Grid.Column="2" Text="lots" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- Max Exposure display -->
+                        <Border Background="#EFF6FF" BorderBrush="#BFDBFE"
+                                BorderThickness="1" CornerRadius="4" Padding="10,7">
+                            <TextBlock Text="{Binding MaxExposureDisplay}"
+                                       Foreground="{StaticResource PrimaryBrush}"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       ToolTip="Worst-case capital at risk if all concurrent trades hit stop-loss simultaneously."/>
+                        </Border>
+
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 4 — Exit Rules
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource DangerBrush}" CornerRadius="6,0,0,6"/>
+                    <StackPanel Grid.Column="1" Margin="16,14,16,14">
+                        <TextBlock Text="Exit Rules" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <!-- Target 1 R:R -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Target 1 R:R" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="First profit target = Entry + (Entry − Stop) × Target1RR. Range: 0.5–5.0."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding Target1RR, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="First profit target R:R. Must be less than Target 2 R:R."/>
+                            <TextBlock Grid.Column="2" Text="×  (0.5 – 5.0)" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- Target 2 R:R -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Target 2 R:R" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Second (final) profit target R:R. Must be greater than Target 1. Range: 1.0–10.0."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding Target2RR, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, StringFormat=N1}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Second profit target R:R. Rides the remainder of the position after T1 exit."/>
+                            <TextBlock Grid.Column="2" Text="×  (1.0 – 10.0)" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- Exit % at Target 1 -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Exit % at Target 1" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Percentage of the position to close when Target 1 is reached. Remainder rides to Target 2."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding Target1ExitPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="25, 50, or 75 percent. The rest of the position targets T2."/>
+                            <TextBlock Grid.Column="2" Text="%  (25 – 75)" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <Separator Margin="0,4,0,10"/>
+
+                        <!-- Exit on Pattern Failure -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Exit on Pattern Failure" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="When ON, position is exited if price closes below the VCP TightLow (base breakdown)."/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding ExitOnPatternFailure, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Content="Close trade if VCP base breaks"
+                                      Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                      ToolTip="Exit when price closes below TightLow — the VCP structure has failed."/>
+                        </Grid>
+
+                        <!-- Pattern Failure Exit Mode — bound to PatternFailureModeVisible -->
+                        <Grid Visibility="{Binding PatternFailureModeVisible}" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="220"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="  Pattern Failure Mode" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Immediate: place exit order as soon as breakdown is detected. WaitForCandleClose: wait for candle to close below TightLow."/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding ExitModes}"
+                                      SelectedItem="{Binding PatternFailureExitMode, Mode=TwoWay}"
+                                      Style="{StaticResource DarkComboBoxStyle}"
+                                      Height="32"
+                                      ToolTip="Immediate exits on tick. WaitForCandleClose is safer but slightly slower."/>
+                        </Grid>
+
+                        <Separator Margin="0,4,0,10"/>
+
+                        <!-- Exit on Reversal Candle -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Exit on Reversal Candle" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="When ON, exit the trade if a bearish reversal candle forms after entry (e.g. shooting star, bearish engulfing)."/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding ExitOnReversalCandle, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Content="Close on bearish reversal candle"
+                                      Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                      ToolTip="Shooting star, bearish engulfing, etc. triggers exit."/>
+                        </Grid>
+
+                        <!-- Reversal Exit Mode — bound to ReversalModeVisible -->
+                        <Grid Visibility="{Binding ReversalModeVisible}" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="220"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="  Reversal Exit Mode" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Immediate: exit on candle formation. WaitForCandleClose: confirm close before exiting."/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding ExitModes}"
+                                      SelectedItem="{Binding ReversalCandleExitMode, Mode=TwoWay}"
+                                      Style="{StaticResource DarkComboBoxStyle}"
+                                      Height="32"
+                                      ToolTip="WaitForCandleClose reduces false exits from intra-candle wicks."/>
+                        </Grid>
+
+                        <Separator Margin="0,4,0,10"/>
+
+                        <!-- End of Day Square-Off -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="End-of-Day Square-Off" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="When ON, all open positions are closed at Square-Off Time to avoid overnight or expiry risk."/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding EnableEndOfDaySquareOff, Mode=TwoWay}"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Content="Auto square-off all positions at end of day"
+                                      Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                      ToolTip="Forces all positions closed at the configured time regardless of P&amp;L."/>
+                        </Grid>
+
+                        <!-- Square-Off Time — bound to EodTimeVisible -->
+                        <Grid Visibility="{Binding EodTimeVisible}" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="  Square-Off Time" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="24-hour time (HH:mm) at which all positions are force-closed. NSE equity closes at 15:30; default 15:10 leaves margin."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding SquareOffTimeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Format: HH:mm (24-hour). Example: 15:10 for 3:10 PM."/>
+                            <TextBlock Grid.Column="2" Text="HH:mm" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 5 — Scanner Settings
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource SuccessBrush}" CornerRadius="6,0,0,6"/>
+                    <StackPanel Grid.Column="1" Margin="16,14,16,14">
+                        <TextBlock Text="Scanner Settings" Style="{StaticResource SectionHeaderStyle}"/>
+
+                        <!-- Min VCP Quality -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="220"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Min VCP Quality" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="A: Textbook patterns only (strictest). B: Good patterns (recommended). C: All patterns including marginal ones."/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding VCPQualities}"
+                                      SelectedItem="{Binding MinVCPQuality, Mode=TwoWay}"
+                                      Style="{StaticResource DarkComboBoxStyle}"
+                                      Height="32"
+                                      ToolTip="Only trade VCP patterns at or above this quality grade. A=best, C=marginal."/>
+                        </Grid>
+
+                        <!-- Watchlist -->
+                        <TextBlock Text="Watchlist" Style="{StaticResource LabelTextStyle}" Margin="0,4,0,6"
+                                   ToolTip="List of equity/index symbols the VCP scanner monitors. Add NIFTY, BANKNIFTY, or any NSE symbol."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- List with per-item ✕ buttons + keyboard shortcut -->
+                            <StackPanel Grid.Column="0">
+                                <ListBox x:Name="WatchlistBox"
+                                         ItemsSource="{Binding Watchlist}"
+                                         SelectedItem="{Binding SelectedWatchlistItem, Mode=TwoWay}"
+                                         Height="110"
+                                         Background="{StaticResource CardHoverBrush}"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         BorderThickness="1"
+                                         Foreground="{StaticResource TextMainBrush}"
+                                         FontSize="12"
+                                         ToolTip="Currently monitored symbols. Click ✕ next to any item to remove it.">
+                                    <ListBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding AddWatchlistItemCommand}"/>
+                                    </ListBox.InputBindings>
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding"    Value="4,2"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TextMainBrush}"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="#DBEAFE"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding}"
+                                                           VerticalAlignment="Center" Padding="4,2"/>
+                                                <Button Grid.Column="1" Content="✕"
+                                                        Command="{Binding DataContext.RemoveWatchlistItemCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                        CommandParameter="{Binding}"
+                                                        Padding="4,1" Margin="4,0,0,0"
+                                                        FontSize="9" FontWeight="Bold"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        Foreground="{StaticResource TextMutedBrush}"
+                                                        ToolTip="Remove this symbol from the watchlist"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button Content="✕ Remove Selected"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding RemoveWatchlistItemCommand}"
+                                            CommandParameter="{Binding SelectedWatchlistItem}"
+                                            Padding="10,5" FontSize="11"
+                                            ToolTip="Remove the selected symbol from the watchlist."/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Add symbol -->
+                            <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
+                                <TextBlock Text="Add Symbol" Style="{StaticResource LabelTextStyle}" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Text="{Binding NewWatchlistSymbol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource DarkTextBoxStyle}"
+                                             Width="140" Height="32"
+                                             ToolTip="Enter NSE symbol (e.g. RELIANCE, NIFTY, BANKNIFTY) and press Enter or click Add.">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Return" Command="{Binding AddWatchlistItemCommand}"/>
+                                        </TextBox.InputBindings>
+                                    </TextBox>
+                                    <Button Content="+ Add"
+                                            Style="{StaticResource ActionPushButtonStyle}"
+                                            Command="{Binding AddWatchlistItemCommand}"
+                                            Padding="12,0" Height="32" Margin="6,0,0,0"
+                                            ToolTip="Add symbol to watchlist. Press Enter in the text box to add quickly."/>
+                                </StackPanel>
+                                <TextBlock Text="Press Enter or click + Add" Margin="0,6,0,0"
+                                           Style="{StaticResource LabelTextStyle}" FontSize="10"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Separator Margin="0,12,0,10"/>
+
+                        <!-- Nifty Lot Size -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="NIFTY Lot Size" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Current SEBI lot size for Nifty (default: 65). Update when SEBI/NSE revises the contract size."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding NiftyLotSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Current SEBI lot size for Nifty (default: 65). Update when NSE changes contract specifications."/>
+                            <TextBlock Grid.Column="2" Text="units/lot" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                        <!-- BankNifty Lot Size -->
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="BANKNIFTY Lot Size" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Current SEBI lot size for BankNifty (default: 30). Update when SEBI/NSE revises the contract size."/>
+                            <TextBox Grid.Column="1" Height="32"
+                                     Text="{Binding BankNiftyLotSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource DarkTextBoxStyle}"
+                                     ToolTip="Current SEBI lot size for BankNifty (default: 30). Update when NSE changes contract specifications."/>
+                            <TextBlock Grid.Column="2" Text="units/lot" Style="{StaticResource LabelTextStyle}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </Grid>
+
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════
+                 SECTION 6 — Save
+            ══════════════════════════════════════════════════════════ -->
+            <Border Style="{StaticResource SectionAccentStyle}">
+                <StackPanel Margin="16,14,16,14">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="💾 Save Settings"
+                                Style="{StaticResource ActionPushButtonStyle}"
+                                Command="{Binding SaveCommand}"
+                                IsEnabled="{Binding IsSaveEnabled}"
+                                Padding="20,9" FontSize="13"
+                                ToolTip="Validate and persist all settings to vcp_settings.json. Disabled for 2 seconds after saving to prevent double-save."/>
+                        <Button Content="↺ Reset Defaults"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ResetDefaultsCommand}"
+                                Padding="16,9" FontSize="13" Margin="10,0,0,0"
+                                ToolTip="Reset all fields to factory defaults (PaperTrade, Daily, 2 trades, ₹1 000 risk, etc.). Does not save automatically."/>
+                    </StackPanel>
+
+                    <!-- Save toast -->
+                    <Border Visibility="{Binding SaveStatusVisibility}"
+                            Background="#F0FDF4" BorderBrush="#BBF7D0"
+                            BorderThickness="1" CornerRadius="4"
+                            Padding="12,8" Margin="0,12,0,0">
+                        <TextBlock Text="{Binding SaveStatusText}"
+                                   Foreground="{StaticResource SuccessBrush}"
+                                   FontSize="12" FontWeight="SemiBold"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Bottom padding -->
+            <Border Height="16"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

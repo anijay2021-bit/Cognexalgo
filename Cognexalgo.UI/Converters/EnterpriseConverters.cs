@@ -38,7 +38,7 @@ namespace Cognexalgo.UI.Converters
 
             if (status == "ACTIVATED") return dangerBrush;
             if (status == "OFF") return primaryBrush;
-            
+
             return mutedBrush;
         }
 
@@ -46,5 +46,29 @@ namespace Cognexalgo.UI.Converters
         {
             throw new NotImplementedException();
         }
+    }
+
+    /// <summary>
+    /// Converts a hex color string (e.g. "#00C853") to a <see cref="SolidColorBrush"/>.
+    /// Returns a white brush if the string is null, empty, or unparseable.
+    /// </summary>
+    public class StringToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string hex && !string.IsNullOrEmpty(hex))
+            {
+                try
+                {
+                    var color = (Color)ColorConverter.ConvertFromString(hex);
+                    return new SolidColorBrush(color);
+                }
+                catch { }
+            }
+            return new SolidColorBrush(Colors.White);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 }

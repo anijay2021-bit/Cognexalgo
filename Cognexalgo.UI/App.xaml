@@ -15,6 +15,7 @@
             <converters:RadioButtonConverter x:Key="RadioButtonConverter"/>
             <converters:OptionTypeToColorConverter x:Key="OptionTypeToColorConverter"/>
             <converters:ActionToColorConverter x:Key="ActionToColorConverter"/>
+            <converters:StringToBrushConverter x:Key="StringToBrushConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

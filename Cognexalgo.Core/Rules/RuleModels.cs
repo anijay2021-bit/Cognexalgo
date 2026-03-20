@@ -129,7 +129,7 @@ namespace Cognexalgo.Core.Rules
 
     public class ResilientRuleListConverter : JsonConverter<List<Rule>>
     {
-        public override List<Rule> ReadJson(JsonReader reader, Type objectType, List<Rule> existingValue, bool hasExistingValue, JsonSerializer serializer)
+        public override List<Rule> ReadJson(JsonReader reader, Type objectType, List<Rule>? existingValue, bool hasExistingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.String)
             {
@@ -152,7 +152,7 @@ namespace Cognexalgo.Core.Rules
             }
         }
 
-        public override void WriteJson(JsonWriter writer, List<Rule> value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, List<Rule>? value, JsonSerializer serializer)
         {
             serializer.Serialize(writer, value);
         }

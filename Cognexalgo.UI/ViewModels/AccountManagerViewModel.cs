@@ -112,11 +112,12 @@ namespace Cognexalgo.UI.ViewModels
         }
 
         [RelayCommand]
-        public async Task ToggleAccount(AccountConfig account)
+        public Task ToggleAccount(AccountConfig account)
         {
             // Save state to DB
             account.Status = account.IsEnabled ? "Active" : "Disabled";
-            // await SaveToDb(account); 
+            // await SaveToDb(account);
+            return Task.CompletedTask;
         }
     }
 }

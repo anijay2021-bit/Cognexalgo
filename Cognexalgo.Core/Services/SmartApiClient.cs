@@ -25,10 +25,10 @@ namespace Cognexalgo.Core.Services
         // ... LoginAsync ...
 
         // (Similar for GetHoldings and PlaceOrder if needed, but GetPosition is the main poll)
-        public string JwtToken { get; private set; }
+        public string? JwtToken { get; private set; }
         private string _apiKey;
         private string _clientCode;
-        public string FeedToken { get; private set; }
+        public string? FeedToken { get; private set; }
 
         private const string BASE_URL = "https://apiconnect.angelbroking.com";
 
@@ -117,11 +117,12 @@ namespace Cognexalgo.Core.Services
                 {
                     JwtToken = data["data"]["jwtToken"]?.ToString();
                     FeedToken = data["data"]["feedToken"]?.ToString();
-                    
-                    // Set Auth Header for future requests
-                    _client.DefaultRequestHeaders.Authorization = 
-                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtToken);
-                        
+
+                    // Set Auth Header for future requests — only when token is non-null
+                    if (!string.IsNullOrEmpty(JwtToken))
+                        _client.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtToken);
+
                     return true;
                 }
                 else

@@ -13,7 +13,7 @@ namespace Cognexalgo.Core.CloudServices
     {
         private IFirebaseClient? _client;
 
-        public async Task<bool> ConnectAsync(string firebaseBasePath, string firebaseSecret)
+        public Task<bool> ConnectAsync(string firebaseBasePath, string firebaseSecret)
         {
             try
             {
@@ -24,12 +24,12 @@ namespace Cognexalgo.Core.CloudServices
                 };
 
                 _client = new FirebaseClient(config);
-                return _client != null;
+                return Task.FromResult(_client != null);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Firebase Connection Error: {ex.Message}");
-                return false;
+                return Task.FromResult(false);
             }
         }
 

@@ -110,8 +110,12 @@ namespace Cognexalgo.UI.ViewModels
         public ObservableCollection<string> Logs { get; } = new ObservableCollection<string>();
         public ObservableCollection<OptionChainItem> OptionChain { get; } = new ObservableCollection<OptionChainItem>();
 
-        public AccountManagerViewModel AccountManager { get; } 
+        public AccountManagerViewModel AccountManager { get; }
         public SafeExitService SafeExitService { get; private set; } // [NEW]
+
+        // ── VCP Scanner ───────────────────────────────────────────────────────
+        public VCPScannerViewModel  VcpScanner  { get; }
+        public VCPSettingsViewModel VcpSettings { get; }
 
         private BootstrapperService _bootstrapper; 
 
@@ -148,6 +152,11 @@ namespace Cognexalgo.UI.ViewModels
 
             // Initialize Sub-ViewModels
             AccountManager = new AccountManagerViewModel(_engine);
+
+            // VCP — manual construction chain, no DI container
+            var vcpLocator = new VCP.VCPServiceLocator(engine);
+            VcpScanner  = vcpLocator.ScannerViewModel;
+            VcpSettings = vcpLocator.SettingsViewModel;
             
             // Subscribe to Engine Events
             _engine.Ticker.OnTickReceived += OnTick;
@@ -617,18 +626,18 @@ namespace Cognexalgo.UI.ViewModels
                 await _engine.ConnectAsync(creds.ApiKey, creds.ClientCode, creds.Password, creds.TotpKey);
                 
                 // [NEW] Subscribe to Auth Events
-                _engine.Api.OnSessionExpired += () => 
+                _engine.Api.OnSessionExpired += () =>
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                    System.Windows.Application.Current.Dispatcher.Invoke(async () =>
                     {
-                        StopEngine();
+                        await StopEngine();
                         MessageBox.Show("Session Expired! Please Re-login.", "Auth Failure", MessageBoxButton.OK, MessageBoxImage.Error);
                         Status = "Disconnected";
                     });
                 };
 
                 await _engine.Ticker.ConnectAsync();
-                _engine.Start();
+                await _engine.Start();
                 Status = "Running";
                 IsEngineRunning = true;
 
@@ -692,10 +701,10 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         private void CreateStrategy()
         {
-            var vm = new StrategyBuilderViewModel(_engine, () => 
+            var vm = new StrategyBuilderViewModel(_engine, async () =>
             {
                  // On Save Success — legacy save done
-                 LoadStrategies();
+                 await LoadStrategies();
                  
                  // ─── V2: Sync to V2 DB ─────────────────────────
                  if (_v2?.IsInitialized == true && Strategies.Count > 0)
@@ -718,9 +727,11 @@ namespace Cognexalgo.UI.ViewModels
                                  // Persist V2Id back to DB so it survives app restarts.
                                  // SaveHybridStrategyAsync does upsert-by-name and serialises
                                  // the full HybridStrategyConfig (including V2Id) to ConfigJson.
+                                 var repo1 = _engine?.StrategyRepository;
+                                 if (repo1 != null)
                                  try
                                  {
-                                     await _engine.StrategyRepository.SaveHybridStrategyAsync(latestSnapshot);
+                                     await repo1.SaveHybridStrategyAsync(latestSnapshot);
                                  }
                                  catch (Exception saveEx)
                                  {
@@ -868,8 +879,10 @@ namespace Cognexalgo.UI.ViewModels
                 if (!string.IsNullOrEmpty(v2Id))
                 {
                     strategy.V2Id = v2Id;
-                    try { await _engine.StrategyRepository.SaveHybridStrategyAsync(strategy); }
-                    catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
+                    var repo2 = _engine?.StrategyRepository;
+                    if (repo2 != null)
+                        try { await repo2.SaveHybridStrategyAsync(strategy); }
+                        catch (Exception ex) { Log($"V2Id persist failed (non-fatal): {ex.Message}", "WARN"); }
                     Log($"V2 Strategy synced: {v2Id}");
                 }
                 else
@@ -942,10 +955,10 @@ namespace Cognexalgo.UI.ViewModels
         {
              if (parameter is not HybridStrategyConfig strategy) return;
 
-             var vm = new StrategyBuilderViewModel(_engine, () => 
+             var vm = new StrategyBuilderViewModel(_engine, async () =>
              {
                   // On Save Success
-                  LoadStrategies();
+                  await LoadStrategies();
                   Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w is Views.StrategyBuilderWindow)?.Close();
              });
              
@@ -1158,7 +1171,13 @@ namespace Cognexalgo.UI.ViewModels
         [RelayCommand]
         public async Task FetchOptionChain(string index = "NIFTY")
         {
-            if (_engine == null || _engine.DataService == null || _isFetchingOptionChain) return;
+            if (_engine is null)
+            {
+                Log("Engine is null — cannot fetch option chain", "WARN");
+                return;
+            }
+            if (_engine.DataService == null || _isFetchingOptionChain) return;
+            var dataService = _engine.DataService; // capture non-null for post-await accesses
 
             try
             {
@@ -1166,9 +1185,9 @@ namespace Cognexalgo.UI.ViewModels
                 var idx = string.IsNullOrEmpty(index) ? SelectedOptionIndex : index;
 
                 Log($"[OptionChain] === Starting for {idx} ===");
-                Log($"[OptionChain] Engine running: {_engine?.IsRunning}");
-                Log($"[OptionChain] JWT present: {!string.IsNullOrEmpty(_engine?.Api?.JwtToken)}");
-                Log($"[OptionChain] DataService null: {_engine?.DataService == null}");
+                Log($"[OptionChain] Engine running: {_engine.IsRunning}");
+                Log($"[OptionChain] JWT present: {!string.IsNullOrEmpty(_engine.Api?.JwtToken)}");
+                Log($"[OptionChain] DataService null: {_engine.DataService == null}");
 
                 // Auto-refresh Scrip Master if it is stale (new day / post-expiry)
                 bool stale = await _engine.TokenService.IsScripMasterStale();
@@ -1190,7 +1209,7 @@ namespace Cognexalgo.UI.ViewModels
                     }
                 }
 
-                var chain = await _engine.DataService.BuildOptionChainAsync(idx, "WEEKLY");
+                var chain = await dataService.BuildOptionChainAsync(idx, "WEEKLY");
 
                 Log($"[OptionChain] Raw chain count: {chain?.Count ?? 0}");
 
@@ -1209,7 +1228,7 @@ namespace Cognexalgo.UI.ViewModels
                     _            => LtpNifty
                 };
                 if (spot <= 0)
-                    spot = await _engine.DataService.GetSpotPriceAsync(idx);
+                    spot = await dataService.GetSpotPriceAsync(idx);
 
                 var greeksSvc = new GreeksService();
                 const double r = 0.067; // RBI repo rate ~6.7%
